@@ -3,5 +3,6 @@ node_modules/
 *.db
 .factory/
 .DS_Store
+.claude/
 dist/
 .vite/
