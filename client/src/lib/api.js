@@ -1,14 +1,22 @@
 const API_BASE = '/api';
 
 async function fetchApi(endpoint, options = {}) {
+  const token = localStorage.getItem('token');
   const response = await fetch(`${API_BASE}${endpoint}`, {
+    ...options,
     headers: {
       'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...options.headers,
     },
-    ...options,
   });
-  
+
+  if (response.status === 401) {
+    localStorage.removeItem('token');
+    window.location.href = '/login';
+    throw new Error('Session expired');
+  }
+
   if (!response.ok) {
     let errorMessage = `API error: ${response.statusText}`;
     try {
@@ -21,11 +29,11 @@ async function fetchApi(endpoint, options = {}) {
     }
     throw new Error(errorMessage);
   }
-  
+
   if (response.status === 204) {
     return null;
   }
-  
+
   return response.json();
 }
 
@@ -41,7 +49,7 @@ export const api = {
     complete: (id) => fetchApi(`/tasks/${id}/complete`, { method: 'POST' }),
     analyze: (id) => fetchApi(`/tasks/${id}/analyze`, { method: 'POST' }),
   },
-  
+
   projects: {
     getAll: () => fetchApi('/projects'),
     getById: (id) => fetchApi(`/projects/${id}`),
@@ -51,7 +59,7 @@ export const api = {
     breakdown: (id) => fetchApi(`/projects/${id}/breakdown`, { method: 'POST' }),
     applyBreakdown: (id, tasks) => fetchApi(`/projects/${id}/apply-breakdown`, { method: 'POST', body: JSON.stringify({ tasks }) }),
   },
-  
+
   ai: {
     processInbox: () => fetchApi('/ai/process-inbox', { method: 'POST' }),
     applyInboxProcessing: (items) => fetchApi('/ai/apply-inbox-processing', { method: 'POST', body: JSON.stringify({ items }) }),

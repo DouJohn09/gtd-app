@@ -6,7 +6,7 @@ const router = Router();
 
 router.get('/', (req, res) => {
   try {
-    const projects = ProjectModel.getAll();
+    const projects = ProjectModel.getAll(req.user.id);
     res.json(projects);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -15,7 +15,7 @@ router.get('/', (req, res) => {
 
 router.get('/:id', (req, res) => {
   try {
-    const project = ProjectModel.getById(req.params.id);
+    const project = ProjectModel.getById(req.params.id, req.user.id);
     if (!project) {
       return res.status(404).json({ error: 'Project not found' });
     }
@@ -27,7 +27,7 @@ router.get('/:id', (req, res) => {
 
 router.post('/', (req, res) => {
   try {
-    const project = ProjectModel.create(req.body);
+    const project = ProjectModel.create(req.body, req.user.id);
     res.status(201).json(project);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -36,7 +36,7 @@ router.post('/', (req, res) => {
 
 router.put('/:id', (req, res) => {
   try {
-    const project = ProjectModel.update(req.params.id, req.body);
+    const project = ProjectModel.update(req.params.id, req.body, req.user.id);
     if (!project) {
       return res.status(404).json({ error: 'Project not found' });
     }
@@ -48,7 +48,7 @@ router.put('/:id', (req, res) => {
 
 router.delete('/:id', (req, res) => {
   try {
-    ProjectModel.delete(req.params.id);
+    ProjectModel.delete(req.params.id, req.user.id);
     res.status(204).send();
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -57,7 +57,7 @@ router.delete('/:id', (req, res) => {
 
 router.post('/:id/breakdown', async (req, res) => {
   try {
-    const project = ProjectModel.getById(req.params.id);
+    const project = ProjectModel.getById(req.params.id, req.user.id);
     if (!project) {
       return res.status(404).json({ error: 'Project not found' });
     }
@@ -72,15 +72,15 @@ router.post('/:id/apply-breakdown', async (req, res) => {
   try {
     const { tasks } = req.body;
     const projectId = req.params.id;
-    
-    const createdTasks = tasks.map(task => 
+
+    const createdTasks = tasks.map(task =>
       TaskModel.create({
         ...task,
         project_id: projectId,
         list: 'next_actions'
-      })
+      }, req.user.id)
     );
-    
+
     res.json(createdTasks);
   } catch (error) {
     res.status(500).json({ error: error.message });
