@@ -45,6 +45,13 @@ if (process.env.NODE_ENV === 'production') {
 
 async function start() {
   await initDb();
+  console.log('ENV check:', {
+    NODE_ENV: process.env.NODE_ENV,
+    hasGoogleClientId: !!process.env.GOOGLE_CLIENT_ID,
+    hasJwtSecret: !!process.env.JWT_SECRET,
+    hasOpenaiKey: !!process.env.OPENAI_API_KEY,
+    hasDatabasePath: !!process.env.DATABASE_PATH,
+  });
   app.listen(PORT, () => {
     console.log(`GTD Server running on http://localhost:${PORT}`);
   });
