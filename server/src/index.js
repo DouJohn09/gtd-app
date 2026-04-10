@@ -29,6 +29,11 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// Expose Google Client ID to frontend (safe — this is a public value)
+app.get('/api/config', (req, res) => {
+  res.json({ googleClientId: process.env.GOOGLE_CLIENT_ID });
+});
+
 // Serve client build in production
 if (process.env.NODE_ENV === 'production') {
   const clientDistPath = join(__dirname, '../../client/dist');
