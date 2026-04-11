@@ -95,6 +95,35 @@ export async function initDb() {
   `);
   db.run(`CREATE UNIQUE INDEX IF NOT EXISTS idx_contexts_name_user ON contexts(name, user_id)`);
 
+  // Habits tables
+  db.run(`
+    CREATE TABLE IF NOT EXISTS habits (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      description TEXT,
+      frequency TEXT DEFAULT 'daily' CHECK(frequency IN ('daily', 'weekly', 'specific_days')),
+      target_days TEXT,
+      category TEXT,
+      color TEXT DEFAULT '#3b82f6',
+      user_id INTEGER REFERENCES users(id),
+      active INTEGER DEFAULT 1,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+  db.run(`CREATE INDEX IF NOT EXISTS idx_habits_user ON habits(user_id)`);
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS habit_logs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      habit_id INTEGER REFERENCES habits(id) ON DELETE CASCADE,
+      completed_date DATE NOT NULL,
+      user_id INTEGER REFERENCES users(id),
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+  db.run(`CREATE UNIQUE INDEX IF NOT EXISTS idx_habit_logs_unique ON habit_logs(habit_id, completed_date)`);
+  db.run(`CREATE INDEX IF NOT EXISTS idx_habit_logs_user_date ON habit_logs(user_id, completed_date)`);
+
   saveDb();
   return db;
 }

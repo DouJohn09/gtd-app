@@ -1,14 +1,15 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { 
-  Inbox, 
-  ListTodo, 
-  Clock, 
-  CloudSun, 
+import {
+  Inbox,
+  ListTodo,
+  Clock,
+  CloudSun,
   CheckCircle2,
   Target,
   Sparkles,
-  ArrowRight
+  ArrowRight,
+  Flame
 } from 'lucide-react';
 import { api } from '../lib/api';
 import QuickCapture from '../components/QuickCapture';
@@ -17,16 +18,19 @@ import TaskCard from '../components/TaskCard';
 export default function Dashboard() {
   const [stats, setStats] = useState(null);
   const [dailyFocus, setDailyFocus] = useState([]);
+  const [habits, setHabits] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const fetchData = async () => {
     try {
-      const [statsData, focusData] = await Promise.all([
+      const [statsData, focusData, habitsData] = await Promise.all([
         api.tasks.getStats(),
-        api.tasks.getDailyFocus()
+        api.tasks.getDailyFocus(),
+        api.habits.getAll()
       ]);
       setStats(statsData);
       setDailyFocus(focusData);
+      setHabits(habitsData);
     } catch (error) {
       console.error('Failed to fetch dashboard data:', error);
     } finally {
@@ -88,6 +92,56 @@ export default function Dashboard() {
         ))}
       </div>
       
+      {habits.length > 0 && (
+        <div className="gtd-card mb-6">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="font-semibold flex items-center gap-2">
+              <Target className="w-5 h-5 text-blue-600" />
+              Today's Habits
+            </h2>
+            <Link to="/habits" className="text-sm text-blue-600 hover:underline flex items-center gap-1">
+              View all <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+          </div>
+          <div className="flex items-center gap-2 mb-3">
+            <div className="flex-1 bg-gray-200 rounded-full h-2">
+              <div
+                className="bg-green-500 h-2 rounded-full transition-all"
+                style={{ width: `${habits.length > 0 ? (habits.filter(h => h.completed_today).length / habits.length) * 100 : 0}%` }}
+              />
+            </div>
+            <span className="text-sm text-gray-500 font-medium">
+              {habits.filter(h => h.completed_today).length}/{habits.length}
+            </span>
+          </div>
+          <div className="space-y-1.5">
+            {habits.map(h => (
+              <button
+                key={h.id}
+                onClick={async () => {
+                  await api.habits.toggle(h.id);
+                  fetchData();
+                }}
+                className="flex items-center gap-2.5 w-full text-left py-1 hover:bg-gray-50 rounded px-1 -mx-1"
+              >
+                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
+                  h.completed_today ? 'border-green-500 bg-green-500' : 'border-gray-300'
+                }`}>
+                  {h.completed_today && (
+                    <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                    </svg>
+                  )}
+                </div>
+                <span className={`text-sm ${h.completed_today ? 'text-gray-400 line-through' : 'text-gray-700'}`}>
+                  {h.name}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="grid md:grid-cols-2 gap-6">
         <div className="gtd-card">
           <div className="flex items-center justify-between mb-4">

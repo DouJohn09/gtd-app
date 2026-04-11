@@ -66,6 +66,15 @@ export const api = {
     delete: (id) => fetchApi(`/contexts/${id}`, { method: 'DELETE' }),
   },
 
+  habits: {
+    getAll: () => fetchApi('/habits'),
+    getStats: () => fetchApi('/habits/stats'),
+    create: (habit) => fetchApi('/habits', { method: 'POST', body: JSON.stringify(habit) }),
+    update: (id, updates) => fetchApi(`/habits/${id}`, { method: 'PUT', body: JSON.stringify(updates) }),
+    delete: (id) => fetchApi(`/habits/${id}`, { method: 'DELETE' }),
+    toggle: (id, date) => fetchApi(`/habits/${id}/toggle`, { method: 'POST', body: JSON.stringify({ date }) }),
+  },
+
   ai: {
     processInbox: () => fetchApi('/ai/process-inbox', { method: 'POST' }),
     applyInboxProcessing: (items) => fetchApi('/ai/apply-inbox-processing', { method: 'POST', body: JSON.stringify({ items }) }),

@@ -7,6 +7,7 @@ import {
   Clock,
   Sparkles,
   CloudSun,
+  Target,
   LogOut
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
@@ -18,6 +19,7 @@ const navItems = [
   { to: '/lists/next_actions', icon: ListTodo, label: 'Next Actions' },
   { to: '/lists/waiting_for', icon: Clock, label: 'Waiting For' },
   { to: '/lists/someday_maybe', icon: CloudSun, label: 'Someday/Maybe' },
+  { to: '/habits', icon: Target, label: 'Habits' },
   { to: '/ai', icon: Sparkles, label: 'AI Assistant' },
 ];
 

@@ -6,6 +6,7 @@ import Inbox from './pages/Inbox';
 import Projects from './pages/Projects';
 import Lists from './pages/Lists';
 import AIAssistant from './pages/AIAssistant';
+import Habits from './pages/Habits';
 import Login from './pages/Login';
 
 function ProtectedRoute({ children }) {
@@ -27,6 +28,7 @@ export default function App() {
         <Route path="inbox" element={<Inbox />} />
         <Route path="projects" element={<Projects />} />
         <Route path="lists/:list" element={<Lists />} />
+        <Route path="habits" element={<Habits />} />
         <Route path="ai" element={<AIAssistant />} />
       </Route>
     </Routes>
