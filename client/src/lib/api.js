@@ -60,6 +60,12 @@ export const api = {
     applyBreakdown: (id, tasks) => fetchApi(`/projects/${id}/apply-breakdown`, { method: 'POST', body: JSON.stringify({ tasks }) }),
   },
 
+  contexts: {
+    getAll: () => fetchApi('/contexts'),
+    create: (name) => fetchApi('/contexts', { method: 'POST', body: JSON.stringify({ name }) }),
+    delete: (id) => fetchApi(`/contexts/${id}`, { method: 'DELETE' }),
+  },
+
   ai: {
     processInbox: () => fetchApi('/ai/process-inbox', { method: 'POST' }),
     applyInboxProcessing: (items) => fetchApi('/ai/apply-inbox-processing', { method: 'POST', body: JSON.stringify({ items }) }),

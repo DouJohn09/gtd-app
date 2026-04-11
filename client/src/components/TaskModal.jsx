@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, AlertCircle } from 'lucide-react';
+import { X, AlertCircle, Plus } from 'lucide-react';
 import { api } from '../lib/api';
 import { useToast } from './Toast';
 
@@ -10,7 +10,6 @@ const lists = [
   { value: 'someday_maybe', label: 'Someday/Maybe' },
 ];
 
-const contexts = ['@home', '@work', '@errands', '@computer', '@phone', '@anywhere'];
 const energyLevels = ['low', 'medium', 'high'];
 
 export default function TaskModal({ task, projects, onClose, onSave }) {
@@ -29,6 +28,13 @@ export default function TaskModal({ task, projects, onClose, onSave }) {
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [contexts, setContexts] = useState([]);
+  const [addingContext, setAddingContext] = useState(false);
+  const [newContextName, setNewContextName] = useState('');
+
+  useEffect(() => {
+    api.contexts.getAll().then(setContexts).catch(console.error);
+  }, []);
 
   useEffect(() => {
     if (task) {
@@ -47,13 +53,25 @@ export default function TaskModal({ task, projects, onClose, onSave }) {
     }
   }, [task]);
 
+  const handleAddContext = async () => {
+    if (!newContextName.trim()) return;
+    try {
+      const created = await api.contexts.create(newContextName);
+      setContexts([...contexts, created]);
+      setForm({ ...form, context: created.name });
+      setNewContextName('');
+      setAddingContext(false);
+    } catch (err) {
+      addToast(err.message, 'error');
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError(null);
     setLoading(true);
-    
+
     try {
-      // Clean the data - convert empty strings to null for optional fields
       const data = {
         title: form.title.trim(),
         notes: form.notes.trim() || null,
@@ -66,7 +84,7 @@ export default function TaskModal({ task, projects, onClose, onSave }) {
         time_estimate: form.time_estimate ? parseInt(form.time_estimate) : null,
         is_daily_focus: form.is_daily_focus ? 1 : 0,
       };
-      
+
       if (task?.id) {
         await api.tasks.update(task.id, data);
         addToast('Task updated successfully', 'success');
@@ -95,7 +113,7 @@ export default function TaskModal({ task, projects, onClose, onSave }) {
             <X className="w-5 h-5" />
           </button>
         </div>
-        
+
         <form onSubmit={handleSubmit} className="p-4 space-y-4">
           {error && (
             <div className="bg-red-50 border border-red-200 rounded-lg p-3 flex items-start gap-2">
@@ -103,7 +121,7 @@ export default function TaskModal({ task, projects, onClose, onSave }) {
               <p className="text-sm text-red-700">{error}</p>
             </div>
           )}
-          
+
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Title *</label>
             <input
@@ -115,7 +133,7 @@ export default function TaskModal({ task, projects, onClose, onSave }) {
               autoFocus
             />
           </div>
-          
+
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
             <textarea
@@ -125,7 +143,7 @@ export default function TaskModal({ task, projects, onClose, onSave }) {
               placeholder="Additional details..."
             />
           </div>
-          
+
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">List *</label>
@@ -139,22 +157,49 @@ export default function TaskModal({ task, projects, onClose, onSave }) {
                 ))}
               </select>
             </div>
-            
+
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Context</label>
-              <select
-                value={form.context}
-                onChange={(e) => setForm({ ...form, context: e.target.value })}
-                className="gtd-input"
-              >
-                <option value="">No context</option>
-                {contexts.map(c => (
-                  <option key={c} value={c}>{c}</option>
-                ))}
-              </select>
+              {addingContext ? (
+                <div className="flex gap-1">
+                  <input
+                    type="text"
+                    value={newContextName}
+                    onChange={(e) => setNewContextName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') { e.preventDefault(); handleAddContext(); }
+                      if (e.key === 'Escape') setAddingContext(false);
+                    }}
+                    className="gtd-input flex-1"
+                    placeholder="@context"
+                    autoFocus
+                  />
+                  <button type="button" onClick={handleAddContext} className="gtd-btn gtd-btn-primary px-2">
+                    <Plus className="w-4 h-4" />
+                  </button>
+                </div>
+              ) : (
+                <select
+                  value={form.context}
+                  onChange={(e) => {
+                    if (e.target.value === '__add_new__') {
+                      setAddingContext(true);
+                    } else {
+                      setForm({ ...form, context: e.target.value });
+                    }
+                  }}
+                  className="gtd-input"
+                >
+                  <option value="">No context</option>
+                  {contexts.map(c => (
+                    <option key={c.id} value={c.name}>{c.name}</option>
+                  ))}
+                  <option value="__add_new__">+ Add new context...</option>
+                </select>
+              )}
             </div>
           </div>
-          
+
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Project</label>
             <select
@@ -168,7 +213,7 @@ export default function TaskModal({ task, projects, onClose, onSave }) {
               ))}
             </select>
           </div>
-          
+
           {form.list === 'waiting_for' && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Waiting For (Person)</label>
@@ -181,7 +226,7 @@ export default function TaskModal({ task, projects, onClose, onSave }) {
               />
             </div>
           )}
-          
+
           <div className="grid grid-cols-3 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Energy</label>
@@ -196,7 +241,7 @@ export default function TaskModal({ task, projects, onClose, onSave }) {
                 ))}
               </select>
             </div>
-            
+
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Time (min)</label>
               <input
@@ -208,7 +253,7 @@ export default function TaskModal({ task, projects, onClose, onSave }) {
                 placeholder="30"
               />
             </div>
-            
+
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Due Date</label>
               <input
@@ -219,7 +264,7 @@ export default function TaskModal({ task, projects, onClose, onSave }) {
               />
             </div>
           </div>
-          
+
           <div className="flex items-center gap-2">
             <input
               type="checkbox"
@@ -232,7 +277,7 @@ export default function TaskModal({ task, projects, onClose, onSave }) {
               Add to today's focus
             </label>
           </div>
-          
+
           <div className="flex gap-2 pt-4 border-t">
             <button
               type="button"

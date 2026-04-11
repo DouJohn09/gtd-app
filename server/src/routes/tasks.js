@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { TaskModel } from '../db/models.js';
+import { getDb } from '../db/schema.js';
 import { analyzeTask } from '../services/ai.js';
 
 const router = Router();
@@ -92,7 +93,14 @@ router.post('/:id/analyze', async (req, res) => {
     if (!task) {
       return res.status(404).json({ error: 'Task not found' });
     }
-    const analysis = await analyzeTask(task);
+    const db = getDb();
+    const ctxStmt = db.prepare('SELECT name FROM contexts WHERE user_id = ? ORDER BY name');
+    ctxStmt.bind([req.user.id]);
+    const userContexts = [];
+    while (ctxStmt.step()) userContexts.push(ctxStmt.getAsObject());
+    ctxStmt.free();
+
+    const analysis = await analyzeTask(task, userContexts);
     res.json(analysis);
   } catch (error) {
     res.status(500).json({ error: error.message });

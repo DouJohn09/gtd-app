@@ -1,6 +1,17 @@
 import { Router } from 'express';
 import { TaskModel } from '../db/models.js';
+import { getDb } from '../db/schema.js';
 import { processInbox, getDailyPriorities } from '../services/ai.js';
+
+function getUserContexts(userId) {
+  const db = getDb();
+  const stmt = db.prepare('SELECT name FROM contexts WHERE user_id = ? ORDER BY name');
+  stmt.bind([userId]);
+  const results = [];
+  while (stmt.step()) results.push(stmt.getAsObject());
+  stmt.free();
+  return results;
+}
 
 const router = Router();
 
@@ -11,7 +22,8 @@ router.post('/process-inbox', async (req, res) => {
       return res.json({ message: 'Inbox is empty', processed_items: [] });
     }
 
-    const result = await processInbox(inboxTasks);
+    const userContexts = getUserContexts(req.user.id);
+    const result = await processInbox(inboxTasks, userContexts);
     if (!result) {
       return res.status(500).json({ error: 'AI processing failed' });
     }
@@ -58,7 +70,8 @@ router.post('/daily-priorities', async (req, res) => {
       });
     }
 
-    const result = await getDailyPriorities(nextActions, stats);
+    const userContexts = getUserContexts(req.user.id);
+    const result = await getDailyPriorities(nextActions, stats, userContexts);
     if (!result) {
       return res.status(500).json({ error: 'AI processing failed' });
     }

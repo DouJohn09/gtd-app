@@ -9,6 +9,7 @@ import authRouter from './routes/auth.js';
 import tasksRouter from './routes/tasks.js';
 import projectsRouter from './routes/projects.js';
 import aiRouter from './routes/ai.js';
+import contextsRouter from './routes/contexts.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -24,6 +25,7 @@ app.use('/api/auth', authRouter);
 app.use('/api/tasks', requireAuth, tasksRouter);
 app.use('/api/projects', requireAuth, projectsRouter);
 app.use('/api/ai', requireAuth, aiRouter);
+app.use('/api/contexts', requireAuth, contextsRouter);
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });

@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { ProjectModel, TaskModel } from '../db/models.js';
+import { getDb } from '../db/schema.js';
 import { suggestProjectBreakdown } from '../services/ai.js';
 
 const router = Router();
@@ -61,7 +62,14 @@ router.post('/:id/breakdown', async (req, res) => {
     if (!project) {
       return res.status(404).json({ error: 'Project not found' });
     }
-    const breakdown = await suggestProjectBreakdown(project);
+    const db = getDb();
+    const ctxStmt = db.prepare('SELECT name FROM contexts WHERE user_id = ? ORDER BY name');
+    ctxStmt.bind([req.user.id]);
+    const userContexts = [];
+    while (ctxStmt.step()) userContexts.push(ctxStmt.getAsObject());
+    ctxStmt.free();
+
+    const breakdown = await suggestProjectBreakdown(project, userContexts);
     res.json(breakdown);
   } catch (error) {
     res.status(500).json({ error: error.message });

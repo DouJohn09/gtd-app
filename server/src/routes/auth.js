@@ -27,12 +27,27 @@ router.post('/google', async (req, res) => {
       stmt.free();
       db.run('UPDATE users SET last_login = CURRENT_TIMESTAMP, name = ?, picture = ? WHERE id = ?',
         [name, picture, user.id]);
+
+      // Seed default contexts for existing users who don't have any
+      const ctxCount = db.exec(`SELECT COUNT(*) FROM contexts WHERE user_id = ${user.id}`);
+      if (ctxCount[0]?.values[0][0] === 0) {
+        const defaultContexts = ['@home', '@work', '@errands', '@computer', '@phone', '@anywhere'];
+        for (const ctx of defaultContexts) {
+          db.run('INSERT INTO contexts (name, user_id) VALUES (?, ?)', [ctx, user.id]);
+        }
+      }
     } else {
       stmt.free();
       db.run('INSERT INTO users (google_id, email, name, picture) VALUES (?, ?, ?, ?)',
         [googleId, email, name, picture]);
       const id = db.exec("SELECT last_insert_rowid() as id")[0].values[0][0];
       user = { id, google_id: googleId, email, name, picture };
+
+      // Seed default contexts for new user
+      const defaultContexts = ['@home', '@work', '@errands', '@computer', '@phone', '@anywhere'];
+      for (const ctx of defaultContexts) {
+        db.run('INSERT INTO contexts (name, user_id) VALUES (?, ?)', [ctx, id]);
+      }
     }
     saveDb();
 

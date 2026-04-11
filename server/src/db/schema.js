@@ -84,6 +84,17 @@ export async function initDb() {
   db.run(`CREATE INDEX IF NOT EXISTS idx_tasks_user ON tasks(user_id)`);
   db.run(`CREATE INDEX IF NOT EXISTS idx_projects_user ON projects(user_id)`);
 
+  // Contexts table
+  db.run(`
+    CREATE TABLE IF NOT EXISTS contexts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      user_id INTEGER REFERENCES users(id),
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+  db.run(`CREATE UNIQUE INDEX IF NOT EXISTS idx_contexts_name_user ON contexts(name, user_id)`);
+
   saveDb();
   return db;
 }

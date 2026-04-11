@@ -7,7 +7,12 @@ if (process.env.OPENAI_API_KEY) {
   });
 }
 
-const GTD_SYSTEM_PROMPT = `You are a GTD (Getting Things Done) productivity assistant based on David Allen's methodology. 
+function getSystemPrompt(userContexts) {
+  const contextList = userContexts?.length
+    ? userContexts.map(c => c.name || c).join(', ')
+    : '@home, @work, @errands, @computer, @phone, @anywhere';
+
+  return `You are a GTD (Getting Things Done) productivity assistant based on David Allen's methodology.
 Your role is to help users process, organize, and clarify their tasks and projects.
 
 GTD Lists:
@@ -17,7 +22,7 @@ GTD Lists:
 - someday_maybe: Ideas and tasks for potential future action
 
 Contexts (optional tags for next_actions):
-@home, @work, @errands, @computer, @phone, @anywhere
+${contextList}
 
 When analyzing tasks:
 1. Check if it's actionable - if not, it goes to someday_maybe or trash
@@ -27,18 +32,22 @@ When analyzing tasks:
 5. Identify if task is clear enough or needs clarification
 
 Always respond in JSON format as specified in each request.`;
+}
 
-export async function analyzeTask(task) {
+export async function analyzeTask(task, userContexts) {
   if (!openai) return { error: 'OpenAI API key not configured' };
+  const contextOptions = userContexts?.length
+    ? userContexts.map(c => c.name || c).join('|')
+    : '@home|@work|@errands|@computer|@phone|@anywhere';
   try {
     const response = await openai.chat.completions.create({
       model: 'gpt-4o',
       messages: [
-        { role: 'system', content: GTD_SYSTEM_PROMPT },
-        { 
-          role: 'user', 
+        { role: 'system', content: getSystemPrompt(userContexts) },
+        {
+          role: 'user',
           content: `Analyze this task and provide GTD recommendations:
-          
+
 Task: "${task.title}"
 ${task.notes ? `Notes: "${task.notes}"` : ''}
 
@@ -47,7 +56,7 @@ Respond with JSON:
   "recommended_list": "inbox|next_actions|waiting_for|someday_maybe",
   "is_actionable": boolean,
   "is_project": boolean,
-  "suggested_context": "@home|@work|@errands|@computer|@phone|@anywhere|null",
+  "suggested_context": "${contextOptions}|null",
   "energy_level": "low|medium|high",
   "time_estimate_minutes": number,
   "clarification_needed": boolean,
@@ -68,17 +77,20 @@ Respond with JSON:
   }
 }
 
-export async function suggestProjectBreakdown(project) {
+export async function suggestProjectBreakdown(project, userContexts) {
   if (!openai) return { error: 'OpenAI API key not configured' };
+  const contextOptions = userContexts?.length
+    ? userContexts.map(c => c.name || c).join('|')
+    : '@home|@work|@errands|@computer|@phone|@anywhere';
   try {
     const response = await openai.chat.completions.create({
       model: 'gpt-4o',
       messages: [
-        { role: 'system', content: GTD_SYSTEM_PROMPT },
-        { 
-          role: 'user', 
+        { role: 'system', content: getSystemPrompt(userContexts) },
+        {
+          role: 'user',
           content: `Break down this project into actionable next actions:
-          
+
 Project: "${project.name}"
 ${project.description ? `Description: "${project.description}"` : ''}
 ${project.outcome ? `Desired Outcome: "${project.outcome}"` : ''}
@@ -89,7 +101,7 @@ Respond with JSON:
   "next_actions": [
     {
       "title": "action-oriented task title starting with verb",
-      "context": "@home|@work|@errands|@computer|@phone|@anywhere",
+      "context": "${contextOptions}",
       "energy_level": "low|medium|high",
       "time_estimate_minutes": number,
       "order": number
@@ -110,17 +122,20 @@ Respond with JSON:
   }
 }
 
-export async function processInbox(tasks) {
+export async function processInbox(tasks, userContexts) {
   if (!openai) return { error: 'OpenAI API key not configured' };
+  const contextOptions = userContexts?.length
+    ? userContexts.map(c => c.name || c).join('|')
+    : '@home|@work|@errands|@computer|@phone|@anywhere';
   try {
     const taskList = tasks.map((t, i) => `${i + 1}. "${t.title}"${t.notes ? ` (Notes: ${t.notes})` : ''}`).join('\n');
-    
+
     const response = await openai.chat.completions.create({
       model: 'gpt-4o',
       messages: [
-        { role: 'system', content: GTD_SYSTEM_PROMPT },
-        { 
-          role: 'user', 
+        { role: 'system', content: getSystemPrompt(userContexts) },
+        {
+          role: 'user',
           content: `Process these inbox items and categorize them:
 
 ${taskList}
@@ -133,7 +148,7 @@ For each item, respond with JSON:
       "recommended_list": "next_actions|waiting_for|someday_maybe",
       "is_project": boolean,
       "suggested_title": "improved title if needed",
-      "context": "@home|@work|@errands|@computer|@phone|@anywhere|null",
+      "context": "${contextOptions}|null",
       "priority": 1-5,
       "reasoning": "brief explanation"
     }
@@ -152,7 +167,7 @@ For each item, respond with JSON:
   }
 }
 
-export async function getDailyPriorities(tasks, stats) {
+export async function getDailyPriorities(tasks, stats, userContexts) {
   if (!openai) return { error: 'OpenAI API key not configured' };
   try {
     const taskList = tasks.map((t, i) => 
@@ -162,9 +177,9 @@ export async function getDailyPriorities(tasks, stats) {
     const response = await openai.chat.completions.create({
       model: 'gpt-4o',
       messages: [
-        { role: 'system', content: GTD_SYSTEM_PROMPT },
-        { 
-          role: 'user', 
+        { role: 'system', content: getSystemPrompt(userContexts) },
+        {
+          role: 'user',
           content: `Given these next actions, suggest which should be the daily focus (max 5-7 items for a productive day):
 
 Current Stats:
