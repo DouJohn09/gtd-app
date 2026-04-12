@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Outlet, NavLink } from 'react-router-dom';
 import {
   LayoutDashboard,
@@ -8,7 +9,9 @@ import {
   Sparkles,
   CloudSun,
   Target,
-  LogOut
+  LogOut,
+  Menu,
+  X
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -25,24 +28,53 @@ const navItems = [
 
 export default function Layout() {
   const { user, logout } = useAuth();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
-    <div className="min-h-screen flex">
-      <aside className="w-64 bg-gray-900 text-white flex flex-col">
-        <div className="p-4 border-b border-gray-700">
+    <div className="min-h-screen flex flex-col md:flex-row">
+      {/* Mobile top bar */}
+      <div className="md:hidden flex items-center justify-between bg-gray-900 text-white px-4 py-3">
+        <button onClick={() => setSidebarOpen(true)} className="p-1">
+          <Menu className="w-6 h-6" />
+        </button>
+        <h1 className="text-lg font-bold flex items-center gap-2">
+          <ListTodo className="w-5 h-5" />
+          GTD Flow
+        </h1>
+        <div className="w-6" />
+      </div>
+
+      {/* Backdrop */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 z-40 md:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
+      {/* Sidebar */}
+      <aside className={`
+        fixed inset-y-0 left-0 z-50 w-64 bg-gray-900 text-white flex flex-col transform transition-transform duration-200 ease-in-out
+        ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+        md:translate-x-0 md:static md:z-auto
+      `}>
+        <div className="p-4 border-b border-gray-700 flex items-center justify-between">
           <h1 className="text-xl font-bold flex items-center gap-2">
             <ListTodo className="w-6 h-6" />
             GTD Flow
           </h1>
-          <p className="text-gray-400 text-sm mt-1">Getting Things Done</p>
+          <button onClick={() => setSidebarOpen(false)} className="md:hidden p-1 text-gray-400 hover:text-white">
+            <X className="w-5 h-5" />
+          </button>
         </div>
 
-        <nav className="flex-1 p-4">
+        <nav className="flex-1 p-4 overflow-y-auto">
           <ul className="space-y-1">
             {navItems.map(({ to, icon: Icon, label }) => (
               <li key={to}>
                 <NavLink
                   to={to}
+                  onClick={() => setSidebarOpen(false)}
                   className={({ isActive }) =>
                     `flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${
                       isActive

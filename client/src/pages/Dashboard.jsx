@@ -63,7 +63,7 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="p-8 max-w-6xl mx-auto">
+    <div className="p-4 md:p-8 max-w-6xl mx-auto">
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
         <p className="text-gray-500 mt-1">Your GTD command center</p>
@@ -74,7 +74,7 @@ export default function Dashboard() {
         <QuickCapture onCapture={fetchData} />
       </div>
       
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-8">
         {statCards.map(({ label, value, icon: Icon, color, link }) => (
           <Link
             key={label}

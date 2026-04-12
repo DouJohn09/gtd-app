@@ -95,7 +95,7 @@ export default function Habits() {
   }
 
   return (
-    <div className="p-8 max-w-5xl mx-auto">
+    <div className="p-4 md:p-8 max-w-5xl mx-auto">
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">
@@ -148,7 +148,7 @@ export default function Habits() {
                 <TrendingUp className="w-5 h-5 text-green-600" />
                 Stats (Last 30 Days)
               </h2>
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
                 {stats.habits.map(h => (
                   <div key={h.id} className="gtd-card">
                     <div className="flex items-center gap-2 mb-2">

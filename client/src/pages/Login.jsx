@@ -10,7 +10,7 @@ export default function Login() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <div className="bg-white rounded-xl shadow-lg p-8 max-w-sm w-full text-center">
+      <div className="bg-white rounded-xl shadow-lg p-8 max-w-sm w-full mx-4 sm:mx-auto text-center">
         <ListTodo className="w-12 h-12 text-blue-600 mx-auto mb-4" />
         <h1 className="text-2xl font-bold mb-2">GTD Flow</h1>
         <p className="text-gray-500 mb-6">Sign in to get things done</p>

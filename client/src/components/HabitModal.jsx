@@ -60,7 +60,7 @@ export default function HabitModal({ habit, onClose, onSave }) {
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={onClose}>
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-md" onClick={e => e.stopPropagation()}>
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-md mx-4 sm:mx-auto max-h-[90vh] overflow-auto" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between p-4 border-b">
           <h2 className="text-lg font-semibold">
             {habit?.id ? 'Edit Habit' : 'New Habit'}
@@ -95,7 +95,7 @@ export default function HabitModal({ habit, onClose, onSave }) {
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Frequency</label>
               <select
@@ -124,7 +124,7 @@ export default function HabitModal({ habit, onClose, onSave }) {
           {form.frequency === 'specific_days' && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Which days?</label>
-              <div className="flex gap-1">
+              <div className="flex flex-wrap gap-1">
                 {DAYS.map(d => (
                   <button
                     key={d.value}
@@ -159,7 +159,7 @@ export default function HabitModal({ habit, onClose, onSave }) {
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Color</label>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               {COLORS.map(c => (
                 <button
                   key={c}

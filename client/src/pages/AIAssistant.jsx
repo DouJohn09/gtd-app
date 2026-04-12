@@ -60,7 +60,7 @@ export default function AIAssistant() {
   };
 
   return (
-    <div className="p-8 max-w-4xl mx-auto">
+    <div className="p-4 md:p-8 max-w-4xl mx-auto">
       <div className="mb-8">
         <h1 className="text-2xl font-bold flex items-center gap-3">
           <Sparkles className="w-8 h-8 text-purple-500" />
