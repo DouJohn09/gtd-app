@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Inbox as InboxIcon, Sparkles, Trash2 } from 'lucide-react';
 import { api } from '../lib/api';
 import QuickCapture from '../components/QuickCapture';
 import TaskCard from '../components/TaskCard';
 import TaskModal from '../components/TaskModal';
+import SortDropdown, { sortTasks } from '../components/SortDropdown';
 
 export default function Inbox() {
   const [tasks, setTasks] = useState([]);
@@ -11,6 +12,7 @@ export default function Inbox() {
   const [loading, setLoading] = useState(true);
   const [editingTask, setEditingTask] = useState(null);
   const [showModal, setShowModal] = useState(false);
+  const [sortBy, setSortBy] = useState('date_added_newest');
 
   const fetchData = async () => {
     try {
@@ -47,6 +49,8 @@ export default function Inbox() {
       fetchData();
     }
   };
+
+  const sortedTasks = useMemo(() => sortTasks(tasks, sortBy), [tasks, sortBy]);
 
   return (
     <div className="p-4 md:p-8 max-w-4xl mx-auto">
@@ -90,10 +94,11 @@ export default function Inbox() {
       ) : (
         <div className="space-y-3">
           <div className="flex items-center justify-between text-sm text-gray-500 dark:text-gray-400 px-2">
-            <span>{tasks.length} items to process</span>
+            <span>{sortedTasks.length} items to process</span>
+            <SortDropdown value={sortBy} onChange={setSortBy} />
           </div>
-          
-          {tasks.map(task => (
+
+          {sortedTasks.map(task => (
             <div key={task.id} className="group relative">
               <TaskCard 
                 task={task} 
