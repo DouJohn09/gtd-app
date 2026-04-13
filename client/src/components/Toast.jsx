@@ -46,16 +46,16 @@ function Toast({ toast, onClose }) {
   };
 
   const bgColors = {
-    success: 'bg-green-50 border-green-200',
-    error: 'bg-red-50 border-red-200',
-    warning: 'bg-yellow-50 border-yellow-200',
+    success: 'bg-green-50 border-green-200 dark:bg-green-900/30 dark:border-green-800',
+    error: 'bg-red-50 border-red-200 dark:bg-red-900/30 dark:border-red-800',
+    warning: 'bg-yellow-50 border-yellow-200 dark:bg-yellow-900/30 dark:border-yellow-800',
   };
 
   return (
     <div className={`flex items-center gap-3 px-4 py-3 rounded-lg border shadow-lg ${bgColors[toast.type]} animate-slide-in`}>
       {icons[toast.type]}
-      <span className="text-sm font-medium text-gray-800">{toast.message}</span>
-      <button onClick={onClose} className="text-gray-400 hover:text-gray-600 ml-2">
+      <span className="text-sm font-medium text-gray-800 dark:text-gray-200">{toast.message}</span>
+      <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 ml-2">
         <X className="w-4 h-4" />
       </button>
     </div>

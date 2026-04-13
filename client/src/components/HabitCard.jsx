@@ -8,7 +8,7 @@ export default function HabitCard({ habit, onToggle, onEdit, onDelete }) {
         className={`w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
           habit.completed_today
             ? 'border-green-500 bg-green-500 text-white'
-            : 'border-gray-300 hover:border-green-400'
+            : 'border-gray-300 dark:border-gray-600 hover:border-green-400'
         }`}
       >
         {habit.completed_today && (
@@ -21,7 +21,7 @@ export default function HabitCard({ habit, onToggle, onEdit, onDelete }) {
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
           <span
-            className={`font-medium ${habit.completed_today ? 'text-gray-400 line-through' : 'text-gray-900'}`}
+            className={`font-medium ${habit.completed_today ? 'text-gray-400 dark:text-gray-500 line-through' : 'text-gray-900 dark:text-gray-100'}`}
           >
             {habit.name}
           </span>
@@ -35,7 +35,7 @@ export default function HabitCard({ habit, onToggle, onEdit, onDelete }) {
           )}
         </div>
         {habit.description && (
-          <p className="text-sm text-gray-500 truncate">{habit.description}</p>
+          <p className="text-sm text-gray-500 dark:text-gray-400 truncate">{habit.description}</p>
         )}
       </div>
 
@@ -47,7 +47,7 @@ export default function HabitCard({ habit, onToggle, onEdit, onDelete }) {
       )}
 
       <div className="flex items-center gap-1 flex-shrink-0">
-        <button onClick={() => onEdit(habit)} className="text-gray-400 hover:text-gray-600 p-1">
+        <button onClick={() => onEdit(habit)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 p-1">
           <Pencil className="w-3.5 h-3.5" />
         </button>
         <button onClick={() => onDelete(habit.id)} className="text-gray-400 hover:text-red-500 p-1">

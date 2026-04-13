@@ -11,9 +11,12 @@ import {
   Target,
   LogOut,
   Menu,
-  X
+  X,
+  Moon,
+  Sun
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import useTheme from '../hooks/useTheme';
 
 const navItems = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
@@ -29,6 +32,7 @@ const navItems = [
 export default function Layout() {
   const { user, logout } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { isDark, toggleTheme } = useTheme();
 
   return (
     <div className="min-h-screen flex flex-col md:flex-row">
@@ -41,7 +45,9 @@ export default function Layout() {
           <ListTodo className="w-5 h-5" />
           GTD Flow
         </h1>
-        <div className="w-6" />
+        <button onClick={toggleTheme} className="p-1">
+          {isDark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+        </button>
       </div>
 
       {/* Backdrop */}
@@ -98,6 +104,9 @@ export default function Layout() {
               <div className="text-sm text-white truncate">{user?.name}</div>
               <div className="text-xs text-gray-400 truncate">{user?.email}</div>
             </div>
+            <button onClick={toggleTheme} className="text-gray-400 hover:text-white" title={isDark ? 'Light mode' : 'Dark mode'}>
+              {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+            </button>
             <button onClick={logout} className="text-gray-400 hover:text-white" title="Sign out">
               <LogOut className="w-4 h-4" />
             </button>

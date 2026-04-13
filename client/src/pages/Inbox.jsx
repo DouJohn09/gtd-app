@@ -55,7 +55,7 @@ export default function Inbox() {
           <InboxIcon className="w-8 h-8 text-yellow-500" />
           Inbox
         </h1>
-        <p className="text-gray-500 mt-1">
+        <p className="text-gray-500 dark:text-gray-400 mt-1">
           Capture everything, process later. Get it out of your head!
         </p>
       </div>
@@ -64,12 +64,12 @@ export default function Inbox() {
         <QuickCapture onCapture={fetchData} />
       </div>
       
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+      <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-6">
         <div className="flex items-start gap-3">
           <Sparkles className="w-5 h-5 text-blue-600 mt-0.5" />
           <div>
-            <h3 className="font-medium text-blue-900">GTD Tip: Processing Inbox</h3>
-            <p className="text-sm text-blue-700 mt-1">
+            <h3 className="font-medium text-blue-900 dark:text-blue-300">GTD Tip: Processing Inbox</h3>
+            <p className="text-sm text-blue-700 dark:text-blue-400 mt-1">
               For each item ask: Is it actionable? If yes, what's the next action? 
               If it takes less than 2 minutes, do it now. Otherwise, delegate it or defer it to Next Actions.
             </p>
@@ -89,7 +89,7 @@ export default function Inbox() {
         </div>
       ) : (
         <div className="space-y-3">
-          <div className="flex items-center justify-between text-sm text-gray-500 px-2">
+          <div className="flex items-center justify-between text-sm text-gray-500 dark:text-gray-400 px-2">
             <span>{tasks.length} items to process</span>
           </div>
           

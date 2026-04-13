@@ -104,26 +104,26 @@ export default function TaskModal({ task, projects, onClose, onSave }) {
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={onClose}>
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-auto mx-4 sm:mx-auto" onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between p-4 border-b">
+      <div className="bg-white dark:bg-gray-900 rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-auto mx-4 sm:mx-auto" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between p-4 border-b dark:border-gray-700">
           <h2 className="text-lg font-semibold">
             {task?.id ? 'Edit Task' : 'New Task'}
           </h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
             <X className="w-5 h-5" />
           </button>
         </div>
 
         <form onSubmit={handleSubmit} className="p-4 space-y-4">
           {error && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-3 flex items-start gap-2">
+            <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg p-3 flex items-start gap-2">
               <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
-              <p className="text-sm text-red-700">{error}</p>
+              <p className="text-sm text-red-700 dark:text-red-400">{error}</p>
             </div>
           )}
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Title *</label>
+            <label className="gtd-label">Title *</label>
             <input
               type="text"
               value={form.title}
@@ -135,7 +135,7 @@ export default function TaskModal({ task, projects, onClose, onSave }) {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+            <label className="gtd-label">Notes</label>
             <textarea
               value={form.notes}
               onChange={(e) => setForm({ ...form, notes: e.target.value })}
@@ -146,7 +146,7 @@ export default function TaskModal({ task, projects, onClose, onSave }) {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">List *</label>
+              <label className="gtd-label">List *</label>
               <select
                 value={form.list}
                 onChange={(e) => setForm({ ...form, list: e.target.value })}
@@ -159,7 +159,7 @@ export default function TaskModal({ task, projects, onClose, onSave }) {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Context</label>
+              <label className="gtd-label">Context</label>
               {addingContext ? (
                 <div className="flex gap-1">
                   <input
@@ -201,7 +201,7 @@ export default function TaskModal({ task, projects, onClose, onSave }) {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Project</label>
+            <label className="gtd-label">Project</label>
             <select
               value={form.project_id}
               onChange={(e) => setForm({ ...form, project_id: e.target.value })}
@@ -216,7 +216,7 @@ export default function TaskModal({ task, projects, onClose, onSave }) {
 
           {form.list === 'waiting_for' && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Waiting For (Person)</label>
+              <label className="gtd-label">Waiting For (Person)</label>
               <input
                 type="text"
                 value={form.waiting_for_person}
@@ -229,7 +229,7 @@ export default function TaskModal({ task, projects, onClose, onSave }) {
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Energy</label>
+              <label className="gtd-label">Energy</label>
               <select
                 value={form.energy_level}
                 onChange={(e) => setForm({ ...form, energy_level: e.target.value })}
@@ -243,7 +243,7 @@ export default function TaskModal({ task, projects, onClose, onSave }) {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Time (min)</label>
+              <label className="gtd-label">Time (min)</label>
               <input
                 type="number"
                 value={form.time_estimate}
@@ -255,7 +255,7 @@ export default function TaskModal({ task, projects, onClose, onSave }) {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Due Date</label>
+              <label className="gtd-label">Due Date</label>
               <input
                 type="date"
                 value={form.due_date}
@@ -271,14 +271,14 @@ export default function TaskModal({ task, projects, onClose, onSave }) {
               id="daily_focus"
               checked={form.is_daily_focus}
               onChange={(e) => setForm({ ...form, is_daily_focus: e.target.checked })}
-              className="w-4 h-4 rounded border-gray-300"
+              className="w-4 h-4 rounded border-gray-300 dark:border-gray-600"
             />
-            <label htmlFor="daily_focus" className="text-sm text-gray-700">
+            <label htmlFor="daily_focus" className="text-sm text-gray-700 dark:text-gray-300">
               Add to today's focus
             </label>
           </div>
 
-          <div className="flex gap-2 pt-4 border-t">
+          <div className="flex gap-2 pt-4 border-t dark:border-gray-700">
             <button
               type="button"
               onClick={onClose}

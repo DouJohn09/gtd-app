@@ -65,12 +65,12 @@ export default function Dashboard() {
   return (
     <div className="p-4 md:p-8 max-w-6xl mx-auto">
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-        <p className="text-gray-500 mt-1">Your GTD command center</p>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Dashboard</h1>
+        <p className="text-gray-500 dark:text-gray-400 mt-1">Your GTD command center</p>
       </div>
       
       <div className="gtd-card mb-6">
-        <h2 className="font-medium text-gray-700 mb-3">Quick Capture</h2>
+        <h2 className="font-medium text-gray-700 dark:text-gray-300 mb-3">Quick Capture</h2>
         <QuickCapture onCapture={fetchData} />
       </div>
       
@@ -86,7 +86,7 @@ export default function Dashboard() {
             </div>
             <div>
               <div className="text-2xl font-bold">{value}</div>
-              <div className="text-sm text-gray-500">{label}</div>
+              <div className="text-sm text-gray-500 dark:text-gray-400">{label}</div>
             </div>
           </Link>
         ))}
@@ -104,13 +104,13 @@ export default function Dashboard() {
             </Link>
           </div>
           <div className="flex items-center gap-2 mb-3">
-            <div className="flex-1 bg-gray-200 rounded-full h-2">
+            <div className="flex-1 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
               <div
                 className="bg-green-500 h-2 rounded-full transition-all"
                 style={{ width: `${habits.length > 0 ? (habits.filter(h => h.completed_today).length / habits.length) * 100 : 0}%` }}
               />
             </div>
-            <span className="text-sm text-gray-500 font-medium">
+            <span className="text-sm text-gray-500 dark:text-gray-400 font-medium">
               {habits.filter(h => h.completed_today).length}/{habits.length}
             </span>
           </div>
@@ -122,10 +122,10 @@ export default function Dashboard() {
                   await api.habits.toggle(h.id);
                   fetchData();
                 }}
-                className="flex items-center gap-2.5 w-full text-left py-1 hover:bg-gray-50 rounded px-1 -mx-1"
+                className="flex items-center gap-2.5 w-full text-left py-1 hover:bg-gray-50 dark:hover:bg-gray-800 rounded px-1 -mx-1"
               >
                 <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
-                  h.completed_today ? 'border-green-500 bg-green-500' : 'border-gray-300'
+                  h.completed_today ? 'border-green-500 bg-green-500' : 'border-gray-300 dark:border-gray-600'
                 }`}>
                   {h.completed_today && (
                     <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
@@ -133,7 +133,7 @@ export default function Dashboard() {
                     </svg>
                   )}
                 </div>
-                <span className={`text-sm ${h.completed_today ? 'text-gray-400 line-through' : 'text-gray-700'}`}>
+                <span className={`text-sm ${h.completed_today ? 'text-gray-400 dark:text-gray-500 line-through' : 'text-gray-700 dark:text-gray-300'}`}>
                   {h.name}
                 </span>
               </button>
@@ -149,13 +149,13 @@ export default function Dashboard() {
               <Target className="w-5 h-5 text-yellow-600" />
               Today's Focus
             </h2>
-            <span className="text-sm text-gray-500">
+            <span className="text-sm text-gray-500 dark:text-gray-400">
               {stats?.completed_today || 0} completed today
             </span>
           </div>
           
           {dailyFocus.length === 0 ? (
-            <div className="text-center py-8 text-gray-500">
+            <div className="text-center py-8 text-gray-500 dark:text-gray-400">
               <Target className="w-12 h-12 mx-auto mb-2 opacity-30" />
               <p>No tasks in today's focus</p>
               <Link to="/ai" className="text-blue-600 hover:underline text-sm mt-2 inline-flex items-center gap-1">
@@ -187,7 +187,7 @@ export default function Dashboard() {
           <div className="space-y-3">
             <Link 
               to="/inbox"
-              className="flex items-center justify-between p-3 bg-yellow-50 rounded-lg hover:bg-yellow-100 transition-colors"
+              className="flex items-center justify-between p-3 bg-yellow-50 dark:bg-yellow-900/30 rounded-lg hover:bg-yellow-100 dark:hover:bg-yellow-900/50 transition-colors"
             >
               <div className="flex items-center gap-3">
                 <Inbox className="w-5 h-5 text-yellow-600" />
@@ -201,7 +201,7 @@ export default function Dashboard() {
             
             <Link 
               to="/ai"
-              className="flex items-center justify-between p-3 bg-purple-50 rounded-lg hover:bg-purple-100 transition-colors"
+              className="flex items-center justify-between p-3 bg-purple-50 dark:bg-purple-900/30 rounded-lg hover:bg-purple-100 dark:hover:bg-purple-900/50 transition-colors"
             >
               <div className="flex items-center gap-3">
                 <Sparkles className="w-5 h-5 text-purple-600" />
@@ -212,7 +212,7 @@ export default function Dashboard() {
             
             <Link 
               to="/projects"
-              className="flex items-center justify-between p-3 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition-colors"
+              className="flex items-center justify-between p-3 bg-indigo-50 dark:bg-indigo-900/30 rounded-lg hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors"
             >
               <div className="flex items-center gap-3">
                 <ListTodo className="w-5 h-5 text-indigo-600" />

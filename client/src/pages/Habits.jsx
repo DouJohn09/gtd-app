@@ -2,11 +2,13 @@ import { useState, useEffect, useMemo } from 'react';
 import { Target, Plus, Flame, TrendingUp } from 'lucide-react';
 import { api } from '../lib/api';
 import { useToast } from '../components/Toast';
+import useTheme from '../hooks/useTheme';
 import HabitCard from '../components/HabitCard';
 import HabitModal from '../components/HabitModal';
 
 export default function Habits() {
   const { addToast } = useToast();
+  const { isDark } = useTheme();
   const [habits, setHabits] = useState([]);
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -102,7 +104,7 @@ export default function Habits() {
             <Target className="w-7 h-7 text-blue-600" />
             Habits
           </h1>
-          <p className="text-gray-500 mt-1">
+          <p className="text-gray-500 dark:text-gray-400 mt-1">
             {totalCount > 0 ? `${completedCount}/${totalCount} done today` : 'Track your daily habits'}
           </p>
         </div>
@@ -126,7 +128,7 @@ export default function Habits() {
           {/* Habit cards by category */}
           {Object.entries(grouped).map(([category, categoryHabits]) => (
             <div key={category}>
-              <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wide mb-2">{category}</h3>
+              <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">{category}</h3>
               <div className="space-y-2">
                 {categoryHabits.map(habit => (
                   <HabitCard
@@ -158,7 +160,7 @@ export default function Habits() {
                     <div className="flex items-center justify-between">
                       <div>
                         <div className="text-2xl font-bold" style={{ color: h.color }}>{h.completionRate}%</div>
-                        <div className="text-xs text-gray-500">{h.completedLast30}/{h.expectedLast30} days</div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">{h.completedLast30}/{h.expectedLast30} days</div>
                       </div>
                       {h.streak > 0 && (
                         <div className="flex items-center gap-1 text-orange-500">
@@ -178,7 +180,7 @@ export default function Habits() {
             <div>
               <h2 className="text-lg font-semibold mb-3">Activity (Last 90 Days)</h2>
               <div className="gtd-card">
-                <Heatmap data={stats.heatmap} totalHabits={habits.length} />
+                <Heatmap data={stats.heatmap} totalHabits={habits.length} isDark={isDark} />
               </div>
             </div>
           )}
@@ -197,7 +199,7 @@ export default function Habits() {
 }
 
 // Calendar heatmap component
-function Heatmap({ data, totalHabits }) {
+function Heatmap({ data, totalHabits, isDark }) {
   const cells = useMemo(() => {
     const result = [];
     const today = new Date();
@@ -213,6 +215,13 @@ function Heatmap({ data, totalHabits }) {
   }, [data, totalHabits]);
 
   const getColor = (intensity) => {
+    if (isDark) {
+      if (intensity === 0) return '#1f2937';
+      if (intensity <= 0.25) return '#064e3b';
+      if (intensity <= 0.5) return '#065f46';
+      if (intensity <= 0.75) return '#047857';
+      return '#059669';
+    }
     if (intensity === 0) return '#f3f4f6';
     if (intensity <= 0.25) return '#bbf7d0';
     if (intensity <= 0.5) return '#86efac';

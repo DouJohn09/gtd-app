@@ -111,16 +111,16 @@ export default function AIAssistant() {
           <Sparkles className="w-8 h-8 text-purple-500" />
           AI Assistant
         </h1>
-        <p className="text-gray-500 mt-1">Let AI help you process and prioritize using GTD principles</p>
+        <p className="text-gray-500 dark:text-gray-400 mt-1">Let AI help you process and prioritize using GTD principles</p>
       </div>
 
       <div className="grid md:grid-cols-2 gap-6">
         <div className="gtd-card">
           <div className="flex items-center gap-3 mb-4">
-            <div className="bg-yellow-100 p-2 rounded-lg"><Inbox className="w-5 h-5 text-yellow-600" /></div>
+            <div className="bg-yellow-100 dark:bg-yellow-900/30 p-2 rounded-lg"><Inbox className="w-5 h-5 text-yellow-600" /></div>
             <div>
               <h2 className="font-semibold">Process Inbox</h2>
-              <p className="text-sm text-gray-500">AI categorizes your inbox items</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400">AI categorizes your inbox items</p>
             </div>
           </div>
           <button onClick={processInbox} disabled={loading.inbox} className="gtd-btn gtd-btn-primary w-full flex items-center justify-center gap-2">
@@ -128,9 +128,9 @@ export default function AIAssistant() {
           </button>
 
           {inboxResult?.processed_items && (
-            <div className="mt-4 pt-4 border-t space-y-3">
+            <div className="mt-4 pt-4 border-t dark:border-gray-700 space-y-3">
               {inboxResult.processed_items.map((item, i) => (
-                <div key={i} className="bg-gray-50 rounded-lg p-3">
+                <div key={i} className="bg-gray-50 dark:bg-gray-800 rounded-lg p-3">
                   <div className="flex items-center gap-2">
                     <CheckCircle2 className="w-4 h-4 text-green-500" />
                     <span className="font-medium text-sm">{item.suggested_title || inboxResult.tasks[item.original_index - 1]?.title}</span>
@@ -140,7 +140,7 @@ export default function AIAssistant() {
                     <span className={`gtd-badge list-${item.recommended_list}`}>{item.recommended_list.replace('_', ' ')}</span>
                     {item.context && <span className="context-badge">{item.context}</span>}
                   </div>
-                  <p className="text-xs text-gray-500 mt-1">{item.reasoning}</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{item.reasoning}</p>
                 </div>
               ))}
               <button onClick={applyInboxProcessing} disabled={applying} className="gtd-btn gtd-btn-primary w-full mt-4">
@@ -152,10 +152,10 @@ export default function AIAssistant() {
 
         <div className="gtd-card">
           <div className="flex items-center gap-3 mb-4">
-            <div className="bg-green-100 p-2 rounded-lg"><Target className="w-5 h-5 text-green-600" /></div>
+            <div className="bg-green-100 dark:bg-green-900/30 p-2 rounded-lg"><Target className="w-5 h-5 text-green-600" /></div>
             <div>
               <h2 className="font-semibold">Daily Focus</h2>
-              <p className="text-sm text-gray-500">AI suggests today's priorities</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400">AI suggests today's priorities</p>
             </div>
           </div>
           <button onClick={getDailyPriorities} disabled={loading.priorities} className="gtd-btn gtd-btn-primary w-full flex items-center justify-center gap-2">
@@ -163,17 +163,17 @@ export default function AIAssistant() {
           </button>
 
           {prioritiesResult?.suggested_focus && (
-            <div className="mt-4 pt-4 border-t">
+            <div className="mt-4 pt-4 border-t dark:border-gray-700">
               {prioritiesResult.productivity_tip && (
-                <div className="bg-blue-50 rounded-lg p-3 mb-4">
-                  <p className="text-sm text-blue-700"><strong>Tip:</strong> {prioritiesResult.productivity_tip}</p>
+                <div className="bg-blue-50 dark:bg-blue-900/30 rounded-lg p-3 mb-4">
+                  <p className="text-sm text-blue-700 dark:text-blue-400"><strong>Tip:</strong> {prioritiesResult.productivity_tip}</p>
                 </div>
               )}
               <div className="space-y-3">
                 {prioritiesResult.suggested_focus.map((item, i) => (
-                  <div key={i} className="bg-gray-50 rounded-lg p-3">
+                  <div key={i} className="bg-gray-50 dark:bg-gray-800 rounded-lg p-3">
                     <div className="font-medium text-sm">{prioritiesResult.tasks[item.task_index - 1]?.title}</div>
-                    <p className="text-xs text-gray-500 mt-1">{item.reason}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{item.reason}</p>
                   </div>
                 ))}
               </div>
@@ -188,17 +188,17 @@ export default function AIAssistant() {
       {/* Import Notes Section */}
       <div className="gtd-card mt-6">
         <div className="flex items-center gap-3 mb-4">
-          <div className="bg-indigo-100 p-2 rounded-lg"><FileText className="w-5 h-5 text-indigo-600" /></div>
+          <div className="bg-indigo-100 dark:bg-indigo-900/30 p-2 rounded-lg"><FileText className="w-5 h-5 text-indigo-600" /></div>
           <div>
             <h2 className="font-semibold">Import Notes</h2>
-            <p className="text-sm text-gray-500">Paste notes from another app and let AI categorize them</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400">Paste notes from another app and let AI categorize them</p>
           </div>
         </div>
 
         {importDone !== null && !importResult && (
-          <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4 flex items-center gap-3">
+          <div className="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-lg p-4 mb-4 flex items-center gap-3">
             <CheckCircle2 className="w-5 h-5 text-green-600 flex-shrink-0" />
-            <p className="text-sm text-green-800">
+            <p className="text-sm text-green-800 dark:text-green-300">
               Successfully imported {importDone} {importDone === 1 ? 'task' : 'tasks'}! Check your lists.
             </p>
           </div>
@@ -224,7 +224,7 @@ export default function AIAssistant() {
 
         {importResult?.items && (
           <div className="space-y-3">
-            <div className="flex items-center justify-between text-sm text-gray-500">
+            <div className="flex items-center justify-between text-sm text-gray-500 dark:text-gray-400">
               <span>{importResult.items.length} items found</span>
               <button
                 onClick={() => {
@@ -244,13 +244,13 @@ export default function AIAssistant() {
               <div
                 key={i}
                 className={`rounded-lg p-3 border cursor-pointer transition-colors ${
-                  importSelected.has(i) ? 'bg-white border-blue-200' : 'bg-gray-50 border-gray-100 opacity-60'
+                  importSelected.has(i) ? 'bg-white dark:bg-gray-800 border-blue-200 dark:border-blue-800' : 'bg-gray-50 dark:bg-gray-800/50 border-gray-100 dark:border-gray-700 opacity-60'
                 }`}
                 onClick={() => toggleImportItem(i)}
               >
                 <div className="flex items-start gap-3">
                   <div className={`mt-0.5 w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 ${
-                    importSelected.has(i) ? 'border-blue-500 bg-blue-500' : 'border-gray-300'
+                    importSelected.has(i) ? 'border-blue-500 bg-blue-500' : 'border-gray-300 dark:border-gray-600'
                   }`}>
                     {importSelected.has(i) && (
                       <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
@@ -260,7 +260,7 @@ export default function AIAssistant() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <span className="font-medium text-sm">{item.title}</span>
-                    {item.notes && <p className="text-xs text-gray-500 mt-0.5">{item.notes}</p>}
+                    {item.notes && <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{item.notes}</p>}
                     <div className="flex flex-wrap items-center gap-2 mt-2 text-xs">
                       <ArrowRight className="w-3 h-3 text-gray-400" />
                       <span className={`gtd-badge list-${item.recommended_list}`}>

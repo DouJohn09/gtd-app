@@ -47,7 +47,7 @@ export default function Lists() {
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className={`text-2xl font-bold flex items-center gap-3`}><Icon className={`w-8 h-8 ${config.color}`} />{config.title}</h1>
-          <p className="text-gray-500 mt-1">{config.description}</p>
+          <p className="text-gray-500 dark:text-gray-400 mt-1">{config.description}</p>
         </div>
         <button onClick={() => { setEditingTask({ list }); setShowModal(true); }} className="gtd-btn gtd-btn-primary flex items-center gap-2">
           <Plus className="w-4 h-4" /> Add Task
@@ -62,7 +62,7 @@ export default function Lists() {
         <div className="space-y-6">
           {Object.entries(groupedByContext).map(([context, contextTasks]) => (
             <div key={context}>
-              <h3 className="text-sm font-medium text-gray-500 mb-3 uppercase">{context}</h3>
+              <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-3 uppercase">{context}</h3>
               <div className="space-y-3">
                 {contextTasks.map(task => (
                   <div key={task.id} className="group relative">

@@ -67,11 +67,11 @@ export default function Projects() {
     <div className="p-4 md:p-8 max-w-4xl mx-auto">
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-3">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 flex items-center gap-3">
             <FolderKanban className="w-8 h-8 text-indigo-500" />
             Projects
           </h1>
-          <p className="text-gray-500 mt-1">Multi-step outcomes you're committed to</p>
+          <p className="text-gray-500 dark:text-gray-400 mt-1">Multi-step outcomes you're committed to</p>
         </div>
         <button onClick={() => setShowNewProject(true)} className="gtd-btn gtd-btn-primary flex items-center gap-2">
           <Plus className="w-4 h-4" /> New Project
@@ -108,14 +108,14 @@ export default function Projects() {
                   <ChevronRight className={`w-5 h-5 text-gray-400 transition-transform ${expandedProject === project.id ? 'rotate-90' : ''}`} />
                   <div>
                     <h3 className="font-medium">{project.name}</h3>
-                    {project.outcome && <p className="text-sm text-gray-500">{project.outcome}</p>}
+                    {project.outcome && <p className="text-sm text-gray-500 dark:text-gray-400">{project.outcome}</p>}
                   </div>
                 </div>
-                <span className="text-sm text-gray-500">{project.task_count} tasks</span>
+                <span className="text-sm text-gray-500 dark:text-gray-400">{project.task_count} tasks</span>
               </div>
 
               {expandedProject === project.id && (
-                <div className="mt-4 pt-4 border-t">
+                <div className="mt-4 pt-4 border-t dark:border-gray-700">
                   <div className="flex gap-2 mb-4">
                     <button onClick={() => handleAiBreakdown(project)} disabled={loadingAi} className="gtd-btn gtd-btn-secondary flex items-center gap-2 text-sm">
                       <Sparkles className="w-4 h-4" /> {loadingAi ? 'Analyzing...' : 'AI Breakdown'}
@@ -126,8 +126,8 @@ export default function Projects() {
                   </div>
 
                   {aiBreakdown?.projectId === project.id && (
-                    <div className="bg-purple-50 rounded-lg p-4 mb-4">
-                      <h4 className="font-medium text-purple-900 flex items-center gap-2"><Sparkles className="w-4 h-4" /> AI Breakdown</h4>
+                    <div className="bg-purple-50 dark:bg-purple-900/30 rounded-lg p-4 mb-4">
+                      <h4 className="font-medium text-purple-900 dark:text-purple-300 flex items-center gap-2"><Sparkles className="w-4 h-4" /> AI Breakdown</h4>
                       <ul className="mt-3 space-y-2">
                         {aiBreakdown.next_actions?.map((action, i) => (
                           <li key={i} className="flex items-center gap-2 text-sm">

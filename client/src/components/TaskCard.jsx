@@ -32,7 +32,7 @@ export default function TaskCard({ task, onComplete, onEdit, showList = false })
         </div>
         
         {task.notes && (
-          <p className="text-sm text-gray-500 mt-1 line-clamp-2">{task.notes}</p>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 line-clamp-2">{task.notes}</p>
         )}
         
         <div className="flex flex-wrap items-center gap-2 mt-2">
@@ -50,7 +50,7 @@ export default function TaskCard({ task, onComplete, onEdit, showList = false })
           )}
           
           {task.project_name && (
-            <span className="gtd-badge bg-indigo-100 text-indigo-800">
+            <span className="gtd-badge bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-300">
               <FolderOpen className="w-3 h-3 mr-1" />
               {task.project_name}
             </span>
@@ -64,7 +64,7 @@ export default function TaskCard({ task, onComplete, onEdit, showList = false })
           )}
           
           {task.time_estimate && (
-            <span className="flex items-center gap-1 text-xs text-gray-500">
+            <span className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
               <Clock className="w-3 h-3" />
               {task.time_estimate}m
             </span>
@@ -79,7 +79,7 @@ export default function TaskCard({ task, onComplete, onEdit, showList = false })
       </div>
       
       {task.is_daily_focus === 1 && (
-        <span className="gtd-badge bg-yellow-100 text-yellow-800">
+        <span className="gtd-badge bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300">
           Today
         </span>
       )}

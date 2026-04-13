@@ -60,19 +60,19 @@ export default function HabitModal({ habit, onClose, onSave }) {
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={onClose}>
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-md mx-4 sm:mx-auto max-h-[90vh] overflow-auto" onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between p-4 border-b">
+      <div className="bg-white dark:bg-gray-900 rounded-xl shadow-xl w-full max-w-md mx-4 sm:mx-auto max-h-[90vh] overflow-auto" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between p-4 border-b dark:border-gray-700">
           <h2 className="text-lg font-semibold">
             {habit?.id ? 'Edit Habit' : 'New Habit'}
           </h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
             <X className="w-5 h-5" />
           </button>
         </div>
 
         <form onSubmit={handleSubmit} className="p-4 space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Name *</label>
+            <label className="gtd-label">Name *</label>
             <input
               type="text"
               value={form.name}
@@ -85,7 +85,7 @@ export default function HabitModal({ habit, onClose, onSave }) {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+            <label className="gtd-label">Description</label>
             <input
               type="text"
               value={form.description}
@@ -97,7 +97,7 @@ export default function HabitModal({ habit, onClose, onSave }) {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Frequency</label>
+              <label className="gtd-label">Frequency</label>
               <select
                 value={form.frequency}
                 onChange={e => setForm({ ...form, frequency: e.target.value })}
@@ -110,7 +110,7 @@ export default function HabitModal({ habit, onClose, onSave }) {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+              <label className="gtd-label">Category</label>
               <input
                 type="text"
                 value={form.category}
@@ -123,7 +123,7 @@ export default function HabitModal({ habit, onClose, onSave }) {
 
           {form.frequency === 'specific_days' && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Which days?</label>
+              <label className="gtd-label">Which days?</label>
               <div className="flex flex-wrap gap-1">
                 {DAYS.map(d => (
                   <button
@@ -133,7 +133,7 @@ export default function HabitModal({ habit, onClose, onSave }) {
                     className={`px-2.5 py-1.5 rounded text-sm font-medium transition-colors ${
                       form.target_days.includes(d.value)
                         ? 'bg-blue-600 text-white'
-                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'
                     }`}
                   >
                     {d.label}
@@ -145,7 +145,7 @@ export default function HabitModal({ habit, onClose, onSave }) {
 
           {form.frequency === 'weekly' && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Times per week</label>
+              <label className="gtd-label">Times per week</label>
               <input
                 type="number"
                 min="1"
@@ -158,7 +158,7 @@ export default function HabitModal({ habit, onClose, onSave }) {
           )}
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Color</label>
+            <label className="gtd-label">Color</label>
             <div className="flex flex-wrap gap-2">
               {COLORS.map(c => (
                 <button
@@ -174,7 +174,7 @@ export default function HabitModal({ habit, onClose, onSave }) {
             </div>
           </div>
 
-          <div className="flex gap-2 pt-4 border-t">
+          <div className="flex gap-2 pt-4 border-t dark:border-gray-700">
             <button type="button" onClick={onClose} className="gtd-btn gtd-btn-secondary flex-1">
               Cancel
             </button>

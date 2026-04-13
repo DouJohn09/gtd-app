@@ -3,11 +3,12 @@
 @tailwind utilities;
 
 body {
-  @apply bg-gray-50 text-gray-900;
+  @apply bg-gray-50 text-gray-900 dark:bg-gray-950 dark:text-gray-100;
 }
 
 .gtd-card {
-  @apply bg-white rounded-lg shadow-sm border border-gray-200 p-4;
+  @apply bg-white rounded-lg shadow-sm border border-gray-200 p-4
+         dark:bg-gray-900 dark:border-gray-700;
 }
 
 .gtd-btn {
@@ -19,11 +20,17 @@ body {
 }
 
 .gtd-btn-secondary {
-  @apply bg-gray-100 text-gray-700 hover:bg-gray-200;
+  @apply bg-gray-100 text-gray-700 hover:bg-gray-200
+         dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600;
 }
 
 .gtd-input {
-  @apply w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none;
+  @apply w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none
+         dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100 dark:placeholder-gray-400;
+}
+
+.gtd-label {
+  @apply block text-sm font-medium text-gray-700 mb-1 dark:text-gray-300;
 }
 
 .gtd-badge {
@@ -31,14 +38,14 @@ body {
 }
 
 .context-badge {
-  @apply gtd-badge bg-purple-100 text-purple-800;
+  @apply gtd-badge bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300;
 }
 
-.list-inbox { @apply bg-yellow-100 text-yellow-800; }
-.list-next_actions { @apply bg-green-100 text-green-800; }
-.list-waiting_for { @apply bg-orange-100 text-orange-800; }
-.list-someday_maybe { @apply bg-blue-100 text-blue-800; }
-.list-completed { @apply bg-gray-100 text-gray-800; }
+.list-inbox { @apply bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300; }
+.list-next_actions { @apply bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300; }
+.list-waiting_for { @apply bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300; }
+.list-someday_maybe { @apply bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300; }
+.list-completed { @apply bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300; }
 
 @keyframes slide-in {
   from {
