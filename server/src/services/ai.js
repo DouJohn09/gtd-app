@@ -260,3 +260,48 @@ Respond with JSON:
     return null;
   }
 }
+
+export async function findDuplicates(tasks, userContexts) {
+  if (!openai) return { error: 'OpenAI API key not configured' };
+  try {
+    const taskList = tasks.map(t =>
+      `[ID:${t.id}] "${t.title}"${t.notes ? ` (Notes: ${t.notes})` : ''} [List: ${t.list}]${t.context ? ` [Context: ${t.context}]` : ''}`
+    ).join('\n');
+
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o',
+      messages: [
+        { role: 'system', content: getSystemPrompt(userContexts) },
+        {
+          role: 'user',
+          content: `Analyze these tasks and find groups of duplicate or very similar items. Two tasks are duplicates if they refer to the same action, even if worded differently. Do NOT flag tasks that are merely related but distinct actions.
+
+Tasks:
+${taskList}
+
+Respond with JSON:
+{
+  "duplicate_groups": [
+    {
+      "reason": "brief explanation of why these are duplicates",
+      "tasks": [
+        { "id": number, "title": "task title", "keep": boolean }
+      ]
+    }
+  ],
+  "summary": "short summary like 'Found 3 groups of duplicates' or 'No duplicates found'"
+}
+
+For each group, mark exactly one task as "keep": true (the most complete, best-worded, or most specific one). Mark the rest as "keep": false.
+If no duplicates exist, return an empty duplicate_groups array.`
+        }
+      ],
+      response_format: { type: 'json_object' }
+    });
+
+    return JSON.parse(response.choices[0].message.content);
+  } catch (error) {
+    console.error('AI find duplicates error:', error);
+    return null;
+  }
+}

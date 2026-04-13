@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { TaskModel } from '../db/models.js';
 import { getDb } from '../db/schema.js';
-import { processInbox, getDailyPriorities, importNotes } from '../services/ai.js';
+import { processInbox, getDailyPriorities, importNotes, findDuplicates } from '../services/ai.js';
 
 function getUserContexts(userId) {
   const db = getDb();
@@ -140,6 +140,41 @@ router.post('/apply-daily-focus', async (req, res) => {
     );
 
     res.json(updatedTasks);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.post('/find-duplicates', async (req, res) => {
+  try {
+    const allTasks = ['inbox', 'next_actions', 'waiting_for', 'someday_maybe']
+      .flatMap(list => TaskModel.getAll(list, req.user.id));
+
+    if (allTasks.length < 2) {
+      return res.json({ duplicate_groups: [], summary: 'Not enough tasks to compare' });
+    }
+
+    const userContexts = getUserContexts(req.user.id);
+    const result = await findDuplicates(allTasks, userContexts);
+    if (!result) {
+      return res.status(500).json({ error: 'AI processing failed' });
+    }
+
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.post('/apply-duplicates', async (req, res) => {
+  try {
+    const { taskIds } = req.body;
+    if (!taskIds || taskIds.length === 0) {
+      return res.status(400).json({ error: 'No tasks to remove' });
+    }
+
+    taskIds.forEach(id => TaskModel.delete(id, req.user.id));
+    res.json({ count: taskIds.length });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

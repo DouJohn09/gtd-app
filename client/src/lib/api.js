@@ -82,5 +82,7 @@ export const api = {
     applyDailyFocus: (taskIds) => fetchApi('/ai/apply-daily-focus', { method: 'POST', body: JSON.stringify({ taskIds }) }),
     importNotes: (text) => fetchApi('/ai/import-notes', { method: 'POST', body: JSON.stringify({ text }) }),
     applyImport: (items) => fetchApi('/ai/apply-import', { method: 'POST', body: JSON.stringify({ items }) }),
+    findDuplicates: () => fetchApi('/ai/find-duplicates', { method: 'POST' }),
+    applyDuplicates: (taskIds) => fetchApi('/ai/apply-duplicates', { method: 'POST', body: JSON.stringify({ taskIds }) }),
   }
 };
