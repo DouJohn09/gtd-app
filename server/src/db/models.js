@@ -24,7 +24,8 @@ export const TaskModel = {
   getAll(list = null, userId) {
     const db = getDb();
     if (list) {
-      const stmt = db.prepare(`SELECT t.*, p.name as project_name FROM tasks t LEFT JOIN projects p ON t.project_id = p.id WHERE t.list = ? AND t.user_id = ? ORDER BY t.priority DESC, t.created_at DESC`);
+      const orderBy = list === 'completed' ? 't.completed_at DESC' : 't.priority DESC, t.created_at DESC';
+      const stmt = db.prepare(`SELECT t.*, p.name as project_name FROM tasks t LEFT JOIN projects p ON t.project_id = p.id WHERE t.list = ? AND t.user_id = ? ORDER BY ${orderBy}`);
       stmt.bind([list, userId]);
       return rowsToObjects(stmt);
     } else {

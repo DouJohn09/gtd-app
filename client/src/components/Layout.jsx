@@ -13,7 +13,8 @@ import {
   Menu,
   X,
   Moon,
-  Sun
+  Sun,
+  CheckCircle2
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import useTheme from '../hooks/useTheme';
@@ -26,6 +27,7 @@ const navItems = [
   { to: '/lists/waiting_for', icon: Clock, label: 'Waiting For' },
   { to: '/lists/someday_maybe', icon: CloudSun, label: 'Someday/Maybe' },
   { to: '/habits', icon: Target, label: 'Habits' },
+  { to: '/completed', icon: CheckCircle2, label: 'Completed' },
   { to: '/ai', icon: Sparkles, label: 'AI Assistant' },
 ];
 
