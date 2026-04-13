@@ -80,5 +80,7 @@ export const api = {
     applyInboxProcessing: (items) => fetchApi('/ai/apply-inbox-processing', { method: 'POST', body: JSON.stringify({ items }) }),
     getDailyPriorities: () => fetchApi('/ai/daily-priorities', { method: 'POST' }),
     applyDailyFocus: (taskIds) => fetchApi('/ai/apply-daily-focus', { method: 'POST', body: JSON.stringify({ taskIds }) }),
+    importNotes: (text) => fetchApi('/ai/import-notes', { method: 'POST', body: JSON.stringify({ text }) }),
+    applyImport: (items) => fetchApi('/ai/apply-import', { method: 'POST', body: JSON.stringify({ items }) }),
   }
 };

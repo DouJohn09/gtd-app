@@ -167,6 +167,55 @@ For each item, respond with JSON:
   }
 }
 
+export async function importNotes(rawText, userContexts) {
+  if (!openai) return { error: 'OpenAI API key not configured' };
+  const contextOptions = userContexts?.length
+    ? userContexts.map(c => c.name || c).join('|')
+    : '@home|@work|@errands|@computer|@phone|@anywhere';
+  try {
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o',
+      messages: [
+        { role: 'system', content: getSystemPrompt(userContexts) },
+        {
+          role: 'user',
+          content: `A user is importing notes from another app. Parse the following text into individual items and categorize each one using GTD methodology.
+
+Split the text into logical items — each line, bullet point, or distinct thought should become a separate item. Ignore empty lines.
+
+Text to import:
+"""
+${rawText}
+"""
+
+Respond with JSON:
+{
+  "items": [
+    {
+      "title": "clear action-oriented title starting with a verb if actionable",
+      "notes": "any additional details from the original text, or null",
+      "recommended_list": "inbox|next_actions|waiting_for|someday_maybe",
+      "context": "${contextOptions}|null",
+      "priority": 1-5,
+      "energy_level": "low|medium|high|null",
+      "time_estimate": null or number in minutes,
+      "is_project": boolean,
+      "reasoning": "brief explanation of categorization"
+    }
+  ]
+}`
+        }
+      ],
+      response_format: { type: 'json_object' }
+    });
+
+    return JSON.parse(response.choices[0].message.content);
+  } catch (error) {
+    console.error('AI import notes error:', error);
+    return null;
+  }
+}
+
 export async function getDailyPriorities(tasks, stats, userContexts) {
   if (!openai) return { error: 'OpenAI API key not configured' };
   try {

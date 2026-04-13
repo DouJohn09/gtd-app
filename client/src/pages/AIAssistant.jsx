@@ -1,12 +1,16 @@
 import { useState } from 'react';
-import { Sparkles, Inbox, Target, CheckCircle2, ArrowRight } from 'lucide-react';
+import { Sparkles, Inbox, Target, CheckCircle2, ArrowRight, FileText, Upload } from 'lucide-react';
 import { api } from '../lib/api';
 
 export default function AIAssistant() {
   const [inboxResult, setInboxResult] = useState(null);
   const [prioritiesResult, setPrioritiesResult] = useState(null);
-  const [loading, setLoading] = useState({ inbox: false, priorities: false });
+  const [loading, setLoading] = useState({ inbox: false, priorities: false, import: false });
   const [applying, setApplying] = useState(false);
+  const [importText, setImportText] = useState('');
+  const [importResult, setImportResult] = useState(null);
+  const [importSelected, setImportSelected] = useState(new Set());
+  const [importDone, setImportDone] = useState(null);
 
   const processInbox = async () => {
     setLoading(l => ({ ...l, inbox: true }));
@@ -54,6 +58,47 @@ export default function AIAssistant() {
       const taskIds = prioritiesResult.suggested_focus.map(f => prioritiesResult.tasks[f.task_index - 1]?.id).filter(Boolean);
       await api.ai.applyDailyFocus(taskIds);
       setPrioritiesResult(null);
+    } finally {
+      setApplying(false);
+    }
+  };
+
+  const analyzeImport = async () => {
+    if (!importText.trim()) return;
+    setLoading(l => ({ ...l, import: true }));
+    setImportDone(null);
+    try {
+      const result = await api.ai.importNotes(importText);
+      setImportResult(result);
+      if (result?.items) {
+        setImportSelected(new Set(result.items.map((_, i) => i)));
+      }
+    } catch (error) {
+      console.error('Failed to analyze notes:', error);
+    } finally {
+      setLoading(l => ({ ...l, import: false }));
+    }
+  };
+
+  const toggleImportItem = (index) => {
+    setImportSelected(prev => {
+      const next = new Set(prev);
+      if (next.has(index)) next.delete(index);
+      else next.add(index);
+      return next;
+    });
+  };
+
+  const applyImport = async () => {
+    if (!importResult?.items) return;
+    setApplying(true);
+    try {
+      const items = importResult.items.filter((_, i) => importSelected.has(i));
+      const result = await api.ai.applyImport(items);
+      setImportDone(result.count);
+      setImportResult(null);
+      setImportText('');
+      setImportSelected(new Set());
     } finally {
       setApplying(false);
     }
@@ -138,6 +183,120 @@ export default function AIAssistant() {
             </div>
           )}
         </div>
+      </div>
+
+      {/* Import Notes Section */}
+      <div className="gtd-card mt-6">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="bg-indigo-100 p-2 rounded-lg"><FileText className="w-5 h-5 text-indigo-600" /></div>
+          <div>
+            <h2 className="font-semibold">Import Notes</h2>
+            <p className="text-sm text-gray-500">Paste notes from another app and let AI categorize them</p>
+          </div>
+        </div>
+
+        {importDone !== null && !importResult && (
+          <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4 flex items-center gap-3">
+            <CheckCircle2 className="w-5 h-5 text-green-600 flex-shrink-0" />
+            <p className="text-sm text-green-800">
+              Successfully imported {importDone} {importDone === 1 ? 'task' : 'tasks'}! Check your lists.
+            </p>
+          </div>
+        )}
+
+        {!importResult && (
+          <>
+            <textarea
+              value={importText}
+              onChange={(e) => setImportText(e.target.value)}
+              className="gtd-input min-h-[160px] mb-3"
+              placeholder={"Paste your notes here — one item per line, or free-form text...\n\nExample:\n- Buy groceries for the week\n- Call dentist to schedule appointment\n- Research vacation destinations\n- Waiting for Bob to send the report\n- Learn Spanish someday"}
+            />
+            <button
+              onClick={analyzeImport}
+              disabled={loading.import || !importText.trim()}
+              className="gtd-btn gtd-btn-primary w-full flex items-center justify-center gap-2 disabled:opacity-50"
+            >
+              {loading.import ? 'Analyzing...' : <><Sparkles className="w-4 h-4" /> Analyze & Categorize</>}
+            </button>
+          </>
+        )}
+
+        {importResult?.items && (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between text-sm text-gray-500">
+              <span>{importResult.items.length} items found</span>
+              <button
+                onClick={() => {
+                  if (importSelected.size === importResult.items.length) {
+                    setImportSelected(new Set());
+                  } else {
+                    setImportSelected(new Set(importResult.items.map((_, i) => i)));
+                  }
+                }}
+                className="text-blue-600 hover:underline"
+              >
+                {importSelected.size === importResult.items.length ? 'Deselect all' : 'Select all'}
+              </button>
+            </div>
+
+            {importResult.items.map((item, i) => (
+              <div
+                key={i}
+                className={`rounded-lg p-3 border cursor-pointer transition-colors ${
+                  importSelected.has(i) ? 'bg-white border-blue-200' : 'bg-gray-50 border-gray-100 opacity-60'
+                }`}
+                onClick={() => toggleImportItem(i)}
+              >
+                <div className="flex items-start gap-3">
+                  <div className={`mt-0.5 w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 ${
+                    importSelected.has(i) ? 'border-blue-500 bg-blue-500' : 'border-gray-300'
+                  }`}>
+                    {importSelected.has(i) && (
+                      <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                      </svg>
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <span className="font-medium text-sm">{item.title}</span>
+                    {item.notes && <p className="text-xs text-gray-500 mt-0.5">{item.notes}</p>}
+                    <div className="flex flex-wrap items-center gap-2 mt-2 text-xs">
+                      <ArrowRight className="w-3 h-3 text-gray-400" />
+                      <span className={`gtd-badge list-${item.recommended_list}`}>
+                        {item.recommended_list.replace('_', ' ')}
+                      </span>
+                      {item.context && <span className="context-badge">{item.context}</span>}
+                      {item.energy_level && (
+                        <span className="text-gray-400">Energy: {item.energy_level}</span>
+                      )}
+                      {item.time_estimate && (
+                        <span className="text-gray-400">{item.time_estimate}min</span>
+                      )}
+                    </div>
+                    <p className="text-xs text-gray-400 mt-1">{item.reasoning}</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+
+            <div className="flex gap-2 pt-2">
+              <button
+                onClick={() => { setImportResult(null); }}
+                className="gtd-btn gtd-btn-secondary flex-1"
+              >
+                Back
+              </button>
+              <button
+                onClick={applyImport}
+                disabled={applying || importSelected.size === 0}
+                className="gtd-btn gtd-btn-primary flex-1 flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                {applying ? 'Importing...' : <><Upload className="w-4 h-4" /> Import {importSelected.size} {importSelected.size === 1 ? 'item' : 'items'}</>}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

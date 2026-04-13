@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { TaskModel } from '../db/models.js';
 import { getDb } from '../db/schema.js';
-import { processInbox, getDailyPriorities } from '../services/ai.js';
+import { processInbox, getDailyPriorities, importNotes } from '../services/ai.js';
 
 function getUserContexts(userId) {
   const db = getDb();
@@ -78,6 +78,50 @@ router.post('/daily-priorities', async (req, res) => {
 
     result.tasks = nextActions;
     res.json(result);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.post('/import-notes', async (req, res) => {
+  try {
+    const { text } = req.body;
+    if (!text || !text.trim()) {
+      return res.status(400).json({ error: 'No text provided' });
+    }
+
+    const userContexts = getUserContexts(req.user.id);
+    const result = await importNotes(text, userContexts);
+    if (!result) {
+      return res.status(500).json({ error: 'AI processing failed' });
+    }
+
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.post('/apply-import', async (req, res) => {
+  try {
+    const { items } = req.body;
+    if (!items || items.length === 0) {
+      return res.status(400).json({ error: 'No items to import' });
+    }
+
+    const created = items.map(item => {
+      return TaskModel.create({
+        title: item.title,
+        notes: item.notes || null,
+        list: item.recommended_list || 'inbox',
+        context: item.context || null,
+        priority: item.priority || null,
+        energy_level: item.energy_level || null,
+        time_estimate: item.time_estimate || null,
+      }, req.user.id);
+    });
+
+    res.json({ count: created.length, tasks: created });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
