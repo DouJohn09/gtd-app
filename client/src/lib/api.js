@@ -58,6 +58,7 @@ export const api = {
     delete: (id) => fetchApi(`/projects/${id}`, { method: 'DELETE' }),
     breakdown: (id) => fetchApi(`/projects/${id}/breakdown`, { method: 'POST' }),
     applyBreakdown: (id, tasks) => fetchApi(`/projects/${id}/apply-breakdown`, { method: 'POST', body: JSON.stringify({ tasks }) }),
+    reorder: (id, taskIds) => fetchApi(`/projects/${id}/reorder`, { method: 'POST', body: JSON.stringify({ taskIds }) }),
   },
 
   contexts: {

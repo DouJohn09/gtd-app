@@ -84,6 +84,19 @@ export async function initDb() {
   db.run(`CREATE INDEX IF NOT EXISTS idx_tasks_user ON tasks(user_id)`);
   db.run(`CREATE INDEX IF NOT EXISTS idx_projects_user ON projects(user_id)`);
 
+  // Migration: add execution_mode to projects
+  const hasExecutionMode = projectsColumns[0]?.values.some(col => col[1] === 'execution_mode');
+  if (!hasExecutionMode) {
+    db.run("ALTER TABLE projects ADD COLUMN execution_mode TEXT DEFAULT 'parallel'");
+  }
+
+  // Migration: add position to tasks (for ordering within sequential projects)
+  const hasPosition = tasksColumns[0]?.values.some(col => col[1] === 'position');
+  if (!hasPosition) {
+    db.run('ALTER TABLE tasks ADD COLUMN position INTEGER DEFAULT 0');
+  }
+  db.run('CREATE INDEX IF NOT EXISTS idx_tasks_position ON tasks(project_id, position)');
+
   // Contexts table
   db.run(`
     CREATE TABLE IF NOT EXISTS contexts (

@@ -68,6 +68,7 @@ router.put('/:id', (req, res) => {
 
 router.delete('/:id', (req, res) => {
   try {
+    // TaskModel.delete handles sequential promotion internally
     TaskModel.delete(req.params.id, req.user.id);
     res.status(204).send();
   } catch (error) {

@@ -6,20 +6,20 @@ const energyColors = {
   high: 'text-red-600'
 };
 
-export default function TaskCard({ task, onComplete, onEdit, showList = false }) {
+export default function TaskCard({ task, onComplete, onEdit, showList = false, queued = false }) {
   const isCompleted = task.list === 'completed';
-  
+
   return (
-    <div className={`gtd-card flex items-start gap-3 ${isCompleted ? 'opacity-60' : ''}`}>
+    <div className={`gtd-card flex items-start gap-3 ${isCompleted ? 'opacity-60' : ''} ${queued ? 'opacity-50 border-dashed' : ''}`}>
       <button
         onClick={() => onComplete?.(task.id)}
-        className="mt-0.5 text-gray-400 hover:text-green-600 transition-colors"
-        disabled={isCompleted}
+        className={`mt-0.5 transition-colors ${queued ? 'text-gray-300 dark:text-gray-600 cursor-not-allowed' : 'text-gray-400 hover:text-green-600'}`}
+        disabled={isCompleted || queued}
       >
         {isCompleted ? (
           <CheckCircle className="w-5 h-5 text-green-600" />
         ) : (
-          <Circle className="w-5 h-5" />
+          <Circle className={`w-5 h-5 ${queued ? 'text-gray-300 dark:text-gray-600' : ''}`} />
         )}
       </button>
       
@@ -78,7 +78,12 @@ export default function TaskCard({ task, onComplete, onEdit, showList = false })
         </div>
       </div>
       
-      {task.is_daily_focus === 1 && (
+      {queued && (
+        <span className="gtd-badge bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400 text-xs">
+          Queued
+        </span>
+      )}
+      {task.is_daily_focus === 1 && !queued && (
         <span className="gtd-badge bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300">
           Today
         </span>

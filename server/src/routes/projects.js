@@ -81,15 +81,29 @@ router.post('/:id/apply-breakdown', async (req, res) => {
     const { tasks } = req.body;
     const projectId = req.params.id;
 
-    const createdTasks = tasks.map(task =>
+    const createdTasks = tasks.map((task, index) =>
       TaskModel.create({
         ...task,
         project_id: projectId,
-        list: 'next_actions'
+        list: 'next_actions',
+        position: task.order ?? index
       }, req.user.id)
     );
 
     res.json(createdTasks);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.post('/:id/reorder', (req, res) => {
+  try {
+    const { taskIds } = req.body;
+    if (!Array.isArray(taskIds)) {
+      return res.status(400).json({ error: 'taskIds must be an array' });
+    }
+    const tasks = TaskModel.reorderTasks(req.params.id, taskIds, req.user.id);
+    res.json(tasks);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
