@@ -10,7 +10,7 @@ export default function TaskCard({ task, onComplete, onEdit, showList = false, q
   const isCompleted = task.list === 'completed';
 
   return (
-    <div className={`gtd-card flex items-start gap-3 ${isCompleted ? 'opacity-60' : ''} ${queued ? 'opacity-50 border-dashed' : ''}`}>
+    <div className={`gtd-card flex items-start gap-3 overflow-hidden ${isCompleted ? 'opacity-60' : ''} ${queued ? 'opacity-50 border-dashed' : ''}`}>
       <button
         onClick={() => onComplete?.(task.id)}
         className={`mt-0.5 transition-colors ${queued ? 'text-gray-300 dark:text-gray-600 cursor-not-allowed' : 'text-gray-400 hover:text-green-600'}`}
@@ -25,7 +25,7 @@ export default function TaskCard({ task, onComplete, onEdit, showList = false, q
       
       <div className="flex-1 min-w-0">
         <div 
-          className={`font-medium cursor-pointer hover:text-blue-600 ${isCompleted ? 'line-through' : ''}`}
+          className={`font-medium cursor-pointer hover:text-blue-600 break-words ${isCompleted ? 'line-through' : ''}`}
           onClick={() => onEdit?.(task)}
         >
           {task.title}
