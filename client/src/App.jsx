@@ -8,6 +8,7 @@ import Lists from './pages/Lists';
 import AIAssistant from './pages/AIAssistant';
 import Habits from './pages/Habits';
 import CompletedTasks from './pages/CompletedTasks';
+import WeeklyReview from './pages/WeeklyReview';
 import Login from './pages/Login';
 
 function ProtectedRoute({ children }) {
@@ -31,6 +32,7 @@ export default function App() {
         <Route path="lists/:list" element={<Lists />} />
         <Route path="habits" element={<Habits />} />
         <Route path="completed" element={<CompletedTasks />} />
+        <Route path="review" element={<WeeklyReview />} />
         <Route path="ai" element={<AIAssistant />} />
       </Route>
     </Routes>

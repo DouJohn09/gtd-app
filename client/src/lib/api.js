@@ -85,5 +85,7 @@ export const api = {
     applyImport: (items) => fetchApi('/ai/apply-import', { method: 'POST', body: JSON.stringify({ items }) }),
     findDuplicates: () => fetchApi('/ai/find-duplicates', { method: 'POST' }),
     applyDuplicates: (taskIds) => fetchApi('/ai/apply-duplicates', { method: 'POST', body: JSON.stringify({ taskIds }) }),
+    weeklyReview: () => fetchApi('/ai/weekly-review', { method: 'POST' }),
+    completeReview: (data) => fetchApi('/ai/complete-review', { method: 'POST', body: JSON.stringify(data) }),
   }
 };

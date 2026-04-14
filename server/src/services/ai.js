@@ -305,3 +305,89 @@ If no duplicates exist, return an empty duplicate_groups array.`
     return null;
   }
 }
+
+export async function weeklyReviewAnalysis(data, userContexts) {
+  if (!openai) return { error: 'OpenAI API key not configured' };
+  try {
+    const nextActionsList = data.nextActions.slice(0, 30).map(t => {
+      const age = Math.floor((Date.now() - new Date(t.created_at).getTime()) / (1000 * 60 * 60 * 24));
+      return `[ID:${t.id}] "${t.title}" [Context: ${t.context || 'none'}]${t.project_name ? ` [Project: ${t.project_name}]` : ''}${t.due_date ? ` [Due: ${t.due_date}]` : ''} (${age} days old)`;
+    }).join('\n');
+
+    const waitingForList = data.waitingFor.slice(0, 20).map(t => {
+      const age = Math.floor((Date.now() - new Date(t.created_at).getTime()) / (1000 * 60 * 60 * 24));
+      return `[ID:${t.id}] "${t.title}" [Waiting for: ${t.waiting_for_person || 'unknown'}] (${age} days)`;
+    }).join('\n');
+
+    const projectsList = data.projects.map(p =>
+      `"${p.name}" [Status: ${p.status}] [Tasks: ${p.task_count}] [Mode: ${p.execution_mode || 'parallel'}] [Has next action: ${p.next_action ? 'yes' : 'NO'}]`
+    ).join('\n');
+
+    const staleList = data.staleItems.map(t => {
+      const age = Math.floor((Date.now() - new Date(t.updated_at).getTime()) / (1000 * 60 * 60 * 24));
+      return `[ID:${t.id}] "${t.title}" [List: ${t.list}] (${age} days without update)`;
+    }).join('\n');
+
+    const habitSummary = data.habitStats?.habits?.map(h =>
+      `"${h.name}" — ${h.completionRate}% completion, ${h.streak} day streak`
+    ).join('\n') || 'No habits tracked';
+
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o',
+      messages: [
+        { role: 'system', content: getSystemPrompt(userContexts) },
+        {
+          role: 'user',
+          content: `Conduct a GTD Weekly Review analysis of this user's system. Be specific, actionable, and encouraging.
+
+System State:
+- Inbox: ${data.stats.inbox} items
+- Next Actions: ${data.stats.next_actions} items
+- Waiting For: ${data.stats.waiting_for} items
+- Someday/Maybe: ${data.stats.someday_maybe} items
+- Completed this week: ${data.completedThisWeek}
+- Last review: ${data.lastReviewDate || 'Never'}
+
+Next Actions:
+${nextActionsList || 'None'}
+
+Waiting For:
+${waitingForList || 'None'}
+
+Projects (${data.projects.length}):
+${projectsList || 'None'}
+
+Stale Items (unchanged 14+ days):
+${staleList || 'None'}
+
+Habits:
+${habitSummary}
+
+Respond with JSON:
+{
+  "weekly_summary": "2-3 sentence overview of the week's productivity and system state",
+  "tasks_completed_insight": "observation about completion patterns",
+  "stale_items": [
+    { "id": number, "title": "...", "list": "...", "days_stale": number, "suggestion": "delete|move_to_someday|follow_up|keep", "reason": "why this suggestion" }
+  ],
+  "projects_needing_attention": [
+    { "name": "...", "issue": "no_next_action|stalled|too_many_tasks", "suggestion": "specific actionable suggestion" }
+  ],
+  "waiting_for_followups": [
+    { "id": number, "title": "...", "waiting_for_person": "...", "days_waiting": number, "suggestion": "specific follow-up action" }
+  ],
+  "recommendations": ["3-5 actionable recommendations for next week"],
+  "motivational_insight": "encouraging observation about progress or habits",
+  "system_health_score": number from 1-10
+}`
+        }
+      ],
+      response_format: { type: 'json_object' }
+    });
+
+    return JSON.parse(response.choices[0].message.content);
+  } catch (error) {
+    console.error('AI weekly review error:', error);
+    return null;
+  }
+}

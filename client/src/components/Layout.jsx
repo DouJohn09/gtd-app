@@ -14,7 +14,8 @@ import {
   X,
   Moon,
   Sun,
-  CheckCircle2
+  CheckCircle2,
+  RotateCcw
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import useTheme from '../hooks/useTheme';
@@ -28,6 +29,7 @@ const navItems = [
   { to: '/lists/someday_maybe', icon: CloudSun, label: 'Someday/Maybe' },
   { to: '/habits', icon: Target, label: 'Habits' },
   { to: '/completed', icon: CheckCircle2, label: 'Completed' },
+  { to: '/review', icon: RotateCcw, label: 'Weekly Review' },
   { to: '/ai', icon: Sparkles, label: 'AI Assistant' },
 ];
 

@@ -337,3 +337,83 @@ export const ProjectModel = {
     return { changes: 1 };
   }
 };
+
+export const WeeklyReviewModel = {
+  getHistory(userId, limit = 10) {
+    const db = getDb();
+    const stmt = db.prepare('SELECT * FROM weekly_reviews WHERE user_id = ? ORDER BY completed_at DESC LIMIT ?');
+    stmt.bind([userId, limit]);
+    return rowsToObjects(stmt);
+  },
+
+  getLastReview(userId) {
+    const db = getDb();
+    const stmt = db.prepare('SELECT * FROM weekly_reviews WHERE user_id = ? ORDER BY completed_at DESC LIMIT 1');
+    stmt.bind([userId]);
+    return rowToObject(stmt);
+  },
+
+  getStreak(userId) {
+    const db = getDb();
+    const stmt = db.prepare('SELECT completed_at FROM weekly_reviews WHERE user_id = ? ORDER BY completed_at DESC');
+    stmt.bind([userId]);
+    const reviews = rowsToObjects(stmt);
+    if (reviews.length === 0) return 0;
+
+    let streak = 1;
+    for (let i = 1; i < reviews.length; i++) {
+      const prev = new Date(reviews[i - 1].completed_at);
+      const curr = new Date(reviews[i].completed_at);
+      const daysBetween = (prev - curr) / (1000 * 60 * 60 * 24);
+      if (daysBetween <= 10) {
+        streak++;
+      } else {
+        break;
+      }
+    }
+    return streak;
+  },
+
+  getCompletedTasksSince(userId, since) {
+    const db = getDb();
+    const stmt = db.prepare("SELECT COUNT(*) as cnt FROM tasks WHERE list = 'completed' AND completed_at >= ? AND user_id = ?");
+    stmt.bind([since, userId]);
+    const row = rowToObject(stmt);
+    return row ? row.cnt : 0;
+  },
+
+  getStaleItems(userId, days = 14) {
+    const db = getDb();
+    const stmt = db.prepare(`
+      SELECT t.*, p.name as project_name FROM tasks t
+      LEFT JOIN projects p ON t.project_id = p.id
+      WHERE t.list IN ('next_actions', 'waiting_for', 'someday_maybe')
+        AND t.user_id = ?
+        AND t.updated_at < datetime('now', '-' || ? || ' days')
+      ORDER BY t.updated_at ASC
+      LIMIT 20
+    `);
+    stmt.bind([userId, days]);
+    return rowsToObjects(stmt);
+  },
+
+  create(data, userId) {
+    const db = getDb();
+    db.run(`
+      INSERT INTO weekly_reviews (user_id, inbox_count_at_start, tasks_completed, tasks_moved, tasks_deleted, ai_summary)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `, [
+      userId,
+      data.inboxCountAtStart || 0,
+      data.tasksCompleted || 0,
+      data.tasksMoved || 0,
+      data.tasksDeleted || 0,
+      data.aiSummary ? JSON.stringify(data.aiSummary) : null
+    ]);
+    const id = db.exec("SELECT last_insert_rowid() as id")[0].values[0][0];
+    saveDb();
+    const stmt = db.prepare('SELECT * FROM weekly_reviews WHERE id = ?');
+    stmt.bind([id]);
+    return rowToObject(stmt);
+  }
+};

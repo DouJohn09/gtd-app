@@ -1,7 +1,7 @@
 import { Router } from 'express';
-import { TaskModel } from '../db/models.js';
+import { TaskModel, ProjectModel, WeeklyReviewModel } from '../db/models.js';
 import { getDb } from '../db/schema.js';
-import { processInbox, getDailyPriorities, importNotes, findDuplicates } from '../services/ai.js';
+import { processInbox, getDailyPriorities, importNotes, findDuplicates, weeklyReviewAnalysis } from '../services/ai.js';
 
 function getUserContexts(userId) {
   const db = getDb();
@@ -175,6 +175,111 @@ router.post('/apply-duplicates', async (req, res) => {
 
     taskIds.forEach(id => TaskModel.delete(id, req.user.id));
     res.json({ count: taskIds.length });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Helper to query habit stats (reused from habits route pattern)
+function getHabitStats(userId) {
+  const db = getDb();
+  const stmt = db.prepare('SELECT * FROM habits WHERE user_id = ? AND active = 1 ORDER BY name');
+  stmt.bind([userId]);
+  const habits = [];
+  while (stmt.step()) habits.push(stmt.getAsObject());
+  stmt.free();
+
+  const ninetyDaysAgo = new Date();
+  ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+  const startDate = ninetyDaysAgo.toISOString().split('T')[0];
+  const logStmt = db.prepare('SELECT habit_id, completed_date FROM habit_logs WHERE user_id = ? AND completed_date >= ?');
+  logStmt.bind([userId, startDate]);
+  const allLogs = [];
+  while (logStmt.step()) allLogs.push(logStmt.getAsObject());
+  logStmt.free();
+
+  const today = new Date().toISOString().split('T')[0];
+  return {
+    habits: habits.map(habit => {
+      const logs = allLogs.filter(l => l.habit_id === habit.id);
+      const completedDates = new Set(logs.map(l => l.completed_date));
+      let streak = 0;
+      const d = new Date(today);
+      while (true) {
+        const dateStr = d.toISOString().split('T')[0];
+        if (completedDates.has(dateStr)) { streak++; d.setDate(d.getDate() - 1); }
+        else if (dateStr === today) { d.setDate(d.getDate() - 1); }
+        else break;
+      }
+      let expectedDays = 0, completedDays = 0;
+      for (let i = 0; i < 30; i++) {
+        const checkDate = new Date();
+        checkDate.setDate(checkDate.getDate() - i);
+        expectedDays++;
+        if (completedDates.has(checkDate.toISOString().split('T')[0])) completedDays++;
+      }
+      return {
+        id: habit.id, name: habit.name, color: habit.color, streak,
+        completionRate: expectedDays > 0 ? Math.round((completedDays / expectedDays) * 100) : 0,
+        completedLast30: completedDays, expectedLast30: expectedDays,
+      };
+    })
+  };
+}
+
+router.post('/weekly-review', async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const stats = TaskModel.getStats(userId);
+    const inboxItems = TaskModel.getAll('inbox', userId);
+    const nextActions = TaskModel.getAll('next_actions', userId);
+    const waitingFor = TaskModel.getAll('waiting_for', userId);
+    const somedayMaybe = TaskModel.getAll('someday_maybe', userId);
+    const projects = ProjectModel.getAll(userId);
+    const staleItems = WeeklyReviewModel.getStaleItems(userId);
+    const lastReview = WeeklyReviewModel.getLastReview(userId);
+    const streak = WeeklyReviewModel.getStreak(userId);
+    const habitStats = getHabitStats(userId);
+    const userContexts = getUserContexts(userId);
+
+    const since = lastReview?.completed_at || new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    const completedThisWeek = WeeklyReviewModel.getCompletedTasksSince(userId, since);
+
+    const aiAnalysis = await weeklyReviewAnalysis({
+      stats, nextActions, waitingFor, somedayMaybe, projects,
+      staleItems, habitStats, completedThisWeek,
+      lastReviewDate: lastReview?.completed_at || null,
+    }, userContexts);
+
+    res.json({
+      stats, inboxItems, nextActions, waitingFor, somedayMaybe,
+      projects, habitStats, lastReview, streak, completedThisWeek,
+      aiAnalysis: aiAnalysis || { error: 'AI analysis unavailable' },
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.post('/complete-review', async (req, res) => {
+  try {
+    const { tasksCompleted = [], tasksDeleted = [], tasksMoved = [], inboxCountAtStart = 0, aiSummary } = req.body;
+    const userId = req.user.id;
+
+    tasksCompleted.forEach(id => TaskModel.complete(id, userId));
+    tasksDeleted.forEach(id => TaskModel.delete(id, userId));
+    tasksMoved.forEach(({ id, toList }) => TaskModel.update(id, { list: toList }, userId));
+
+    const review = WeeklyReviewModel.create({
+      inboxCountAtStart,
+      tasksCompleted: tasksCompleted.length,
+      tasksMoved: tasksMoved.length,
+      tasksDeleted: tasksDeleted.length,
+      aiSummary,
+    }, userId);
+
+    const streak = WeeklyReviewModel.getStreak(userId);
+    res.json({ review, streak });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

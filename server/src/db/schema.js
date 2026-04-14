@@ -137,6 +137,22 @@ export async function initDb() {
   db.run(`CREATE UNIQUE INDEX IF NOT EXISTS idx_habit_logs_unique ON habit_logs(habit_id, completed_date)`);
   db.run(`CREATE INDEX IF NOT EXISTS idx_habit_logs_user_date ON habit_logs(user_id, completed_date)`);
 
+  // Weekly reviews table
+  db.run(`
+    CREATE TABLE IF NOT EXISTS weekly_reviews (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER REFERENCES users(id),
+      completed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      inbox_count_at_start INTEGER DEFAULT 0,
+      tasks_completed INTEGER DEFAULT 0,
+      tasks_moved INTEGER DEFAULT 0,
+      tasks_deleted INTEGER DEFAULT 0,
+      ai_summary TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+  db.run(`CREATE INDEX IF NOT EXISTS idx_reviews_user ON weekly_reviews(user_id, completed_at)`);
+
   saveDb();
   return db;
 }
