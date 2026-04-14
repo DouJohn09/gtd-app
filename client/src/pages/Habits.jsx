@@ -4,7 +4,7 @@ import { api } from '../lib/api';
 import { useToast } from '../components/Toast';
 import useTheme from '../hooks/useTheme';
 import HabitCard from '../components/HabitCard';
-import HabitModal from '../components/HabitModal';
+import HabitModal, { SUGGESTED_HABITS } from '../components/HabitModal';
 
 export default function Habits() {
   const { addToast } = useToast();
@@ -32,12 +32,16 @@ export default function Habits() {
 
   useEffect(() => { fetchData(); }, []);
 
-  const handleToggle = async (habitId) => {
+  const handleToggle = async (habitId, date) => {
     try {
-      await api.habits.toggle(habitId);
-      setHabits(prev => prev.map(h =>
-        h.id === habitId ? { ...h, completed_today: !h.completed_today } : h
-      ));
+      const result = await api.habits.toggle(habitId, date);
+      if (!date) {
+        // Only update local state for today's toggle
+        setHabits(prev => prev.map(h =>
+          h.id === habitId ? { ...h, completed_today: !h.completed_today } : h
+        ));
+      }
+      addToast(date ? `Habit ${result.completed ? 'logged' : 'unlogged'} for ${date}` : undefined);
       // Refresh stats after toggle
       const statsData = await api.habits.getStats();
       setStats(statsData);
@@ -118,10 +122,34 @@ export default function Habits() {
 
       {/* Today's Habits */}
       {habits.length === 0 ? (
-        <div className="gtd-card text-center py-12 text-gray-500">
-          <Target className="w-12 h-12 mx-auto mb-3 text-gray-300" />
-          <p className="font-medium">No habits yet</p>
-          <p className="text-sm mt-1">Create your first habit to start tracking</p>
+        <div>
+          <div className="gtd-card text-center py-8 text-gray-500 mb-6">
+            <Target className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+            <p className="font-medium">No habits yet</p>
+            <p className="text-sm mt-1">Pick from the suggestions below or create your own</p>
+          </div>
+          <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">Suggested Habits</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {SUGGESTED_HABITS.map(s => (
+              <div key={s.name} className="gtd-card flex items-center gap-3">
+                <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: s.color }} />
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-sm">{s.name}</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">{s.description}</p>
+                </div>
+                <button
+                  onClick={async () => {
+                    await api.habits.create(s);
+                    addToast(`Added "${s.name}"`, 'success');
+                    fetchData();
+                  }}
+                  className="gtd-btn gtd-btn-primary text-xs px-3 py-1 flex-shrink-0"
+                >
+                  Add
+                </button>
+              </div>
+            ))}
+          </div>
         </div>
       ) : (
         <div className="space-y-6">
@@ -192,6 +220,8 @@ export default function Habits() {
           habit={editingHabit}
           onClose={() => { setShowModal(false); setEditingHabit(null); }}
           onSave={handleSave}
+          existingCategories={[...new Set(habits.map(h => h.category).filter(Boolean))]}
+          existingHabitNames={habits.map(h => h.name)}
         />
       )}
     </div>

@@ -3,6 +3,13 @@ import { getDb, saveDb } from '../db/schema.js';
 
 const router = Router();
 
+// Normalize category to title case
+const normalizeCategory = (cat) => {
+  if (!cat?.trim()) return null;
+  const trimmed = cat.trim();
+  return trimmed.charAt(0).toUpperCase() + trimmed.slice(1).toLowerCase();
+};
+
 // Helper to get rows as objects
 function queryAll(db, sql, params = []) {
   const stmt = db.prepare(sql);
@@ -141,7 +148,7 @@ router.post('/', (req, res) => {
     const db = getDb();
     db.run(
       'INSERT INTO habits (name, description, frequency, target_days, category, color, user_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [name.trim(), description || null, frequency || 'daily', target_days ? JSON.stringify(target_days) : null, category || null, color || '#3b82f6', req.user.id]
+      [name.trim(), description || null, frequency || 'daily', target_days ? JSON.stringify(target_days) : null, normalizeCategory(category), color || '#3b82f6', req.user.id]
     );
     const id = db.exec("SELECT last_insert_rowid() as id")[0].values[0][0];
     saveDb();
@@ -167,7 +174,7 @@ router.put('/:id', (req, res) => {
     if (description !== undefined) { fields.push('description = ?'); values.push(description || null); }
     if (frequency !== undefined) { fields.push('frequency = ?'); values.push(frequency); }
     if (target_days !== undefined) { fields.push('target_days = ?'); values.push(target_days ? JSON.stringify(target_days) : null); }
-    if (category !== undefined) { fields.push('category = ?'); values.push(category || null); }
+    if (category !== undefined) { fields.push('category = ?'); values.push(normalizeCategory(category)); }
     if (color !== undefined) { fields.push('color = ?'); values.push(color); }
     if (active !== undefined) { fields.push('active = ?'); values.push(active); }
 

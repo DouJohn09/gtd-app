@@ -1,6 +1,18 @@
-import { Flame, Pencil, Trash2 } from 'lucide-react';
+import { useState, useRef } from 'react';
+import { Flame, Pencil, Trash2, Calendar } from 'lucide-react';
 
 export default function HabitCard({ habit, onToggle, onEdit, onDelete }) {
+  const dateInputRef = useRef(null);
+  const today = new Date().toISOString().split('T')[0];
+
+  const handleDateChange = (e) => {
+    const date = e.target.value;
+    if (date) {
+      onToggle(habit.id, date);
+      e.target.value = '';
+    }
+  };
+
   return (
     <div className="gtd-card flex items-center gap-3">
       <button
@@ -47,6 +59,23 @@ export default function HabitCard({ habit, onToggle, onEdit, onDelete }) {
       )}
 
       <div className="flex items-center gap-1 flex-shrink-0">
+        <div className="relative">
+          <button
+            onClick={() => dateInputRef.current?.showPicker?.() || dateInputRef.current?.click()}
+            className="text-gray-400 hover:text-blue-500 p-1"
+            title="Log for another date"
+          >
+            <Calendar className="w-3.5 h-3.5" />
+          </button>
+          <input
+            ref={dateInputRef}
+            type="date"
+            max={today}
+            onChange={handleDateChange}
+            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+            tabIndex={-1}
+          />
+        </div>
         <button onClick={() => onEdit(habit)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 p-1">
           <Pencil className="w-3.5 h-3.5" />
         </button>

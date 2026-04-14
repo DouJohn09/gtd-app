@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { X } from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
+import { X, Plus } from 'lucide-react';
 
 const COLORS = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4', '#f97316'];
 const DAYS = [
@@ -12,7 +12,23 @@ const DAYS = [
   { value: 'sun', label: 'Sun' },
 ];
 
-export default function HabitModal({ habit, onClose, onSave }) {
+const DEFAULT_CATEGORIES = [
+  'Health', 'Fitness', 'Mindfulness', 'Learning',
+  'Productivity', 'Self-Care', 'Social', 'Finance'
+];
+
+export const SUGGESTED_HABITS = [
+  { name: 'Exercise', description: '30 min workout', category: 'Fitness', color: '#ef4444', frequency: 'daily' },
+  { name: 'Read', description: 'Read for 20 minutes', category: 'Learning', color: '#3b82f6', frequency: 'daily' },
+  { name: 'Meditate', description: '10 min meditation', category: 'Mindfulness', color: '#8b5cf6', frequency: 'daily' },
+  { name: 'Drink Water', description: '8 glasses of water', category: 'Health', color: '#06b6d4', frequency: 'daily' },
+  { name: 'Journal', description: 'Write daily reflections', category: 'Mindfulness', color: '#f59e0b', frequency: 'daily' },
+  { name: 'Sleep 8 Hours', description: 'Get enough rest', category: 'Health', color: '#10b981', frequency: 'daily' },
+  { name: 'No Social Media', description: 'Limit screen time', category: 'Productivity', color: '#ec4899', frequency: 'daily' },
+  { name: 'Learn Something New', description: 'Study or practice a skill', category: 'Learning', color: '#f97316', frequency: 'daily' },
+];
+
+export default function HabitModal({ habit, onClose, onSave, existingCategories = [], existingHabitNames = [] }) {
   const [form, setForm] = useState({
     name: '',
     description: '',
@@ -21,19 +37,46 @@ export default function HabitModal({ habit, onClose, onSave }) {
     category: '',
     color: '#3b82f6',
   });
+  const [customCategory, setCustomCategory] = useState(false);
+
+  const allCategories = useMemo(() => {
+    const merged = new Set([...DEFAULT_CATEGORIES, ...existingCategories]);
+    return [...merged].sort();
+  }, [existingCategories]);
+
+  // Suggestions the user doesn't already have
+  const availableSuggestions = useMemo(() => {
+    const names = new Set(existingHabitNames.map(n => n.toLowerCase()));
+    return SUGGESTED_HABITS.filter(s => !names.has(s.name.toLowerCase()));
+  }, [existingHabitNames]);
 
   useEffect(() => {
     if (habit) {
+      const cat = habit.category || '';
+      const isCustom = cat && !DEFAULT_CATEGORIES.includes(cat) && !existingCategories.includes(cat);
       setForm({
         name: habit.name || '',
         description: habit.description || '',
         frequency: habit.frequency || 'daily',
         target_days: habit.target_days || [],
-        category: habit.category || '',
+        category: isCustom ? '__custom__' : cat,
         color: habit.color || '#3b82f6',
       });
+      if (isCustom) {
+        setCustomCategory(true);
+        setForm(f => ({ ...f, category: '__custom__', customCategoryValue: cat }));
+      }
     }
   }, [habit]);
+
+  const [customCategoryValue, setCustomCategoryValue] = useState('');
+
+  useEffect(() => {
+    if (habit?.category && !allCategories.includes(habit.category)) {
+      setCustomCategory(true);
+      setCustomCategoryValue(habit.category);
+    }
+  }, [habit, allCategories]);
 
   const toggleDay = (day) => {
     setForm(f => ({
@@ -44,18 +87,35 @@ export default function HabitModal({ habit, onClose, onSave }) {
     }));
   };
 
+  const handleCategoryChange = (value) => {
+    if (value === '__custom__') {
+      setCustomCategory(true);
+      setForm(f => ({ ...f, category: '__custom__' }));
+    } else {
+      setCustomCategory(false);
+      setCustomCategoryValue('');
+      setForm(f => ({ ...f, category: value }));
+    }
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
+    const category = customCategory ? customCategoryValue.trim() : form.category;
     const data = {
       ...form,
       name: form.name.trim(),
       description: form.description.trim() || null,
-      category: form.category.trim() || null,
+      category: category || null,
       target_days: form.frequency === 'specific_days' ? form.target_days
         : form.frequency === 'weekly' ? form.target_days
         : null,
     };
+    delete data.customCategoryValue;
     onSave(data);
+  };
+
+  const handleQuickAdd = (suggestion) => {
+    onSave(suggestion);
   };
 
   return (
@@ -69,6 +129,26 @@ export default function HabitModal({ habit, onClose, onSave }) {
             <X className="w-5 h-5" />
           </button>
         </div>
+
+        {/* Quick-add suggestions for new habits */}
+        {!habit?.id && availableSuggestions.length > 0 && (
+          <div className="p-4 border-b dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
+            <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">Quick Add</p>
+            <div className="flex flex-wrap gap-2">
+              {availableSuggestions.slice(0, 6).map(s => (
+                <button
+                  key={s.name}
+                  onClick={() => handleQuickAdd(s)}
+                  className="flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-full border border-gray-200 dark:border-gray-600 hover:bg-white dark:hover:bg-gray-700 transition-colors"
+                >
+                  <div className="w-2 h-2 rounded-full" style={{ backgroundColor: s.color }} />
+                  {s.name}
+                  <Plus className="w-3 h-3 text-gray-400" />
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="p-4 space-y-4">
           <div>
@@ -111,13 +191,27 @@ export default function HabitModal({ habit, onClose, onSave }) {
 
             <div>
               <label className="gtd-label">Category</label>
-              <input
-                type="text"
-                value={form.category}
-                onChange={e => setForm({ ...form, category: e.target.value })}
+              <select
+                value={customCategory ? '__custom__' : form.category}
+                onChange={e => handleCategoryChange(e.target.value)}
                 className="gtd-input"
-                placeholder="e.g. health, learning"
-              />
+              >
+                <option value="">No category</option>
+                {allCategories.map(cat => (
+                  <option key={cat} value={cat}>{cat}</option>
+                ))}
+                <option value="__custom__">Custom...</option>
+              </select>
+              {customCategory && (
+                <input
+                  type="text"
+                  value={customCategoryValue}
+                  onChange={e => setCustomCategoryValue(e.target.value)}
+                  className="gtd-input mt-2"
+                  placeholder="Enter category name"
+                  autoFocus
+                />
+              )}
             </div>
           </div>
 
