@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import CalendarTaskCard from '../CalendarTaskCard';
+import CalendarEventCard from '../CalendarEventCard';
 
-export default function WeekView({ days, tasksByDate, onEditTask, onCompleteTask, onDropTask, onDayClick }) {
+export default function WeekView({ days, itemsByDate, onEditTask, onCompleteTask, onDropTask, onDayClick }) {
   const [dragOverDate, setDragOverDate] = useState(null);
 
   const handleDragOver = (e, date) => {
@@ -24,7 +25,7 @@ export default function WeekView({ days, tasksByDate, onEditTask, onCompleteTask
   return (
     <div className="grid grid-cols-1 md:grid-cols-7 gap-px bg-gray-200 dark:bg-gray-700 rounded-lg overflow-hidden">
       {days.map(({ date, day, dayName, isToday }) => {
-        const tasks = tasksByDate[date] || [];
+        const items = itemsByDate[date] || [];
         const isDragOver = dragOverDate === date;
 
         return (
@@ -53,15 +54,19 @@ export default function WeekView({ days, tasksByDate, onEditTask, onCompleteTask
             </div>
 
             <div className="space-y-0.5">
-              {tasks.map(task => (
-                <CalendarTaskCard
-                  key={task.id}
-                  task={task}
-                  onEdit={onEditTask}
-                  onComplete={onCompleteTask}
-                />
+              {items.map(item => (
+                item.type === 'google_event' ? (
+                  <CalendarEventCard key={item.id} event={item} />
+                ) : (
+                  <CalendarTaskCard
+                    key={item.id}
+                    task={item}
+                    onEdit={onEditTask}
+                    onComplete={onCompleteTask}
+                  />
+                )
               ))}
-              {tasks.length === 0 && (
+              {items.length === 0 && (
                 <div className="text-xs text-gray-400 dark:text-gray-600 text-center py-4 hidden md:block">
                   No tasks
                 </div>

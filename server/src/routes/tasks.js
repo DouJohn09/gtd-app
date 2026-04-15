@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { TaskModel } from '../db/models.js';
 import { getDb } from '../db/schema.js';
 import { analyzeTask } from '../services/ai.js';
+import { getCalendarEvents } from '../services/googleCalendar.js';
 
 const router = Router();
 
@@ -33,7 +34,7 @@ router.get('/daily-focus', (req, res) => {
   }
 });
 
-router.get('/calendar', (req, res) => {
+router.get('/calendar', async (req, res) => {
   try {
     const { start, end } = req.query;
     if (!start || !end) {
@@ -41,7 +42,15 @@ router.get('/calendar', (req, res) => {
     }
     const scheduled = TaskModel.getByDateRange(start, end, req.user.id);
     const unscheduled = TaskModel.getUnscheduled(req.user.id);
-    res.json({ scheduled, unscheduled });
+
+    let googleEvents = [];
+    try {
+      googleEvents = await getCalendarEvents(req.user.id, start, end);
+    } catch (err) {
+      console.error('Google Calendar fetch error:', err.message);
+    }
+
+    res.json({ scheduled, unscheduled, googleEvents });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

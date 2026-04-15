@@ -1,6 +1,8 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { CalendarDays, ChevronLeft, ChevronRight, PanelRightOpen } from 'lucide-react';
+import { CalendarDays, ChevronLeft, ChevronRight, PanelRightOpen, Link, Unlink } from 'lucide-react';
+import { useGoogleLogin } from '@react-oauth/google';
 import { api } from '../lib/api';
+import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../components/Toast';
 import TaskModal from '../components/TaskModal';
 import MonthView from '../components/calendar/MonthView';
@@ -21,6 +23,7 @@ const VIEW_TYPES = ['month', 'week', 'day'];
 export default function Calendar() {
   const [scheduledTasks, setScheduledTasks] = useState([]);
   const [unscheduledTasks, setUnscheduledTasks] = useState([]);
+  const [googleEvents, setGoogleEvents] = useState([]);
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [editingTask, setEditingTask] = useState(null);
@@ -28,11 +31,21 @@ export default function Calendar() {
   const [viewType, setViewType] = useState('month');
   const [currentDate, setCurrentDate] = useState(new Date());
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [calendarConnected, setCalendarConnected] = useState(false);
+  const [calendarLoading, setCalendarLoading] = useState(false);
+  const { user } = useAuth();
   const { addToast } = useToast();
 
   const dateKey = formatDateKey(currentDate);
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
+
+  // Check Google Calendar connection status on mount
+  useEffect(() => {
+    if (user?.google_calendar_connected !== undefined) {
+      setCalendarConnected(user.google_calendar_connected);
+    }
+  }, [user]);
 
   const fetchData = useCallback(async () => {
     try {
@@ -43,6 +56,7 @@ export default function Calendar() {
       ]);
       setScheduledTasks(calendarData.scheduled);
       setUnscheduledTasks(calendarData.unscheduled);
+      setGoogleEvents(calendarData.googleEvents || []);
       setProjects(projectsData);
     } catch (error) {
       console.error('Failed to fetch calendar data:', error);
@@ -56,15 +70,39 @@ export default function Calendar() {
     fetchData();
   }, [fetchData]);
 
-  const tasksByDate = useMemo(() => {
-    return scheduledTasks.reduce((map, task) => {
+  const itemsByDate = useMemo(() => {
+    const map = {};
+    // Add tasks
+    for (const task of scheduledTasks) {
       const key = task.due_date;
-      if (!key) return map;
+      if (!key) continue;
       if (!map[key]) map[key] = [];
       map[key].push(task);
-      return map;
-    }, {});
-  }, [scheduledTasks]);
+    }
+    // Add Google events
+    for (const event of googleEvents) {
+      const key = event.due_date;
+      if (!key) continue;
+      if (!map[key]) map[key] = [];
+      map[key].push(event);
+    }
+    // Sort each day: Google events first (all-day first, then by start_time), then tasks
+    for (const key of Object.keys(map)) {
+      map[key].sort((a, b) => {
+        const aIsEvent = a.type === 'google_event';
+        const bIsEvent = b.type === 'google_event';
+        if (aIsEvent && !bIsEvent) return -1;
+        if (!aIsEvent && bIsEvent) return 1;
+        if (aIsEvent && bIsEvent) {
+          if (a.all_day && !b.all_day) return -1;
+          if (!a.all_day && b.all_day) return 1;
+          return (a.start_time || '').localeCompare(b.start_time || '');
+        }
+        return 0;
+      });
+    }
+    return map;
+  }, [scheduledTasks, googleEvents]);
 
   const days = useMemo(() => {
     if (viewType === 'month') return getMonthDays(year, month);
@@ -126,6 +164,40 @@ export default function Calendar() {
     fetchData();
   };
 
+  const connectGoogleCalendar = useGoogleLogin({
+    flow: 'auth-code',
+    scope: 'https://www.googleapis.com/auth/calendar.readonly',
+    prompt: 'consent',
+    onSuccess: async (response) => {
+      setCalendarLoading(true);
+      try {
+        await api.calendar.connect(response.code);
+        setCalendarConnected(true);
+        addToast('Google Calendar connected', 'success');
+        fetchData();
+      } catch (err) {
+        addToast('Failed to connect Google Calendar', 'error');
+      } finally {
+        setCalendarLoading(false);
+      }
+    },
+    onError: () => addToast('Google Calendar connection failed', 'error'),
+  });
+
+  const disconnectGoogleCalendar = async () => {
+    setCalendarLoading(true);
+    try {
+      await api.calendar.disconnect();
+      setCalendarConnected(false);
+      setGoogleEvents([]);
+      addToast('Google Calendar disconnected', 'success');
+    } catch (err) {
+      addToast('Failed to disconnect', 'error');
+    } finally {
+      setCalendarLoading(false);
+    }
+  };
+
   const getPeriodLabel = () => {
     if (viewType === 'month') {
       return `${getMonthName(month)} ${year}`;
@@ -162,6 +234,27 @@ export default function Calendar() {
         </h1>
 
         <div className="flex items-center gap-2">
+          {/* Google Calendar connect/disconnect */}
+          {calendarConnected ? (
+            <button
+              onClick={disconnectGoogleCalendar}
+              disabled={calendarLoading}
+              className="gtd-btn gtd-btn-secondary text-sm py-1.5 px-3 flex items-center gap-1.5"
+            >
+              <Unlink className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Disconnect</span>
+            </button>
+          ) : (
+            <button
+              onClick={() => connectGoogleCalendar()}
+              disabled={calendarLoading}
+              className="gtd-btn gtd-btn-secondary text-sm py-1.5 px-3 flex items-center gap-1.5"
+            >
+              <Link className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Connect Calendar</span>
+            </button>
+          )}
+
           {/* View toggle */}
           <div className="flex rounded-lg overflow-hidden border border-gray-300 dark:border-gray-600">
             {VIEW_TYPES.map(v => (
@@ -212,7 +305,7 @@ export default function Calendar() {
           {viewType === 'month' && (
             <MonthView
               days={days}
-              tasksByDate={tasksByDate}
+              itemsByDate={itemsByDate}
               onEditTask={handleEdit}
               onCompleteTask={handleComplete}
               onDropTask={handleDropTask}
@@ -222,7 +315,7 @@ export default function Calendar() {
           {viewType === 'week' && (
             <WeekView
               days={days}
-              tasksByDate={tasksByDate}
+              itemsByDate={itemsByDate}
               onEditTask={handleEdit}
               onCompleteTask={handleComplete}
               onDropTask={handleDropTask}
@@ -232,7 +325,7 @@ export default function Calendar() {
           {viewType === 'day' && (
             <DayView
               date={dateKey}
-              tasks={tasksByDate[dateKey] || []}
+              items={itemsByDate[dateKey] || []}
               onEditTask={handleEdit}
               onCompleteTask={handleComplete}
               onDropTask={handleDropTask}

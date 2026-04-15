@@ -77,6 +77,12 @@ export const api = {
     toggle: (id, date = undefined) => fetchApi(`/habits/${id}/toggle`, { method: 'POST', body: JSON.stringify({ date }) }),
   },
 
+  calendar: {
+    getStatus: () => fetchApi('/auth/google-calendar/status'),
+    connect: (code) => fetchApi('/auth/google-calendar', { method: 'POST', body: JSON.stringify({ code }) }),
+    disconnect: () => fetchApi('/auth/google-calendar', { method: 'DELETE' }),
+  },
+
   ai: {
     processInbox: () => fetchApi('/ai/process-inbox', { method: 'POST' }),
     applyInboxProcessing: (items) => fetchApi('/ai/apply-inbox-processing', { method: 'POST', body: JSON.stringify({ items }) }),

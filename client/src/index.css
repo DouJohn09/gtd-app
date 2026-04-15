@@ -77,3 +77,7 @@ body {
 .calendar-drop-target {
   @apply bg-blue-50 dark:bg-blue-900/30 ring-2 ring-blue-400;
 }
+
+.calendar-event-google {
+  @apply bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300;
+}

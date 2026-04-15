@@ -84,6 +84,15 @@ export async function initDb() {
   db.run(`CREATE INDEX IF NOT EXISTS idx_tasks_user ON tasks(user_id)`);
   db.run(`CREATE INDEX IF NOT EXISTS idx_projects_user ON projects(user_id)`);
 
+  // Migration: add Google Calendar token columns to users
+  const usersColumns = db.exec("PRAGMA table_info(users)");
+  const hasCalendarToken = usersColumns[0]?.values.some(col => col[1] === 'google_calendar_refresh_token');
+  if (!hasCalendarToken) {
+    db.run('ALTER TABLE users ADD COLUMN google_calendar_access_token TEXT');
+    db.run('ALTER TABLE users ADD COLUMN google_calendar_refresh_token TEXT');
+    db.run('ALTER TABLE users ADD COLUMN google_calendar_token_expiry TEXT');
+  }
+
   // Migration: add execution_mode to projects
   const hasExecutionMode = projectsColumns[0]?.values.some(col => col[1] === 'execution_mode');
   if (!hasExecutionMode) {

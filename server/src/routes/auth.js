@@ -2,6 +2,8 @@ import { Router } from 'express';
 import { OAuth2Client } from 'google-auth-library';
 import jwt from 'jsonwebtoken';
 import { getDb, saveDb } from '../db/schema.js';
+import { requireAuth } from '../middleware/auth.js';
+import { exchangeCodeForTokens, revokeCalendarAccess, isCalendarConnected } from '../services/googleCalendar.js';
 
 const router = Router();
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
@@ -75,17 +77,66 @@ router.get('/me', (req, res) => {
   try {
     const payload = jwt.verify(authHeader.split(' ')[1], process.env.JWT_SECRET);
     const db = getDb();
-    const stmt = db.prepare('SELECT id, email, name, picture FROM users WHERE id = ?');
+    const stmt = db.prepare('SELECT id, email, name, picture, (google_calendar_refresh_token IS NOT NULL OR google_calendar_access_token IS NOT NULL) as google_calendar_connected FROM users WHERE id = ?');
     stmt.bind([payload.userId]);
     if (stmt.step()) {
       const user = stmt.getAsObject();
       stmt.free();
+      user.google_calendar_connected = !!user.google_calendar_connected;
       return res.json({ user });
     }
     stmt.free();
     return res.status(401).json({ error: 'User not found' });
   } catch {
     return res.status(401).json({ error: 'Invalid token' });
+  }
+});
+
+// Google Calendar connection routes (require auth)
+router.get('/google-calendar/status', requireAuth, (req, res) => {
+  try {
+    const connected = isCalendarConnected(req.user.id);
+    res.json({ connected });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.post('/google-calendar', requireAuth, async (req, res) => {
+  try {
+    const { code } = req.body;
+    if (!code) {
+      return res.status(400).json({ error: 'Authorization code is required' });
+    }
+    const tokens = await exchangeCodeForTokens(code);
+    const db = getDb();
+    // If Google didn't return a refresh_token (re-authorization), keep the existing one
+    if (tokens.refresh_token) {
+      db.run(
+        'UPDATE users SET google_calendar_access_token = ?, google_calendar_refresh_token = ?, google_calendar_token_expiry = ? WHERE id = ?',
+        [tokens.access_token, tokens.refresh_token, tokens.expiry_date, req.user.id]
+      );
+    } else {
+      db.run(
+        'UPDATE users SET google_calendar_access_token = ?, google_calendar_token_expiry = ? WHERE id = ?',
+        [tokens.access_token, tokens.expiry_date, req.user.id]
+      );
+    }
+    saveDb();
+    res.json({ connected: true });
+  } catch (error) {
+    console.error('Google Calendar connect error:', error);
+    res.status(400).json({ error: 'Failed to connect Google Calendar' });
+  }
+});
+
+router.delete('/google-calendar', requireAuth, async (req, res) => {
+  try {
+    await revokeCalendarAccess(req.user.id);
+    res.json({ connected: false });
+  } catch (error) {
+    console.error('Google Calendar disconnect error:', error);
+    res.status(500).json({ error: error.message });
   }
 });
 

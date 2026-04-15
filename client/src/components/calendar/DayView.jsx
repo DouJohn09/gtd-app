@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { CalendarDays } from 'lucide-react';
 import TaskCard from '../TaskCard';
+import CalendarEventCard from '../CalendarEventCard';
 
-export default function DayView({ date, tasks, onEditTask, onCompleteTask, onDropTask }) {
+export default function DayView({ date, items, onEditTask, onCompleteTask, onDropTask }) {
   const [isDragOver, setIsDragOver] = useState(false);
 
   const handleDragOver = (e) => {
@@ -31,7 +32,7 @@ export default function DayView({ date, tasks, onEditTask, onCompleteTask, onDro
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
-      {tasks.length === 0 ? (
+      {items.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 text-gray-400 dark:text-gray-600">
           <CalendarDays className="w-12 h-12 mb-3" />
           <p className="text-lg font-medium">No tasks scheduled</p>
@@ -39,14 +40,18 @@ export default function DayView({ date, tasks, onEditTask, onCompleteTask, onDro
         </div>
       ) : (
         <div className="space-y-2">
-          {tasks.map(task => (
-            <TaskCard
-              key={task.id}
-              task={task}
-              onComplete={onCompleteTask}
-              onEdit={onEditTask}
-              showList
-            />
+          {items.map(item => (
+            item.type === 'google_event' ? (
+              <CalendarEventCard key={item.id} event={item} expanded />
+            ) : (
+              <TaskCard
+                key={item.id}
+                task={item}
+                onComplete={onCompleteTask}
+                onEdit={onEditTask}
+                showList
+              />
+            )
           ))}
         </div>
       )}

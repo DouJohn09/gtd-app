@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { getDayNames } from '../../lib/dateUtils';
 import CalendarTaskCard from '../CalendarTaskCard';
+import CalendarEventCard from '../CalendarEventCard';
 
-const MAX_VISIBLE_TASKS = 3;
+const MAX_VISIBLE_ITEMS = 3;
 
-export default function MonthView({ days, tasksByDate, onEditTask, onCompleteTask, onDropTask, onDayClick }) {
+export default function MonthView({ days, itemsByDate, onEditTask, onCompleteTask, onDropTask, onDayClick }) {
   const dayNames = getDayNames();
   const [dragOverDate, setDragOverDate] = useState(null);
 
@@ -37,9 +38,9 @@ export default function MonthView({ days, tasksByDate, onEditTask, onCompleteTas
 
       <div className="grid grid-cols-7">
         {days.map(({ date, day, isCurrentMonth, isToday }) => {
-          const tasks = tasksByDate[date] || [];
-          const visibleTasks = tasks.slice(0, MAX_VISIBLE_TASKS);
-          const overflow = tasks.length - MAX_VISIBLE_TASKS;
+          const items = itemsByDate[date] || [];
+          const visibleItems = items.slice(0, MAX_VISIBLE_ITEMS);
+          const overflow = items.length - MAX_VISIBLE_ITEMS;
           const isDragOver = dragOverDate === date;
 
           return (
@@ -60,13 +61,17 @@ export default function MonthView({ days, tasksByDate, onEditTask, onCompleteTas
               </div>
 
               <div className="space-y-0.5">
-                {visibleTasks.map(task => (
-                  <CalendarTaskCard
-                    key={task.id}
-                    task={task}
-                    onEdit={onEditTask}
-                    onComplete={onCompleteTask}
-                  />
+                {visibleItems.map(item => (
+                  item.type === 'google_event' ? (
+                    <CalendarEventCard key={item.id} event={item} />
+                  ) : (
+                    <CalendarTaskCard
+                      key={item.id}
+                      task={item}
+                      onEdit={onEditTask}
+                      onComplete={onCompleteTask}
+                    />
+                  )
                 ))}
                 {overflow > 0 && (
                   <div
