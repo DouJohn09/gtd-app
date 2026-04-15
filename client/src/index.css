@@ -61,3 +61,19 @@ body {
 .animate-slide-in {
   animation: slide-in 0.2s ease-out;
 }
+
+.calendar-cell {
+  @apply border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-1 min-h-[100px] overflow-hidden;
+}
+
+.calendar-cell-today {
+  @apply ring-2 ring-blue-500 ring-inset;
+}
+
+.calendar-cell-other-month {
+  @apply bg-gray-50 dark:bg-gray-950 opacity-60;
+}
+
+.calendar-drop-target {
+  @apply bg-blue-50 dark:bg-blue-900/30 ring-2 ring-blue-400;
+}

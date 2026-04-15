@@ -43,6 +43,7 @@ export const api = {
     getById: (id) => fetchApi(`/tasks/${id}`),
     getStats: () => fetchApi('/tasks/stats'),
     getDailyFocus: () => fetchApi('/tasks/daily-focus'),
+    getCalendar: (start, end) => fetchApi(`/tasks/calendar?start=${start}&end=${end}`),
     create: (task) => fetchApi('/tasks', { method: 'POST', body: JSON.stringify(task) }),
     update: (id, updates) => fetchApi(`/tasks/${id}`, { method: 'PUT', body: JSON.stringify(updates) }),
     delete: (id) => fetchApi(`/tasks/${id}`, { method: 'DELETE' }),

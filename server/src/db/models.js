@@ -76,6 +76,30 @@ export const TaskModel = {
     return rowsToObjects(stmt);
   },
 
+  getByDateRange(startDate, endDate, userId) {
+    const db = getDb();
+    const stmt = db.prepare(`
+      SELECT t.*, p.name as project_name FROM tasks t
+      LEFT JOIN projects p ON t.project_id = p.id
+      WHERE t.user_id = ? AND t.due_date >= ? AND t.due_date <= ? AND t.list != 'completed'
+      ORDER BY t.due_date ASC, t.priority DESC
+    `);
+    stmt.bind([userId, startDate, endDate]);
+    return rowsToObjects(stmt);
+  },
+
+  getUnscheduled(userId) {
+    const db = getDb();
+    const stmt = db.prepare(`
+      SELECT t.*, p.name as project_name FROM tasks t
+      LEFT JOIN projects p ON t.project_id = p.id
+      WHERE t.user_id = ? AND (t.due_date IS NULL OR t.due_date = '') AND t.list != 'completed'
+      ORDER BY t.priority DESC, t.created_at DESC
+    `);
+    stmt.bind([userId]);
+    return rowsToObjects(stmt);
+  },
+
   create(task, userId) {
     const db = getDb();
 

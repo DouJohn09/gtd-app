@@ -33,6 +33,20 @@ router.get('/daily-focus', (req, res) => {
   }
 });
 
+router.get('/calendar', (req, res) => {
+  try {
+    const { start, end } = req.query;
+    if (!start || !end) {
+      return res.status(400).json({ error: 'start and end query parameters are required (YYYY-MM-DD)' });
+    }
+    const scheduled = TaskModel.getByDateRange(start, end, req.user.id);
+    const unscheduled = TaskModel.getUnscheduled(req.user.id);
+    res.json({ scheduled, unscheduled });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 router.get('/:id', (req, res) => {
   try {
     const task = TaskModel.getById(req.params.id, req.user.id);

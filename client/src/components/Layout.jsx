@@ -15,7 +15,8 @@ import {
   Moon,
   Sun,
   CheckCircle2,
-  RotateCcw
+  RotateCcw,
+  CalendarDays
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import useTheme from '../hooks/useTheme';
@@ -27,6 +28,7 @@ const navItems = [
   { to: '/lists/next_actions', icon: ListTodo, label: 'Next Actions' },
   { to: '/lists/waiting_for', icon: Clock, label: 'Waiting For' },
   { to: '/lists/someday_maybe', icon: CloudSun, label: 'Someday/Maybe' },
+  { to: '/calendar', icon: CalendarDays, label: 'Calendar' },
   { to: '/habits', icon: Target, label: 'Habits' },
   { to: '/completed', icon: CheckCircle2, label: 'Completed' },
   { to: '/review', icon: RotateCcw, label: 'Weekly Review' },

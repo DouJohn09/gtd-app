@@ -96,6 +96,7 @@ export async function initDb() {
     db.run('ALTER TABLE tasks ADD COLUMN position INTEGER DEFAULT 0');
   }
   db.run('CREATE INDEX IF NOT EXISTS idx_tasks_position ON tasks(project_id, position)');
+  db.run('CREATE INDEX IF NOT EXISTS idx_tasks_user_due_date ON tasks(user_id, due_date)');
 
   // Contexts table
   db.run(`
