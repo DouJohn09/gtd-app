@@ -14,12 +14,15 @@ import {
 import { api } from '../lib/api';
 import QuickCapture from '../components/QuickCapture';
 import TaskCard from '../components/TaskCard';
+import TaskModal from '../components/TaskModal';
 
 export default function Dashboard() {
   const [stats, setStats] = useState(null);
   const [dailyFocus, setDailyFocus] = useState([]);
   const [habits, setHabits] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [editingTask, setEditingTask] = useState(null);
+  const [showModal, setShowModal] = useState(false);
 
   const fetchData = async () => {
     try {
@@ -166,10 +169,11 @@ export default function Dashboard() {
           ) : (
             <div className="space-y-3">
               {dailyFocus.map(task => (
-                <TaskCard 
-                  key={task.id} 
-                  task={task} 
+                <TaskCard
+                  key={task.id}
+                  task={task}
                   onComplete={handleComplete}
+                  onEdit={(t) => { setEditingTask(t); setShowModal(true); }}
                 />
               ))}
             </div>
@@ -223,6 +227,8 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+
+      {showModal && <TaskModal task={editingTask} onClose={() => { setShowModal(false); setEditingTask(null); }} onSave={fetchData} />}
     </div>
   );
 }

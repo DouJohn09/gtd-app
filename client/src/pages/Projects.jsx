@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { FolderKanban, Plus, Sparkles, ChevronRight, ChevronUp, ChevronDown, CheckCircle2, Trash2, ArrowRightLeft } from 'lucide-react';
 import { api } from '../lib/api';
 import TaskCard from '../components/TaskCard';
+import TaskModal from '../components/TaskModal';
 import { useToast } from '../components/Toast';
 
 export default function Projects() {
@@ -14,6 +15,8 @@ export default function Projects() {
   const [newProject, setNewProject] = useState({ name: '', description: '', outcome: '', execution_mode: 'parallel' });
   const [aiBreakdown, setAiBreakdown] = useState(null);
   const [loadingAi, setLoadingAi] = useState(false);
+  const [editingTask, setEditingTask] = useState(null);
+  const [showModal, setShowModal] = useState(false);
 
   const fetchProjects = async () => {
     try {
@@ -266,6 +269,7 @@ export default function Projects() {
                                 <TaskCard
                                   task={task}
                                   onComplete={handleCompleteTask}
+                                  onEdit={(t) => { setEditingTask(t); setShowModal(true); }}
                                   showList
                                   queued={isQueued}
                                 />
@@ -286,6 +290,8 @@ export default function Projects() {
           ))}
         </div>
       )}
+
+      {showModal && <TaskModal task={editingTask} projects={projects} onClose={() => { setShowModal(false); setEditingTask(null); }} onSave={() => { fetchProjects(); if (expandedProject) fetchExpandedProject(expandedProject); }} />}
     </div>
   );
 }
