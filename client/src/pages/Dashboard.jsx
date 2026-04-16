@@ -79,14 +79,14 @@ export default function Dashboard() {
           <Link
             key={label}
             to={link}
-            className="gtd-card flex items-center gap-4 hover:shadow-md transition-shadow"
+            className="gtd-card flex items-center gap-3 hover:shadow-md transition-shadow overflow-hidden"
           >
-            <div className={`${color} p-3 rounded-lg text-white`}>
+            <div className={`${color} p-3 rounded-lg text-white shrink-0`}>
               <Icon className="w-6 h-6" />
             </div>
-            <div>
+            <div className="min-w-0">
               <div className="text-2xl font-bold">{value}</div>
-              <div className="text-sm text-gray-500 dark:text-gray-400">{label}</div>
+              <div className="text-sm text-gray-500 dark:text-gray-400 truncate">{label}</div>
             </div>
           </Link>
         ))}

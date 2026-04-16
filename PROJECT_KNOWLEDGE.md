@@ -298,6 +298,77 @@ cd server && npm start      # Express on :3000
 
 ---
 
+## Go-to-Market Strategy
+
+### Positioning — Own the "Modern GTD" Niche
+
+Don't compete with Todoist/TickTick on general task management. Position as **the GTD app for people who actually do GTD** — with a modern stack and AI:
+
+- **vs OmniFocus**: Cross-platform, AI-powered, lower price
+- **vs FacileThings**: Modern UI, faster, AI features
+- **vs Nirvana**: Active development, habits, weekly review, AI
+- **vs Todoist/TickTick**: Native GTD workflow instead of GTD-as-afterthought
+
+Unique combination (AI inbox processing + weekly review + habit tracking + sequential projects + calendar sync) doesn't exist anywhere else.
+
+### Must-Ship Before Launch
+
+Two deal-breakers for GTD practitioners:
+
+1. **Recurring tasks** — Without this, users can't manage real workflows. Every competitor has it.
+2. **Start/defer dates** — The #1 GTD-specific request. "Show me tasks only when they're actionable" is core GTD philosophy.
+
+### Launch Sequence
+
+| Phase | Channel | Angle |
+|-------|---------|-------|
+| Week 1-2 | r/gtd (80K) | Soft launch. "I built a GTD app because FacileThings felt dated and OmniFocus doesn't work on my PC" — authentic, problem-first |
+| Week 3 | r/productivity (3.7M) + r/ProductivityApps (30K) | Lead with AI features + calendar |
+| Week 4 | Product Hunt | "AI-powered GTD app" — strong PH category |
+| Week 5+ | Hacker News "Show HN" | Technical story: solo dev, open stack |
+
+### Pricing Strategy
+
+Given subscription fatigue and Todoist's backlash ($48 → $60/yr):
+
+| Tier | Price | What |
+|------|-------|------|
+| Free | $0 | Core GTD (inbox, lists, projects, contexts) |
+| Pro | $3/mo or $30/yr | AI features, calendar sync, habits, analytics |
+| Lifetime | $80 one-time | Everything forever (limited-time launch offer) |
+
+Lifetime deals generate upfront cash and launch communities love them. Things 3 proved this model works.
+
+### Pre-Launch Infrastructure
+
+- **Migrate off sql.js** — In-memory SQLite is fragile for production. A crash or Railway restart risks data loss. Move to PostgreSQL or SQLite on persistent storage before taking money.
+- **Add PWA support** — Installable web app, works on mobile. Low effort, eliminates "no mobile app" objection without native apps.
+
+### Growth Channels (No Budget)
+
+- **Reddit organic posts** — Genuine participation in r/gtd, r/productivity, r/ADHD, r/ProductivityApps
+- **"Built with AI" directories** — Several curate AI-powered tools
+- **GTD blog content** — "How to do a weekly review" type posts that rank on Google and funnel to the app
+- **Template/workflow sharing** — Let users export and share their GTD setups
+
+### What NOT to Do
+
+- Don't build collaboration features yet — solo GTD users are the beachhead
+- Don't build native mobile apps — PWA first, native only with revenue
+- Don't compete on AI hype — position AI as "reduces friction" not "does everything for you"
+- Don't launch free-only — need signal on willingness to pay early
+
+### Priority Order
+
+1. Ship recurring tasks + start dates (table stakes)
+2. Migrate off sql.js to real persistent DB
+3. Add PWA support
+4. Soft launch on r/gtd with free tier + $30/yr Pro
+5. Expand to r/productivity + Product Hunt
+6. Iterate based on feedback
+
+---
+
 ## Commit History (feature evolution)
 1. Initial commit: core GTD app
 2. Google OAuth + Railway deployment
@@ -313,3 +384,5 @@ cd server && npm start      # Express on :3000
 12. Habit improvements (past-date logging, default categories, suggested habits, category normalization)
 13. Text overflow fix in task cards
 14. Weekly Review workflow (4-step wizard with AI analysis)
+15. Calendar view with month/week/day views and drag-and-drop scheduling
+16. Google Calendar sync with opt-in OAuth connection
