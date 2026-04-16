@@ -41,6 +41,13 @@ gtd-app/
 │       │   ├── TaskCard.jsx
 │       │   ├── TaskModal.jsx
 │       │   ├── SortDropdown.jsx  # Reusable sort dropdown + sortTasks() utility
+│       │   ├── CalendarTaskCard.jsx   # Compact draggable task card for calendar views
+│       │   ├── CalendarEventCard.jsx  # Google Calendar event card (read-only, indigo)
+│       │   ├── calendar/
+│       │   │   ├── MonthView.jsx
+│       │   │   ├── WeekView.jsx
+│       │   │   ├── DayView.jsx
+│       │   │   └── UnscheduledSidebar.jsx
 │       │   ├── HabitCard.jsx
 │       │   ├── HabitModal.jsx
 │       │   └── Toast.jsx
@@ -69,15 +76,17 @@ gtd-app/
         │   └── models.js          # Data access layer
         ├── middleware/
         │   └── auth.js            # JWT auth middleware
+        ├── env.js                 # Dotenv config with explicit path
         ├── routes/
         │   ├── tasks.js
         │   ├── projects.js
         │   ├── contexts.js
         │   ├── habits.js
-        │   ├── auth.js
+        │   ├── auth.js            # Login + Google Calendar auth
         │   └── ai.js              # All AI endpoints
         └── services/
-            └── ai.js              # OpenAI integration
+            ├── ai.js              # OpenAI integration
+            └── googleCalendar.js  # Google Calendar token management & event fetching
 ```
 
 ---
@@ -85,7 +94,7 @@ gtd-app/
 ## Database Schema
 
 ### Tables
-- **users** — `id`, `google_id`, `email`, `name`, `picture`, `created_at`, `last_login`
+- **users** — `id`, `google_id`, `email`, `name`, `picture`, `google_calendar_access_token`, `google_calendar_refresh_token`, `google_calendar_token_expiry`, `created_at`, `last_login`
 - **tasks** — `id`, `title`, `notes`, `list` (inbox|next_actions|waiting_for|someday_maybe|completed), `context`, `project_id`, `waiting_for_person`, `due_date`, `energy_level` (low|medium|high), `time_estimate`, `priority`, `is_daily_focus`, `position`, `completed_at`, `user_id`, `created_at`, `updated_at`
 - **projects** — `id`, `name`, `description`, `status` (active|completed|on_hold), `outcome`, `execution_mode` (parallel|sequential), `user_id`, `created_at`, `updated_at`
 - **weekly_reviews** — `id`, `user_id`, `completed_at`, `inbox_count_at_start`, `tasks_completed`, `tasks_moved`, `tasks_deleted`, `ai_summary`, `created_at`
@@ -112,12 +121,17 @@ gtd-app/
 - Energy levels and time estimates on tasks
 - Due dates with priority scoring
 
-### AI Features (OpenAI GPT-4o)
-- **Process Inbox** — AI analyzes inbox tasks, suggests which list each belongs to, assigns priority/energy/time
-- **Daily Focus** — AI picks top priorities for today based on energy, deadlines, importance
-- **Find Duplicates** — AI scans all active tasks for duplicates, suggests which to keep/remove
-- **Import Notes** — Paste bulk text from other apps, AI categorizes each item into GTD lists
-- **Weekly Review Analysis** — AI evaluates system health (1-10 score), identifies stale items, flags projects needing attention, suggests follow-ups on waiting-for items, provides actionable recommendations
+### AI Features (OpenAI)
+- **Smart Capture** (GPT-4o-mini) — Real-time AI on every Quick Capture: auto-categorizes list, context, priority, energy, time estimate; extracts due dates from natural language ("call mom tomorrow"); detects waiting-for patterns; sets daily focus for urgent tasks. Toggle on/off with sparkle icon.
+- **Process Inbox** (GPT-4o) — AI analyzes inbox tasks, suggests which list each belongs to, assigns priority/energy/time
+- **Daily Focus** (GPT-4o) — AI picks top priorities for today based on energy, deadlines, importance
+- **Find Duplicates** (GPT-4o) — AI scans all active tasks for duplicates, suggests which to keep/remove
+- **Import Notes** (GPT-4o) — Paste bulk text from other apps, AI categorizes each item into GTD lists
+- **Weekly Review Analysis** (GPT-4o) — AI evaluates system health (1-10 score), identifies stale items, flags projects needing attention, suggests follow-ups on waiting-for items, provides actionable recommendations
+
+### Calendar
+- **Calendar view** — Month/week/day grids with tasks by due date, unscheduled sidebar, drag-and-drop scheduling
+- **Google Calendar sync** — Opt-in OAuth connection, reads events and displays alongside tasks with indigo styling, read-only (not draggable), click to open in Google Calendar
 
 ### Project Execution Modes
 - **Parallel** (default) — All project tasks visible in Next Actions simultaneously
@@ -157,6 +171,7 @@ gtd-app/
 - `GET /stats` — Streak and completion stats
 
 ### AI: `/api/ai`
+- `POST /smart-capture` — AI-powered task capture with NLP date parsing and auto-categorization
 - `POST /process-inbox` — AI inbox processing
 - `POST /apply-inbox-processing` — Apply AI inbox suggestions
 - `POST /daily-priorities` — AI daily priorities
@@ -170,6 +185,10 @@ gtd-app/
 
 ### Auth: `/api/auth`
 - `POST /google` — Google OAuth login
+- `GET /me` — Get current user (includes `google_calendar_connected`)
+- `GET /google-calendar/status` — Calendar connection status
+- `POST /google-calendar` — Connect Google Calendar (exchange auth code for tokens)
+- `DELETE /google-calendar` — Disconnect Google Calendar (revoke + clear tokens)
 - `GET /config` — Get Google Client ID
 
 ---
@@ -386,3 +405,44 @@ Lifetime deals generate upfront cash and launch communities love them. Things 3 
 14. Weekly Review workflow (4-step wizard with AI analysis)
 15. Calendar view with month/week/day views and drag-and-drop scheduling
 16. Google Calendar sync with opt-in OAuth connection
+17. AI Smart Capture with natural language date parsing and auto-categorization
+
+---
+
+## Build Backlog (Prioritized)
+
+Features to build, ordered by impact and launch-readiness.
+
+### P0 — Must-ship before public launch
+| # | Feature | Why | Effort |
+|---|---------|-----|--------|
+| 1 | **Recurring tasks** | Table stakes — every competitor has it. Users can't manage real workflows without it. | Medium |
+| 2 | **Start/defer dates** | #1 GTD-specific request. Hide tasks until actionable. Core GTD philosophy. | Medium |
+| 3 | **Migrate off sql.js** | In-memory SQLite is fragile. A crash or Railway restart = data loss. Can't take money on this. | High |
+
+### P1 — High impact, build before or shortly after launch
+| # | Feature | Why | Effort |
+|---|---------|-----|--------|
+| 4 | **PWA support** | Installable on mobile without native apps. Eliminates "no mobile app" objection. | Low |
+| 5 | **Calendar time blocking (Phase 3)** | Drag tasks onto time slots. Add `scheduled_time` + `duration` fields. Push blocks to Google Calendar. | High |
+| 6 | **AI-assisted scheduling (Phase 4)** | Smart capture reads your Google Calendar, suggests optimal time slots for new tasks based on free time + energy levels. | Medium |
+| 7 | **Saved filters / custom views** | Power user perspectives: "high-energy @office tasks due this week". OmniFocus killer feature. | Medium |
+| 8 | **Productivity analytics dashboard** | Completion rates, streaks, time trends, project velocity. Users want to see progress. | Medium |
+
+### P2 — Differentiators, build when core is solid
+| # | Feature | Why | Effort |
+|---|---------|-----|--------|
+| 9 | **Built-in Pomodoro timer** | Low effort, high perceived value. TickTick's is "oddly effective." | Low |
+| 10 | **Recurring task flexibility** | Beyond basic recurrence: "every 3rd weekday", "2 days after completion", relative vs absolute. | Medium |
+| 11 | **Task dependencies (cross-project)** | "Task B blocked by Task A" beyond sequential projects. | Medium |
+| 12 | **Free AI provider backend** | Swap to Gemini/Groq for free-tier users to eliminate API costs at scale. | Medium |
+
+### P3 — Future / after product-market fit
+| # | Feature | Why | Effort |
+|---|---------|-----|--------|
+| 13 | **Collaboration & shared lists** | Couples, families, small teams. Different market — build only with clear demand. | High |
+| 14 | **Voice-first task capture** | Speech → organized tasks. Growing trend but niche. | Medium |
+| 15 | **Integrated notes & journaling** | Rich notes alongside tasks. Notion territory. | High |
+| 16 | **Gamification** | XP, rewards, streaks for tasks. Risky if poorly designed. | Medium |
+| 17 | **ADHD-friendly design** | Visual timers, low-overwhelm UI, gentle nudges. Great niche but needs research. | Medium |
+| 18 | **Self-hosted / privacy-first** | Local-only data, no cloud. Growing demand from r/selfhosted. | High |

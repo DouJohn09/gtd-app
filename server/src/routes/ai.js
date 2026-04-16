@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { TaskModel, ProjectModel, WeeklyReviewModel } from '../db/models.js';
 import { getDb } from '../db/schema.js';
-import { processInbox, getDailyPriorities, importNotes, findDuplicates, weeklyReviewAnalysis } from '../services/ai.js';
+import { processInbox, getDailyPriorities, importNotes, findDuplicates, weeklyReviewAnalysis, smartCapture } from '../services/ai.js';
 
 function getUserContexts(userId) {
   const db = getDb();
@@ -14,6 +14,43 @@ function getUserContexts(userId) {
 }
 
 const router = Router();
+
+router.post('/smart-capture', async (req, res) => {
+  try {
+    const { text } = req.body;
+    if (!text?.trim()) {
+      return res.status(400).json({ error: 'Text is required' });
+    }
+    const contexts = getUserContexts(req.user.id);
+    const now = new Date();
+    const today = now.toISOString().split('T')[0];
+    const dayName = now.toLocaleDateString('en-US', { weekday: 'long' });
+    const ai = await smartCapture(text.trim(), contexts, today, dayName);
+
+    if (!ai) {
+      // AI failed — fallback to plain inbox capture
+      const task = TaskModel.create({ title: text.trim() }, req.user.id);
+      return res.json({ task, ai: null, fallback: true });
+    }
+
+    const taskData = {
+      title: ai.title || text.trim(),
+      list: ai.list || 'inbox',
+      context: ai.context || null,
+      priority: ai.priority || 3,
+      energy_level: ai.energy_level || 'medium',
+      time_estimate: ai.time_estimate_minutes || null,
+      due_date: ai.due_date || null,
+      is_daily_focus: ai.is_daily_focus ? 1 : 0,
+      waiting_for_person: ai.waiting_for_person || null,
+    };
+    const task = TaskModel.create(taskData, req.user.id);
+    res.json({ task, ai });
+  } catch (error) {
+    console.error('Smart capture error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
 
 router.post('/process-inbox', async (req, res) => {
   try {

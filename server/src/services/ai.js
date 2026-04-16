@@ -34,6 +34,76 @@ When analyzing tasks:
 Always respond in JSON format as specified in each request.`;
 }
 
+export async function smartCapture(rawText, userContexts, today, dayName) {
+  if (!openai) return null;
+  const contextOptions = userContexts?.length
+    ? userContexts.map(c => c.name || c).join('|')
+    : '@home|@work|@errands|@computer|@phone|@anywhere';
+  try {
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [
+        { role: 'system', content: getSystemPrompt(userContexts) },
+        {
+          role: 'user',
+          content: `You are a smart task capture assistant. Today is ${dayName}, ${today}.
+
+Parse this raw input into a structured GTD task. Extract any dates, people, contexts, and classify it.
+
+Raw input: "${rawText}"
+
+DATE RULES (critical — get this right):
+- Today is ${dayName}, ${today}
+- "tomorrow" = the day after ${today}
+- "Friday" or "by Friday" = the NEAREST upcoming Friday from ${today}. If today IS Friday, it means TODAY.
+- "next Monday" = the Monday of NEXT week
+- "in 3 days" = ${today} + 3 calendar days
+- "end of month" = last day of the current month
+- Always return dates as YYYY-MM-DD format
+- If no date is mentioned, due_date should be null
+
+ENERGY LEVEL RULES:
+- low: quick/simple tasks — calls, emails, messages, lookups, reminders, errands
+- medium: moderate focus — meetings, reviews, planning, writing short documents
+- high: deep focus — coding, analysis, complex writing, strategic thinking, creative work
+
+DAILY FOCUS RULES:
+- is_daily_focus = true if the task is due today or tomorrow, or the input implies urgency ("urgent", "ASAP", "right now", "today")
+- is_daily_focus = false for tasks due later or with no urgency signals
+
+OTHER RULES:
+- Clean the title: remove parsed date/time references but keep the core action. Make it action-oriented (start with a verb).
+- Detect "waiting for [person]" patterns → list: waiting_for, extract person name.
+- Detect vague/aspirational items ("someday", "maybe", "one day", "would be nice") → list: someday_maybe.
+- Default to next_actions if the task is clearly actionable.
+- Only use inbox if the input is genuinely ambiguous or needs clarification.
+- Context should match one of: ${contextOptions} — or null if unclear.
+
+Respond with JSON:
+{
+  "title": "cleaned action-oriented title without date references",
+  "list": "inbox|next_actions|waiting_for|someday_maybe",
+  "context": "${contextOptions}|null",
+  "priority": 1-5,
+  "energy_level": "low|medium|high",
+  "time_estimate_minutes": number or null,
+  "due_date": "YYYY-MM-DD or null",
+  "is_daily_focus": boolean,
+  "waiting_for_person": "person name or null",
+  "reasoning": "brief explanation of what was detected and why"
+}`
+        }
+      ],
+      response_format: { type: 'json_object' }
+    });
+
+    return JSON.parse(response.choices[0].message.content);
+  } catch (error) {
+    console.error('Smart capture AI error:', error);
+    return null;
+  }
+}
+
 export async function analyzeTask(task, userContexts) {
   if (!openai) return { error: 'OpenAI API key not configured' };
   const contextOptions = userContexts?.length
