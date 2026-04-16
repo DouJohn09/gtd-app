@@ -34,11 +34,14 @@ When analyzing tasks:
 Always respond in JSON format as specified in each request.`;
 }
 
-export async function smartCapture(rawText, userContexts, today, dayName) {
+export async function smartCapture(rawText, userContexts, projects, today, dayName) {
   if (!openai) return null;
   const contextOptions = userContexts?.length
     ? userContexts.map(c => c.name || c).join('|')
     : '@home|@work|@errands|@computer|@phone|@anywhere';
+  const projectList = projects?.length
+    ? projects.map(p => p.name).join(', ')
+    : '';
   try {
     const response = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
@@ -71,13 +74,27 @@ DAILY FOCUS RULES:
 - is_daily_focus = true if the task is due today or tomorrow, or the input implies urgency ("urgent", "ASAP", "right now", "today")
 - is_daily_focus = false for tasks due later or with no urgency signals
 
+CONTEXT RULES (personal vs work detection):
+- Context should match one of: ${contextOptions} — or null if unclear.
+- Detect whether the task is personal or work-related based on keywords and intent:
+  - WORK signals: report, meeting, client, project, deadline, presentation, review, budget, stakeholder, sprint, deploy, colleague names, professional activities
+  - PERSONAL signals: family members (mom, dad, kids), groceries, doctor, gym, home repairs, hobbies, friends, personal errands
+- Assign @work for work tasks, @home for home/personal tasks, @phone for calls, @errands for shopping/errands, @computer for digital tasks
+- If the task is clearly work-related, prefer @work or @computer. If personal, prefer @home, @phone, or @errands as appropriate.
+${projectList ? `
+PROJECT MATCHING:
+- Active projects: ${projectList}
+- If the task clearly relates to one of these projects, set project_name to the EXACT project name from the list above.
+- Match based on keywords, topic relevance, or explicit mention of the project name.
+- If no project matches, set project_name to null.
+- Do NOT invent project names — only use names from the list above.
+` : ''}
 OTHER RULES:
 - Clean the title: remove parsed date/time references but keep the core action. Make it action-oriented (start with a verb).
 - Detect "waiting for [person]" patterns → list: waiting_for, extract person name.
 - Detect vague/aspirational items ("someday", "maybe", "one day", "would be nice") → list: someday_maybe.
 - Default to next_actions if the task is clearly actionable.
 - Only use inbox if the input is genuinely ambiguous or needs clarification.
-- Context should match one of: ${contextOptions} — or null if unclear.
 
 Respond with JSON:
 {
@@ -90,6 +107,7 @@ Respond with JSON:
   "due_date": "YYYY-MM-DD or null",
   "is_daily_focus": boolean,
   "waiting_for_person": "person name or null",
+  "project_name": "exact project name from list or null",
   "reasoning": "brief explanation of what was detected and why"
 }`
         }

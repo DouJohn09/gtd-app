@@ -22,10 +22,11 @@ router.post('/smart-capture', async (req, res) => {
       return res.status(400).json({ error: 'Text is required' });
     }
     const contexts = getUserContexts(req.user.id);
+    const projects = ProjectModel.getAll(req.user.id).filter(p => p.status === 'active');
     const now = new Date();
     const today = now.toISOString().split('T')[0];
     const dayName = now.toLocaleDateString('en-US', { weekday: 'long' });
-    const ai = await smartCapture(text.trim(), contexts, today, dayName);
+    const ai = await smartCapture(text.trim(), contexts, projects, today, dayName);
 
     if (!ai) {
       // AI failed — fallback to plain inbox capture
@@ -33,10 +34,18 @@ router.post('/smart-capture', async (req, res) => {
       return res.json({ task, ai: null, fallback: true });
     }
 
+    // Resolve project_id from AI's project_name suggestion
+    let projectId = null;
+    if (ai.project_name) {
+      const match = projects.find(p => p.name.toLowerCase() === ai.project_name.toLowerCase());
+      if (match) projectId = match.id;
+    }
+
     const taskData = {
       title: ai.title || text.trim(),
       list: ai.list || 'inbox',
       context: ai.context || null,
+      project_id: projectId,
       priority: ai.priority || 3,
       energy_level: ai.energy_level || 'medium',
       time_estimate: ai.time_estimate_minutes || null,
