@@ -71,8 +71,9 @@ ENERGY LEVEL RULES:
 - high: deep focus — coding, analysis, complex writing, strategic thinking, creative work
 
 DAILY FOCUS RULES:
-- is_daily_focus = true if the task is due today or tomorrow, or the input implies urgency ("urgent", "ASAP", "right now", "today")
-- is_daily_focus = false for tasks due later or with no urgency signals
+- is_daily_focus = true ONLY if the task is due TODAY or the input explicitly implies urgency ("urgent", "ASAP", "right now", "today")
+- is_daily_focus = false for tasks due tomorrow or later, or with no urgency signals
+- "tomorrow" does NOT mean daily focus — it's scheduled for tomorrow, not today
 
 CONTEXT RULES (personal vs work detection):
 - Context should match one of: ${contextOptions} — or null if unclear.
