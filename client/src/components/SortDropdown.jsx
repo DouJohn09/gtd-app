@@ -1,22 +1,22 @@
 import { ArrowUpDown } from 'lucide-react';
 
 const SORT_OPTIONS = [
-  { value: 'priority', label: 'Priority' },
-  { value: 'date_added_newest', label: 'Date added (newest)' },
-  { value: 'date_added_oldest', label: 'Date added (oldest)' },
-  { value: 'due_date', label: 'Due date (soonest)' },
-  { value: 'energy_low', label: 'Energy (low first)' },
-  { value: 'energy_high', label: 'Energy (high first)' },
-  { value: 'time_shortest', label: 'Quick wins (shortest)' },
-  { value: 'time_longest', label: 'Time (longest first)' },
-  { value: 'alphabetical', label: 'Alphabetical' },
+  { value: 'priority',           label: 'Priority' },
+  { value: 'date_added_newest',  label: 'Date added (newest)' },
+  { value: 'date_added_oldest',  label: 'Date added (oldest)' },
+  { value: 'due_date',           label: 'Due date (soonest)' },
+  { value: 'energy_low',         label: 'Energy (low first)' },
+  { value: 'energy_high',        label: 'Energy (high first)' },
+  { value: 'time_shortest',      label: 'Quick wins (shortest)' },
+  { value: 'time_longest',       label: 'Time (longest first)' },
+  { value: 'alphabetical',       label: 'Alphabetical' },
 ];
 
 const COMPLETED_SORT_OPTIONS = [
-  { value: 'completed_newest', label: 'Completed (newest)' },
-  { value: 'completed_oldest', label: 'Completed (oldest)' },
-  { value: 'priority', label: 'Priority' },
-  { value: 'alphabetical', label: 'Alphabetical' },
+  { value: 'completed_newest',   label: 'Completed (newest)' },
+  { value: 'completed_oldest',   label: 'Completed (oldest)' },
+  { value: 'priority',           label: 'Priority' },
+  { value: 'alphabetical',       label: 'Alphabetical' },
 ];
 
 const energyOrder = { high: 3, medium: 2, low: 1 };
@@ -68,15 +68,18 @@ export default function SortDropdown({ value, onChange, completed = false }) {
   const options = completed ? COMPLETED_SORT_OPTIONS : SORT_OPTIONS;
 
   return (
-    <div className="flex items-center gap-2">
-      <ArrowUpDown className="w-4 h-4 text-gray-400" />
+    <div className="inline-flex items-center gap-1.5 rounded-xl glass px-2 py-1">
+      <ArrowUpDown className="w-3.5 h-3.5 text-text-3" />
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="text-sm border border-gray-200 dark:border-gray-700 rounded-lg px-2 py-1.5 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+        className="font-mono text-[11px] uppercase tracking-wider bg-transparent text-text-2 outline-none cursor-pointer pr-1"
+        style={{ WebkitAppearance: 'none', MozAppearance: 'none', appearance: 'none' }}
       >
         {options.map(opt => (
-          <option key={opt.value} value={opt.value}>{opt.label}</option>
+          <option key={opt.value} value={opt.value} className="bg-bg text-text-1 normal-case tracking-normal font-sans">
+            {opt.label}
+          </option>
         ))}
       </select>
     </div>

@@ -1,50 +1,46 @@
 import { useState, useEffect, useMemo } from 'react';
-import { X, Plus } from 'lucide-react';
+import { X, Plus, Sparkles } from 'lucide-react';
 
-const COLORS = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4', '#f97316'];
+const COLORS = ['#a78bfa', '#5eead4', '#fbbf24', '#fb7185', '#60a5fa', '#f472b6', '#34d399', '#f97316'];
 const DAYS = [
-  { value: 'mon', label: 'Mon' },
-  { value: 'tue', label: 'Tue' },
-  { value: 'wed', label: 'Wed' },
-  { value: 'thu', label: 'Thu' },
-  { value: 'fri', label: 'Fri' },
-  { value: 'sat', label: 'Sat' },
-  { value: 'sun', label: 'Sun' },
+  { value: 'mon', label: 'M' },
+  { value: 'tue', label: 'T' },
+  { value: 'wed', label: 'W' },
+  { value: 'thu', label: 'T' },
+  { value: 'fri', label: 'F' },
+  { value: 'sat', label: 'S' },
+  { value: 'sun', label: 'S' },
 ];
 
 const DEFAULT_CATEGORIES = [
   'Health', 'Fitness', 'Mindfulness', 'Learning',
-  'Productivity', 'Self-Care', 'Social', 'Finance'
+  'Productivity', 'Self-Care', 'Social', 'Finance',
 ];
 
 export const SUGGESTED_HABITS = [
-  { name: 'Exercise', description: '30 min workout', category: 'Fitness', color: '#ef4444', frequency: 'daily' },
-  { name: 'Read', description: 'Read for 20 minutes', category: 'Learning', color: '#3b82f6', frequency: 'daily' },
-  { name: 'Meditate', description: '10 min meditation', category: 'Mindfulness', color: '#8b5cf6', frequency: 'daily' },
-  { name: 'Drink Water', description: '8 glasses of water', category: 'Health', color: '#06b6d4', frequency: 'daily' },
-  { name: 'Journal', description: 'Write daily reflections', category: 'Mindfulness', color: '#f59e0b', frequency: 'daily' },
-  { name: 'Sleep 8 Hours', description: 'Get enough rest', category: 'Health', color: '#10b981', frequency: 'daily' },
-  { name: 'No Social Media', description: 'Limit screen time', category: 'Productivity', color: '#ec4899', frequency: 'daily' },
-  { name: 'Learn Something New', description: 'Study or practice a skill', category: 'Learning', color: '#f97316', frequency: 'daily' },
+  { name: 'Exercise',          description: '30 min workout',         category: 'Fitness',      color: '#fb7185', frequency: 'daily' },
+  { name: 'Read',              description: 'Read for 20 minutes',    category: 'Learning',     color: '#60a5fa', frequency: 'daily' },
+  { name: 'Meditate',          description: '10 min meditation',      category: 'Mindfulness',  color: '#a78bfa', frequency: 'daily' },
+  { name: 'Drink Water',       description: '8 glasses of water',     category: 'Health',       color: '#5eead4', frequency: 'daily' },
+  { name: 'Journal',           description: 'Write daily reflections', category: 'Mindfulness', color: '#fbbf24', frequency: 'daily' },
+  { name: 'Sleep 8 Hours',     description: 'Get enough rest',        category: 'Health',       color: '#34d399', frequency: 'daily' },
+  { name: 'No Social Media',   description: 'Limit screen time',      category: 'Productivity', color: '#f472b6', frequency: 'daily' },
+  { name: 'Learn Something New', description: 'Study or practice',    category: 'Learning',     color: '#f97316', frequency: 'daily' },
 ];
 
 export default function HabitModal({ habit, onClose, onSave, existingCategories = [], existingHabitNames = [] }) {
   const [form, setForm] = useState({
-    name: '',
-    description: '',
-    frequency: 'daily',
-    target_days: [],
-    category: '',
-    color: '#3b82f6',
+    name: '', description: '', frequency: 'daily', target_days: [],
+    category: '', color: '#a78bfa',
   });
   const [customCategory, setCustomCategory] = useState(false);
+  const [customCategoryValue, setCustomCategoryValue] = useState('');
 
   const allCategories = useMemo(() => {
     const merged = new Set([...DEFAULT_CATEGORIES, ...existingCategories]);
     return [...merged].sort();
   }, [existingCategories]);
 
-  // Suggestions the user doesn't already have
   const availableSuggestions = useMemo(() => {
     const names = new Set(existingHabitNames.map(n => n.toLowerCase()));
     return SUGGESTED_HABITS.filter(s => !names.has(s.name.toLowerCase()));
@@ -60,30 +56,25 @@ export default function HabitModal({ habit, onClose, onSave, existingCategories 
         frequency: habit.frequency || 'daily',
         target_days: habit.target_days || [],
         category: isCustom ? '__custom__' : cat,
-        color: habit.color || '#3b82f6',
+        color: habit.color || '#a78bfa',
       });
-      if (isCustom) {
-        setCustomCategory(true);
-        setForm(f => ({ ...f, category: '__custom__', customCategoryValue: cat }));
-      }
+      if (isCustom) { setCustomCategory(true); setCustomCategoryValue(cat); }
     }
-  }, [habit]);
+  }, [habit, existingCategories]);
 
-  const [customCategoryValue, setCustomCategoryValue] = useState('');
-
+  // Esc to close
   useEffect(() => {
-    if (habit?.category && !allCategories.includes(habit.category)) {
-      setCustomCategory(true);
-      setCustomCategoryValue(habit.category);
-    }
-  }, [habit, allCategories]);
+    const handler = (e) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [onClose]);
 
   const toggleDay = (day) => {
     setForm(f => ({
       ...f,
       target_days: f.target_days.includes(day)
         ? f.target_days.filter(d => d !== day)
-        : [...f.target_days, day]
+        : [...f.target_days, day],
     }));
   };
 
@@ -110,49 +101,64 @@ export default function HabitModal({ habit, onClose, onSave, existingCategories 
         : form.frequency === 'weekly' ? form.target_days
         : null,
     };
-    delete data.customCategoryValue;
     onSave(data);
   };
 
-  const handleQuickAdd = (suggestion) => {
-    onSave(suggestion);
-  };
-
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={onClose}>
-      <div className="bg-white dark:bg-gray-900 rounded-xl shadow-xl w-full max-w-md mx-4 sm:mx-auto max-h-[90vh] overflow-auto" onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between p-4 border-b dark:border-gray-700">
-          <h2 className="text-lg font-semibold">
-            {habit?.id ? 'Edit Habit' : 'New Habit'}
-          </h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
-            <X className="w-5 h-5" />
+    <div
+      className="fixed inset-0 z-50 flex items-start justify-center p-4 sm:p-8 overflow-y-auto"
+      style={{ background: 'rgba(8,8,14,0.55)', backdropFilter: 'blur(8px)' }}
+      onClick={onClose}
+    >
+      <div
+        className="relative w-full max-w-md my-6 rounded-2xl glass overflow-hidden"
+        onClick={e => e.stopPropagation()}
+        style={{ boxShadow: '0 24px 64px -16px rgba(0,0,0,0.55), inset 0 1px 0 rgb(255 255 255 / 0.06), inset 0 0 0 1px rgb(var(--mint) / 0.16)' }}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between p-5 border-b border-white/[0.05]">
+          <div>
+            <div className="mono-label" style={{ color: 'rgb(var(--mint-glow))' }}>
+              {habit?.id ? 'edit_habit' : 'new_habit'}
+            </div>
+            <h2 className="font-display text-[24px] leading-tight mt-0.5">
+              {habit?.id ? 'Edit Habit' : 'New Habit'}
+            </h2>
+          </div>
+          <button
+            onClick={onClose}
+            className="grid place-items-center w-8 h-8 rounded-lg text-text-3 hover:text-text-1 hover:bg-white/5 transition-colors"
+          >
+            <X className="w-4 h-4" />
           </button>
         </div>
 
-        {/* Quick-add suggestions for new habits */}
+        {/* Suggestions */}
         {!habit?.id && availableSuggestions.length > 0 && (
-          <div className="p-4 border-b dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
-            <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">Quick Add</p>
-            <div className="flex flex-wrap gap-2">
+          <div className="p-5 border-b border-white/[0.05]">
+            <div className="mono-label mb-3 inline-flex items-center gap-1.5">
+              <Sparkles className="w-3 h-3 text-violet-glow" /> quick_add
+            </div>
+            <div className="flex flex-wrap gap-1.5">
               {availableSuggestions.slice(0, 6).map(s => (
                 <button
                   key={s.name}
-                  onClick={() => handleQuickAdd(s)}
-                  className="flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-full border border-gray-200 dark:border-gray-600 hover:bg-white dark:hover:bg-gray-700 transition-colors"
+                  onClick={() => onSave(s)}
+                  className="inline-flex items-center gap-1.5 text-[12px] px-2.5 py-1.5 rounded-full transition-all hover:bg-white/[0.04]"
+                  style={{ boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.08)' }}
                 >
-                  <div className="w-2 h-2 rounded-full" style={{ backgroundColor: s.color }} />
-                  {s.name}
-                  <Plus className="w-3 h-3 text-gray-400" />
+                  <div className="w-1.5 h-1.5 rounded-full" style={{ background: s.color, boxShadow: `0 0 6px ${s.color}` }} />
+                  <span className="text-text-1">{s.name}</span>
+                  <Plus className="w-3 h-3 text-text-3" />
                 </button>
               ))}
             </div>
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="p-4 space-y-4">
+        <form onSubmit={handleSubmit} className="p-5 space-y-4 max-h-[65vh] overflow-y-auto">
           <div>
-            <label className="gtd-label">Name *</label>
+            <label className="gtd-label">Name</label>
             <input
               type="text"
               value={form.name}
@@ -160,7 +166,7 @@ export default function HabitModal({ habit, onClose, onSave, existingCategories 
               className="gtd-input"
               required
               autoFocus
-              placeholder="e.g. Exercise, Read, Meditate"
+              placeholder="Exercise, Read, Meditate…"
             />
           </div>
 
@@ -200,7 +206,7 @@ export default function HabitModal({ habit, onClose, onSave, existingCategories 
                 {allCategories.map(cat => (
                   <option key={cat} value={cat}>{cat}</option>
                 ))}
-                <option value="__custom__">Custom...</option>
+                <option value="__custom__">Custom…</option>
               </select>
               {customCategory && (
                 <input
@@ -208,7 +214,7 @@ export default function HabitModal({ habit, onClose, onSave, existingCategories 
                   value={customCategoryValue}
                   onChange={e => setCustomCategoryValue(e.target.value)}
                   className="gtd-input mt-2"
-                  placeholder="Enter category name"
+                  placeholder="Category name"
                   autoFocus
                 />
               )}
@@ -217,22 +223,33 @@ export default function HabitModal({ habit, onClose, onSave, existingCategories 
 
           {form.frequency === 'specific_days' && (
             <div>
-              <label className="gtd-label">Which days?</label>
-              <div className="flex flex-wrap gap-1">
-                {DAYS.map(d => (
-                  <button
-                    key={d.value}
-                    type="button"
-                    onClick={() => toggleDay(d.value)}
-                    className={`px-2.5 py-1.5 rounded text-sm font-medium transition-colors ${
-                      form.target_days.includes(d.value)
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'
-                    }`}
-                  >
-                    {d.label}
-                  </button>
-                ))}
+              <label className="gtd-label">Days</label>
+              <div className="flex gap-1">
+                {DAYS.map(d => {
+                  const active = form.target_days.includes(d.value);
+                  return (
+                    <button
+                      key={d.value}
+                      type="button"
+                      onClick={() => toggleDay(d.value)}
+                      className="w-9 h-9 rounded-lg font-mono text-[12px] uppercase transition-all"
+                      style={
+                        active
+                          ? {
+                              background: `linear-gradient(180deg, ${form.color}33, ${form.color}1f)`,
+                              color: form.color,
+                              boxShadow: `inset 0 0 0 1px ${form.color}55`,
+                            }
+                          : {
+                              color: 'rgb(var(--text-3))',
+                              boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.08)',
+                            }
+                      }
+                    >
+                      {d.label}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -242,8 +259,7 @@ export default function HabitModal({ habit, onClose, onSave, existingCategories 
               <label className="gtd-label">Times per week</label>
               <input
                 type="number"
-                min="1"
-                max="7"
+                min="1" max="7"
                 value={form.target_days[0] || 3}
                 onChange={e => setForm({ ...form, target_days: [parseInt(e.target.value)] })}
                 className="gtd-input w-24"
@@ -254,28 +270,35 @@ export default function HabitModal({ habit, onClose, onSave, existingCategories 
           <div>
             <label className="gtd-label">Color</label>
             <div className="flex flex-wrap gap-2">
-              {COLORS.map(c => (
-                <button
-                  key={c}
-                  type="button"
-                  onClick={() => setForm({ ...form, color: c })}
-                  className={`w-7 h-7 rounded-full transition-transform ${
-                    form.color === c ? 'ring-2 ring-offset-2 ring-blue-500 scale-110' : 'hover:scale-105'
-                  }`}
-                  style={{ backgroundColor: c }}
-                />
-              ))}
+              {COLORS.map(c => {
+                const active = form.color === c;
+                return (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => setForm({ ...form, color: c })}
+                    className="w-8 h-8 rounded-full transition-transform"
+                    style={{
+                      background: c,
+                      transform: active ? 'scale(1.15)' : 'scale(1)',
+                      boxShadow: active
+                        ? `0 0 0 2px rgb(var(--bg)), 0 0 0 4px ${c}, 0 0 16px ${c}99`
+                        : `0 0 8px ${c}55`,
+                    }}
+                  />
+                );
+              })}
             </div>
           </div>
 
-          <div className="flex gap-2 pt-4 border-t dark:border-gray-700">
-            <button type="button" onClick={onClose} className="gtd-btn gtd-btn-secondary flex-1">
+          <div className="flex gap-2 pt-3 border-t border-white/[0.05]">
+            <button type="button" onClick={onClose} className="gtd-btn gtd-btn-secondary flex-1 text-[12.5px]">
               Cancel
             </button>
             <button
               type="submit"
               disabled={!form.name.trim()}
-              className="gtd-btn gtd-btn-primary flex-1 disabled:opacity-50"
+              className="gtd-btn gtd-btn-primary flex-1 text-[12.5px] disabled:opacity-50"
             >
               {habit?.id ? 'Save Changes' : 'Create Habit'}
             </button>

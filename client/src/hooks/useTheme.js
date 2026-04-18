@@ -1,22 +1,12 @@
-import { useState, useCallback } from 'react';
+import { useCallback } from 'react';
 
-function getInitialDark() {
-  const stored = localStorage.getItem('theme');
-  if (stored) return stored === 'dark';
-  return window.matchMedia('(prefers-color-scheme: dark)').matches;
-}
-
+// Light mode is not yet implemented in the new design system.
+// Hook is kept as a stable shape so callers don't break; toggleTheme is a no-op
+// that forcibly re-asserts dark. Restore real toggling when the light palette ships.
 export default function useTheme() {
-  const [isDark, setIsDark] = useState(getInitialDark);
-
   const toggleTheme = useCallback(() => {
-    setIsDark(prev => {
-      const next = !prev;
-      document.documentElement.classList.toggle('dark', next);
-      localStorage.setItem('theme', next ? 'dark' : 'light');
-      return next;
-    });
+    document.documentElement.classList.add('dark');
   }, []);
 
-  return { isDark, toggleTheme };
+  return { isDark: true, toggleTheme };
 }

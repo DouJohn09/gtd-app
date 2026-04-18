@@ -1,93 +1,132 @@
-import { CheckCircle, Circle, Clock, Zap, Tag, FolderOpen } from 'lucide-react';
+import { Check, Clock, Zap, Tag, FolderOpen, User } from 'lucide-react';
 
-const energyColors = {
-  low: 'text-green-600',
-  medium: 'text-yellow-600',
-  high: 'text-red-600'
+const ENERGY_TONES = {
+  low: 'mint',
+  medium: 'amber',
+  high: 'rose',
 };
 
 export default function TaskCard({ task, onComplete, onEdit, showList = false, queued = false }) {
   const isCompleted = task.list === 'completed';
+  const focus = task.is_daily_focus === 1 && !queued && !isCompleted;
+  const energyTone = ENERGY_TONES[task.energy_level];
 
   return (
-    <div className={`gtd-card flex items-start gap-3 overflow-hidden ${isCompleted ? 'opacity-60' : ''} ${queued ? 'opacity-50 border-dashed' : ''}`}>
+    <div
+      className="relative rounded-2xl glass p-4 flex items-start gap-3 transition-all"
+      style={
+        isCompleted
+          ? { opacity: 0.6 }
+          : queued
+          ? { opacity: 0.5 }
+          : focus
+          ? { boxShadow: '0 8px 32px -12px rgba(0,0,0,0.4), inset 0 1px 0 rgb(255 255 255 / 0.05), inset 0 0 0 1px rgb(var(--amber) / 0.22), inset 3px 0 0 rgb(var(--amber-glow))' }
+          : undefined
+      }
+    >
+      {/* Checkbox */}
       <button
         onClick={() => onComplete?.(task.id)}
-        className={`mt-0.5 transition-colors ${queued ? 'text-gray-300 dark:text-gray-600 cursor-not-allowed' : 'text-gray-400 hover:text-green-600'}`}
         disabled={isCompleted || queued}
+        aria-pressed={isCompleted}
+        className="fresh-check mt-0.5 w-5 h-5 rounded-full grid place-items-center transition-all flex-shrink-0"
+        style={
+          isCompleted
+            ? {
+                background: 'linear-gradient(180deg, rgb(var(--mint) / 0.85), rgb(var(--mint) / 0.65))',
+                boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.18), 0 0 12px rgb(var(--mint) / 0.3)',
+              }
+            : queued
+            ? { boxShadow: 'inset 0 0 0 1.5px rgba(255,255,255,0.10)', cursor: 'not-allowed' }
+            : { boxShadow: 'inset 0 0 0 1.5px rgba(255,255,255,0.18)' }
+        }
       >
-        {isCompleted ? (
-          <CheckCircle className="w-5 h-5 text-green-600" />
-        ) : (
-          <Circle className={`w-5 h-5 ${queued ? 'text-gray-300 dark:text-gray-600' : ''}`} />
-        )}
+        {isCompleted && <Check className="w-3 h-3 text-bg" strokeWidth={3} />}
       </button>
-      
+
+      {/* Body */}
       <div className="flex-1 min-w-0">
-        <div 
-          className={`font-medium cursor-pointer hover:text-blue-600 break-words ${isCompleted ? 'line-through' : ''}`}
+        <button
           onClick={() => onEdit?.(task)}
+          className={`text-left text-[14px] font-medium break-words leading-snug transition-colors hover:text-violet-glow ${isCompleted ? 'line-through text-text-3' : 'text-text-1'}`}
         >
           {task.title}
-        </div>
-        
+        </button>
+
         {task.notes && (
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 line-clamp-2">{task.notes}</p>
+          <p className="text-[12px] text-text-3 mt-1 line-clamp-2 leading-relaxed">{task.notes}</p>
         )}
-        
-        <div className="flex flex-wrap items-center gap-2 mt-2">
+
+        <div className="flex flex-wrap items-center gap-1.5 mt-2">
           {showList && (
-            <span className={`gtd-badge list-${task.list}`}>
-              {task.list.replace('_', ' ')}
-            </span>
+            <span className={`gtd-badge list-${task.list}`}>{task.list.replace('_', ' ')}</span>
           )}
-          
+
           {task.context && (
-            <span className="context-badge">
-              <Tag className="w-3 h-3 mr-1" />
+            <span className="context-badge inline-flex items-center gap-1">
+              <Tag className="w-2.5 h-2.5" />
               {task.context}
             </span>
           )}
-          
+
           {task.project_name && (
-            <span className="gtd-badge bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-300">
-              <FolderOpen className="w-3 h-3 mr-1" />
+            <span
+              className="gtd-badge inline-flex items-center gap-1"
+              style={{ background: 'rgb(var(--violet) / 0.12)', color: 'rgb(var(--violet-glow))', boxShadow: 'inset 0 0 0 1px rgb(var(--violet) / 0.20)' }}
+            >
+              <FolderOpen className="w-2.5 h-2.5" />
               {task.project_name}
             </span>
           )}
-          
+
           {task.energy_level && (
-            <span className={`flex items-center gap-1 text-xs ${energyColors[task.energy_level]}`}>
-              <Zap className="w-3 h-3" />
+            <span
+              className="font-mono text-[10.5px] uppercase tracking-wider inline-flex items-center gap-1"
+              style={{ color: `rgb(var(--${energyTone}-glow))` }}
+            >
+              <Zap className="w-2.5 h-2.5" />
               {task.energy_level}
             </span>
           )}
-          
+
           {task.time_estimate && (
-            <span className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
-              <Clock className="w-3 h-3" />
+            <span className="font-mono text-[10.5px] text-text-3 inline-flex items-center gap-1">
+              <Clock className="w-2.5 h-2.5" />
               {task.time_estimate}m
             </span>
           )}
-          
+
           {task.waiting_for_person && (
-            <span className="text-xs text-orange-600">
-              Waiting: {task.waiting_for_person}
+            <span
+              className="font-mono text-[10.5px] inline-flex items-center gap-1"
+              style={{ color: 'rgb(var(--rose-glow))' }}
+            >
+              <User className="w-2.5 h-2.5" />
+              {task.waiting_for_person}
             </span>
           )}
         </div>
       </div>
-      
-      {queued && (
-        <span className="gtd-badge bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400 text-xs">
-          Queued
-        </span>
-      )}
-      {task.is_daily_focus === 1 && !queued && (
-        <span className="gtd-badge bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300">
-          Today
-        </span>
-      )}
+
+      {/* Right tags */}
+      <div className="flex flex-col items-end gap-1 flex-shrink-0">
+        {queued && (
+          <span
+            className="font-mono text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-md"
+            style={{ background: 'rgba(255,255,255,0.04)', color: 'rgb(var(--text-3))' }}
+          >
+            queued
+          </span>
+        )}
+        {focus && (
+          <span
+            className="font-mono text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-md inline-flex items-center gap-1"
+            style={{ background: 'rgb(var(--amber) / 0.14)', color: 'rgb(var(--amber-glow))', boxShadow: 'inset 0 0 0 1px rgb(var(--amber) / 0.28)' }}
+          >
+            today
+          </span>
+        )}
+      </div>
     </div>
   );
 }

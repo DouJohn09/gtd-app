@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, Sparkles, Loader2 } from 'lucide-react';
+import { ArrowRight, Sparkles, Loader2 } from 'lucide-react';
 import { api } from '../lib/api';
 import { useToast } from './Toast';
 
@@ -22,7 +22,7 @@ function formatAiToast(ai) {
   return `Added to ${parts.join(' · ')}`;
 }
 
-export default function QuickCapture({ onCapture, placeholder = "Quick capture - what's on your mind?" }) {
+export default function QuickCapture({ onCapture, placeholder = "Quick capture — what's on your mind?", autoFocus = false }) {
   const [title, setTitle] = useState('');
   const [loading, setLoading] = useState(false);
   const [smartMode, setSmartMode] = useState(true);
@@ -31,67 +31,67 @@ export default function QuickCapture({ onCapture, placeholder = "Quick capture -
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!title.trim()) return;
-
     setLoading(true);
     try {
       if (smartMode) {
         const { ai, fallback } = await api.ai.smartCapture(title.trim());
         setTitle('');
-        if (fallback || !ai) {
-          addToast('Task captured to inbox (AI unavailable)', 'info');
-        } else {
-          addToast(formatAiToast(ai), 'success');
-        }
+        if (fallback || !ai) addToast('Captured to inbox (AI unavailable)', 'info');
+        else addToast(formatAiToast(ai), 'success');
       } else {
         await api.tasks.create({ title: title.trim() });
         setTitle('');
-        addToast('Task captured to inbox', 'success');
+        addToast('Captured to inbox', 'success');
       }
       onCapture?.();
     } catch (error) {
       console.error('Failed to capture:', error);
-      addToast(error.message || 'Failed to capture task', 'error');
-    } finally {
-      setLoading(false);
-    }
+      addToast(error.message || 'Failed to capture', 'error');
+    } finally { setLoading(false); }
   };
 
   return (
-    <form onSubmit={handleSubmit} className="flex gap-2">
+    <form onSubmit={handleSubmit} className="flex items-center gap-2">
       <div className="relative flex-1">
         <input
           type="text"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          placeholder={smartMode ? 'e.g. "call mom tomorrow", "buy groceries Friday"' : placeholder}
-          className="gtd-input w-full pr-9"
+          placeholder={smartMode ? '"call mom tomorrow" · "buy groceries Friday"' : placeholder}
+          className="gtd-input w-full pl-10 pr-3"
           disabled={loading}
+          autoFocus={autoFocus}
         />
         <button
           type="button"
           onClick={() => setSmartMode(!smartMode)}
-          className={`absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded transition-colors
-            ${smartMode
-              ? 'text-yellow-500 hover:text-yellow-600'
-              : 'text-gray-400 hover:text-gray-500 dark:text-gray-500 dark:hover:text-gray-400'
-            }
-          `}
-          title={smartMode ? 'AI Smart Capture on — click to disable' : 'AI Smart Capture off — click to enable'}
+          className="absolute left-2 top-1/2 -translate-y-1/2 grid place-items-center w-7 h-7 rounded-lg transition-all"
+          style={
+            smartMode
+              ? { color: 'rgb(var(--violet-glow))', background: 'rgb(var(--violet) / 0.10)', boxShadow: 'inset 0 0 0 1px rgb(var(--violet) / 0.22)' }
+              : { color: 'rgb(var(--text-3))' }
+          }
+          title={smartMode ? 'Smart Capture on — click to disable' : 'Smart Capture off — click to enable'}
         >
-          <Sparkles className="w-4 h-4" />
+          <Sparkles className="w-3.5 h-3.5" />
         </button>
       </div>
       <button
         type="submit"
         disabled={!title.trim() || loading}
-        className="gtd-btn gtd-btn-primary flex items-center gap-2 disabled:opacity-50"
+        className="gtd-btn gtd-btn-primary inline-flex items-center gap-1.5 text-[12.5px] disabled:opacity-50"
       >
         {loading ? (
-          <Loader2 className="w-4 h-4 animate-spin" />
+          <>
+            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            {smartMode ? 'AI…' : 'Saving…'}
+          </>
         ) : (
-          <Plus className="w-4 h-4" />
+          <>
+            Capture
+            <ArrowRight className="w-3.5 h-3.5" />
+          </>
         )}
-        {loading && smartMode ? 'AI...' : 'Capture'}
       </button>
     </form>
   );

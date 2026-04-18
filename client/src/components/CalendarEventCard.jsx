@@ -12,35 +12,41 @@ function formatTime(isoString) {
 
 export default function CalendarEventCard({ event, expanded = false }) {
   const handleClick = () => {
-    if (event.html_link) {
-      window.open(event.html_link, '_blank', 'noopener');
-    }
+    if (event.html_link) window.open(event.html_link, '_blank', 'noopener');
   };
 
   const startTime = formatTime(event.start_time);
-  const endTime = formatTime(event.end_time);
-  const timeLabel = startTime && endTime ? `${startTime} - ${endTime}` : startTime || (event.all_day ? 'All day' : null);
+  const endTime   = formatTime(event.end_time);
+  const timeLabel = startTime && endTime ? `${startTime} – ${endTime}` : startTime || (event.all_day ? 'all day' : null);
 
   if (expanded) {
     return (
       <div
         onClick={handleClick}
-        className="calendar-event-google gtd-card flex items-start gap-3 cursor-pointer hover:ring-1 hover:ring-indigo-400 transition-all"
+        className="rounded-2xl glass glass-hover p-5 flex items-start gap-3 cursor-pointer relative overflow-hidden"
+        style={{ borderColor: 'rgba(167,139,250,0.22)' }}
       >
-        <CalendarDays className="w-5 h-5 text-indigo-500 mt-0.5 flex-shrink-0" />
+        <div
+          className="absolute left-0 top-0 bottom-0 w-[2px]"
+          style={{ background: 'rgb(var(--violet))', boxShadow: '0 0 14px rgba(167,139,250,0.55)' }}
+        />
+        <div
+          className="w-9 h-9 rounded-xl grid place-items-center shrink-0"
+          style={{ background: 'rgba(167,139,250,0.12)', border: '1px solid rgba(167,139,250,0.22)' }}
+        >
+          <CalendarDays className="w-4 h-4 text-violet" />
+        </div>
         <div className="flex-1 min-w-0">
-          <div className="font-medium break-words">{event.title}</div>
-          {timeLabel && (
-            <p className="text-sm mt-1 text-indigo-600 dark:text-indigo-400">{timeLabel}</p>
-          )}
+          <div className="text-[14.5px] font-medium break-words">{event.title}</div>
+          {timeLabel && <p className="font-mono text-[11.5px] mt-1 text-violet-glow">{timeLabel}</p>}
           {event.location && (
-            <p className="text-sm text-indigo-500 dark:text-indigo-400 mt-1 flex items-center gap-1">
+            <p className="text-[12px] text-text-2 mt-1.5 inline-flex items-center gap-1">
               <MapPin className="w-3 h-3" />
               {event.location}
             </p>
           )}
         </div>
-        <ExternalLink className="w-4 h-4 text-indigo-400 flex-shrink-0 mt-0.5" />
+        <ExternalLink className="w-3.5 h-3.5 text-text-3 shrink-0 mt-1" />
       </div>
     );
   }
@@ -48,11 +54,20 @@ export default function CalendarEventCard({ event, expanded = false }) {
   return (
     <div
       onClick={handleClick}
-      className="flex items-center gap-1.5 px-1.5 py-1 rounded text-xs cursor-pointer calendar-event-google hover:ring-1 hover:ring-indigo-400 transition-all"
+      className="flex items-center gap-1.5 px-2 py-1 rounded-md text-[11.5px] cursor-pointer relative overflow-hidden transition-all"
+      style={{
+        background: 'rgba(167,139,250,0.10)',
+        border: '1px solid rgba(167,139,250,0.20)',
+        color: 'rgb(var(--violet-glow))',
+      }}
     >
-      <CalendarDays className="w-3 h-3 flex-shrink-0" />
-      {timeLabel && !event.all_day && (
-        <span className="flex-shrink-0 font-medium">{startTime}</span>
+      <span
+        className="absolute left-0 top-0 bottom-0 w-[2px]"
+        style={{ background: 'rgb(var(--violet))' }}
+      />
+      <CalendarDays className="w-3 h-3 shrink-0 ml-1" />
+      {startTime && !event.all_day && (
+        <span className="font-mono text-[10.5px] shrink-0 text-violet">{startTime}</span>
       )}
       <span className="truncate flex-1">{event.title}</span>
     </div>

@@ -1,33 +1,42 @@
 import { useState, useEffect, useMemo } from 'react';
-import { CheckCircle2, RotateCcw, Trash2 } from 'lucide-react';
+import { CheckCircle2, RotateCcw, Trash2, Check } from 'lucide-react';
 import { api } from '../lib/api';
 import { useToast } from '../components/Toast';
 import SortDropdown, { sortTasks } from '../components/SortDropdown';
+import MonoLabel from '../components/ui/MonoLabel';
 
 function TaskRow({ task, onRestore, onDelete }) {
   return (
-    <div className="gtd-card flex items-center gap-3 group">
-      <CheckCircle2 className="w-5 h-5 text-green-500 flex-shrink-0" />
+    <div className="rounded-2xl glass p-4 flex items-center gap-3 group transition-all">
+      <div
+        className="grid place-items-center w-7 h-7 rounded-full flex-shrink-0"
+        style={{
+          background: 'linear-gradient(180deg, rgb(var(--mint) / 0.85), rgb(var(--mint) / 0.65))',
+          boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.18), 0 0 12px rgb(var(--mint) / 0.3)',
+        }}
+      >
+        <Check className="w-3.5 h-3.5 text-bg" strokeWidth={3} />
+      </div>
       <div className="flex-1 min-w-0">
-        <p className="text-gray-700 dark:text-gray-300 line-through">{task.title}</p>
+        <p className="text-[13.5px] text-text-2 line-through truncate">{task.title}</p>
         {task.context && (
-          <span className="text-xs text-gray-400">@{task.context}</span>
+          <span className="font-mono text-[10.5px] text-text-3">@{task.context}</span>
         )}
       </div>
       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
         <button
           onClick={() => onRestore(task.id)}
-          className="p-1.5 text-gray-400 hover:text-blue-600 rounded"
+          className="p-1.5 text-text-3 hover:text-violet-glow rounded-lg transition-colors"
           title="Restore to inbox"
         >
-          <RotateCcw className="w-4 h-4" />
+          <RotateCcw className="w-3.5 h-3.5" />
         </button>
         <button
           onClick={() => onDelete(task.id)}
-          className="p-1.5 text-gray-400 hover:text-red-600 rounded"
+          className="p-1.5 text-text-3 hover:text-rose-glow rounded-lg transition-colors"
           title="Delete permanently"
         >
-          <Trash2 className="w-4 h-4" />
+          <Trash2 className="w-3.5 h-3.5" />
         </button>
       </div>
     </div>
@@ -46,9 +55,7 @@ export default function CompletedTasks() {
       setTasks(data);
     } catch (error) {
       console.error('Failed to fetch completed tasks:', error);
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   };
 
   useEffect(() => { fetchData(); }, []);
@@ -58,9 +65,7 @@ export default function CompletedTasks() {
       await api.tasks.update(id, { list: 'inbox', completed_at: null });
       addToast('Task restored to inbox', 'success');
       fetchData();
-    } catch (err) {
-      addToast(err.message, 'error');
-    }
+    } catch (err) { addToast(err.message, 'error'); }
   };
 
   const handleDelete = async (id) => {
@@ -69,9 +74,7 @@ export default function CompletedTasks() {
       await api.tasks.delete(id);
       addToast('Task deleted', 'success');
       fetchData();
-    } catch (err) {
-      addToast(err.message, 'error');
-    }
+    } catch (err) { addToast(err.message, 'error'); }
   };
 
   const formatDate = (dateStr) => {
@@ -88,7 +91,6 @@ export default function CompletedTasks() {
 
   const sortedTasks = useMemo(() => sortTasks(tasks, sortBy), [tasks, sortBy]);
 
-  // Group tasks by completion date
   const grouped = sortedTasks.reduce((acc, task) => {
     const date = task.completed_at ? task.completed_at.split('T')[0] : 'Unknown';
     if (!acc[date]) acc[date] = [];
@@ -98,46 +100,66 @@ export default function CompletedTasks() {
 
   if (loading) {
     return (
-      <div className="p-8 flex justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      <div className="px-6 lg:px-12 pt-10 pb-20">
+        <div className="min-h-[40vh] flex items-center justify-center">
+          <div className="w-6 h-6 rounded-full border-2 border-violet/30 border-t-violet animate-spin" />
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="p-4 md:p-8 max-w-4xl mx-auto">
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold flex items-center gap-3">
-          <CheckCircle2 className="w-8 h-8 text-green-500" />
-          Completed Tasks
-        </h1>
-        <p className="text-gray-500 dark:text-gray-400 mt-1">
-          {tasks.length} {tasks.length === 1 ? 'task' : 'tasks'} completed
-        </p>
+    <div className="px-6 lg:px-12 pt-10 pb-20 max-w-3xl">
+      {/* Header */}
+      <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4 mb-8">
+        <div>
+          <MonoLabel tone="mint" className="mb-3">archive</MonoLabel>
+          <h1 className="font-display text-[52px] md:text-[60px] leading-[1] tracking-tight">
+            Completed
+            <span className="font-mono text-[14px] tracking-wider text-text-3 ml-3 align-middle">
+              {tasks.length.toString().padStart(2, '0')}
+            </span>
+          </h1>
+          <p className="font-display italic text-[18px] text-text-2 mt-2">
+            {tasks.length === 0 ? 'Nothing finished yet — soon.' : 'A history of things shipped.'}
+          </p>
+        </div>
+        {tasks.length > 0 && (
+          <SortDropdown value={sortBy} onChange={setSortBy} completed />
+        )}
       </div>
 
-      {tasks.length > 0 && (
-        <div className="flex justify-end mb-4">
-          <SortDropdown value={sortBy} onChange={setSortBy} completed />
-        </div>
-      )}
-
       {tasks.length === 0 ? (
-        <div className="gtd-card text-center py-12 text-gray-500 dark:text-gray-400">
-          <CheckCircle2 className="w-16 h-16 mx-auto mb-4 opacity-30" />
-          <p className="text-xl font-medium">No completed tasks yet</p>
-          <p className="mt-2">Tasks you complete will appear here.</p>
+        <div className="rounded-2xl glass p-10 text-center relative overflow-hidden">
+          <div
+            className="absolute inset-0 pointer-events-none"
+            style={{ background: 'radial-gradient(circle at 50% 30%, rgb(var(--mint) / 0.10), transparent 60%)' }}
+          />
+          <div className="relative">
+            <div
+              className="inline-grid place-items-center w-14 h-14 rounded-2xl mb-4"
+              style={{ background: 'rgb(var(--mint) / 0.10)', boxShadow: 'inset 0 0 0 1px rgb(var(--mint) / 0.25)' }}
+            >
+              <CheckCircle2 className="w-6 h-6" style={{ color: 'rgb(var(--mint-glow))' }} />
+            </div>
+            <div className="mono-label mb-2" style={{ color: 'rgb(var(--mint-glow))' }}>archive_empty</div>
+            <div className="font-display italic text-[28px] mb-1">A blank ledger.</div>
+            <p className="text-[13px] text-text-2">Tasks you complete will land here.</p>
+          </div>
         </div>
       ) : sortBy.startsWith('completed_') ? (
-        <div className="space-y-6">
+        <div className="space-y-7">
           {Object.entries(grouped).map(([date, dateTasks]) => (
             <div key={date}>
-              <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">
-                {formatDate(date + 'T00:00:00')}
-                <span className="ml-2 normal-case tracking-normal text-gray-400 dark:text-gray-500">
-                  {date}
+              <div className="flex items-baseline gap-3 mb-3 px-1">
+                <div className="mono-label">{formatDate(date + 'T00:00:00').toLowerCase().replace(/\s+/g, '_')}</div>
+                <span className="font-mono text-[10.5px] text-text-3">{date}</span>
+                <span className="font-mono text-[10.5px] text-text-3">·</span>
+                <span className="font-mono text-[10.5px] text-mint-glow">
+                  {dateTasks.length.toString().padStart(2, '0')}
                 </span>
-              </h3>
+                <div className="flex-1 h-px" style={{ background: 'linear-gradient(to right, rgba(255,255,255,0.06), transparent)' }} />
+              </div>
               <div className="space-y-2">
                 {dateTasks.map(task => (
                   <TaskRow key={task.id} task={task} onRestore={handleRestore} onDelete={handleDelete} />

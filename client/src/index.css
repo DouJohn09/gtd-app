@@ -2,82 +2,233 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ============================================================
+   Design tokens
+   Dark is the only theme right now. Variables sit in :root so
+   they apply unconditionally. When light mode lands, add a
+   `:root:not(.dark) { ... }` block with light values — the
+   existing useTheme hook already toggles the .dark class.
+   ============================================================ */
+:root {
+  /* surfaces (rgb triplets so Tailwind's <alpha-value> works) */
+  --bg:            10 10 15;
+  --bg-elevated:   18 18 26;
+  --surface:       255 255 255;          /* used with low alpha */
+  --surface-hover: 255 255 255;
+  --border-subtle: 255 255 255;
+  --border-strong: 255 255 255;
+
+  /* alpha presets (consume via rgba in CSS, not Tailwind) */
+  --a-surface: 0.035;
+  --a-surface-hover: 0.06;
+  --a-border-subtle: 0.08;
+  --a-border-strong: 0.14;
+
+  /* text */
+  --text-1: 245 245 247;
+  --text-2: 161 161 170;
+  --text-3: 107 107 117;
+
+  /* accents */
+  --violet:      167 139 250;
+  --violet-glow: 196 181 253;
+  --mint:         94 234 212;
+  --mint-glow:   153 246 228;
+  --amber:       251 191  36;
+  --amber-glow:  253 224 113;
+  --rose:        251 113 133;
+  --rose-glow:   253 164 175;
+}
+
+/* ============================================================
+   Base
+   ============================================================ */
+html, body, #root {
+  background: rgb(var(--bg));
+  color: rgb(var(--text-1));
+}
 body {
-  @apply bg-gray-50 text-gray-900 dark:bg-gray-950 dark:text-gray-100;
+  font-family: 'Satoshi', ui-sans-serif, system-ui, sans-serif;
+  font-feature-settings: 'ss01','cv11';
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-.gtd-card {
-  @apply bg-white rounded-lg shadow-sm border border-gray-200 p-4
-         dark:bg-gray-900 dark:border-gray-700;
+::selection { background: rgba(167,139,250,0.35); color: rgb(var(--text-1)); }
+
+/* Scrollbar — restrained, themed */
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.06);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+*::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.12); background-clip: padding-box; }
+
+/* ============================================================
+   Glass primitives (utility classes used app-wide)
+   ============================================================ */
+.glass {
+  background: rgba(255,255,255,var(--a-surface));
+  border: 1px solid rgba(255,255,255,var(--a-border-subtle));
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow: 0 8px 32px -12px rgba(0,0,0,0.4), inset 0 1px 0 0 rgba(255,255,255,0.06);
+  transition: background 220ms ease, border-color 220ms ease, transform 220ms ease;
+}
+.glass-hover:hover {
+  background: rgba(255,255,255,var(--a-surface-hover));
+  border-color: rgba(255,255,255,var(--a-border-strong));
 }
 
-.gtd-btn {
-  @apply px-4 py-2 rounded-lg font-medium transition-colors;
+.mono-label {
+  font-family: 'Geist Mono', ui-monospace, monospace;
+  font-size: 0.65rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: rgb(var(--text-3));
 }
 
-.gtd-btn-primary {
-  @apply bg-blue-600 text-white hover:bg-blue-700;
+.fresh-check:hover:not([aria-pressed="true"]) {
+  border-color: rgb(var(--violet)) !important;
+  box-shadow: 0 0 0 6px rgba(167,139,250,0.08) !important;
 }
 
-.gtd-btn-secondary {
-  @apply bg-gray-100 text-gray-700 hover:bg-gray-200
-         dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600;
+/* ============================================================
+   .gtd-* classes — redefined so existing pages flip aesthetic
+   without changing JSX. Will retire as pages are ported in
+   later phases.
+   ============================================================ */
+@layer components {
+  .gtd-card {
+    @apply rounded-2xl p-5 glass glass-hover;
+  }
+
+  .gtd-btn {
+    @apply px-4 py-2 rounded-xl font-medium text-sm transition-all duration-200;
+  }
+
+  .gtd-btn-primary {
+    @apply text-white relative overflow-hidden;
+    background: linear-gradient(180deg, rgb(var(--violet)) 0%, #7c3aed 100%);
+    box-shadow: 0 2px 10px -2px rgba(124,58,237,0.5), inset 0 1px 0 0 rgba(255,255,255,0.2);
+  }
+  .gtd-btn-primary:hover {
+    box-shadow: 0 6px 22px -4px rgba(124,58,237,0.7), inset 0 1px 0 0 rgba(255,255,255,0.28);
+  }
+  .gtd-btn-primary:active { transform: translateY(1px); }
+
+  .gtd-btn-secondary {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    color: rgb(var(--text-1));
+  }
+  .gtd-btn-secondary:hover {
+    background: rgba(255,255,255,0.07);
+    border-color: rgba(255,255,255,0.14);
+  }
+
+  .gtd-input {
+    @apply w-full px-4 py-2.5 rounded-xl text-sm transition-all duration-200 outline-none;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.08);
+    color: rgb(var(--text-1));
+  }
+  .gtd-input::placeholder { color: rgb(var(--text-3)); }
+  .gtd-input:focus {
+    background: rgba(255,255,255,0.05);
+    border-color: rgba(167,139,250,0.5);
+    box-shadow: 0 0 0 4px rgba(167,139,250,0.1);
+  }
+
+  .gtd-label {
+    @apply block mb-2 mono-label;
+  }
+
+  .gtd-badge {
+    @apply inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-mono;
+    border: 1px solid rgba(255,255,255,0.08);
+    background: rgba(255,255,255,0.025);
+    color: rgb(var(--text-2));
+  }
+
+  /* Context badge — subtle violet tint, used for @home / @errands etc. */
+  .context-badge {
+    @apply gtd-badge;
+    background: rgba(167,139,250,0.10);
+    border-color: rgba(167,139,250,0.22);
+    color: rgb(var(--violet-glow));
+  }
+
+  /* GTD list color tokens — tinted glass chips, no solid pills */
+  .list-inbox {
+    background: rgba(251,191,36,0.10);
+    border: 1px solid rgba(251,191,36,0.22);
+    color: rgb(var(--amber-glow));
+  }
+  .list-next_actions {
+    background: rgba(94,234,212,0.10);
+    border: 1px solid rgba(94,234,212,0.22);
+    color: rgb(var(--mint-glow));
+  }
+  .list-waiting_for {
+    background: rgba(251,113,133,0.10);
+    border: 1px solid rgba(251,113,133,0.22);
+    color: rgb(var(--rose-glow));
+  }
+  .list-someday_maybe {
+    background: rgba(167,139,250,0.10);
+    border: 1px solid rgba(167,139,250,0.22);
+    color: rgb(var(--violet-glow));
+  }
+  .list-completed {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    color: rgb(var(--text-3));
+  }
+
+  /* Calendar cells (Phase 3c will refine, but baseline aesthetic now) */
+  .calendar-cell {
+    @apply p-1 min-h-[100px] overflow-hidden;
+    background: rgba(255,255,255,0.02);
+    border: 1px solid rgba(255,255,255,0.05);
+  }
+  .calendar-cell-today {
+    box-shadow: inset 0 0 0 1.5px rgb(var(--violet));
+  }
+  .calendar-cell-other-month {
+    background: transparent;
+    opacity: 0.45;
+  }
+  .calendar-drop-target {
+    background: rgba(167,139,250,0.10);
+    box-shadow: inset 0 0 0 1.5px rgba(167,139,250,0.6);
+  }
+  .calendar-event-google {
+    background: rgba(167,139,250,0.10);
+    color: rgb(var(--violet-glow));
+    border: 1px solid rgba(167,139,250,0.22);
+  }
 }
 
-.gtd-input {
-  @apply w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none
-         dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100 dark:placeholder-gray-400;
-}
-
-.gtd-label {
-  @apply block text-sm font-medium text-gray-700 mb-1 dark:text-gray-300;
-}
-
-.gtd-badge {
-  @apply inline-flex items-center px-2 py-0.5 rounded text-xs font-medium;
-}
-
-.context-badge {
-  @apply gtd-badge bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300;
-}
-
-.list-inbox { @apply bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300; }
-.list-next_actions { @apply bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300; }
-.list-waiting_for { @apply bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300; }
-.list-someday_maybe { @apply bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300; }
-.list-completed { @apply bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300; }
-
+/* ============================================================
+   Motion
+   ============================================================ */
 @keyframes slide-in {
-  from {
-    opacity: 0;
-    transform: translateX(100%);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
+  from { opacity: 0; transform: translateX(100%); }
+  to   { opacity: 1; transform: translateX(0); }
 }
+.animate-slide-in { animation: slide-in 0.2s ease-out; }
 
-.animate-slide-in {
-  animation: slide-in 0.2s ease-out;
+@keyframes fresh-rise {
+  to { opacity: 1; transform: translateY(0); }
 }
-
-.calendar-cell {
-  @apply border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-1 min-h-[100px] overflow-hidden;
-}
-
-.calendar-cell-today {
-  @apply ring-2 ring-blue-500 ring-inset;
-}
-
-.calendar-cell-other-month {
-  @apply bg-gray-50 dark:bg-gray-950 opacity-60;
-}
-
-.calendar-drop-target {
-  @apply bg-blue-50 dark:bg-blue-900/30 ring-2 ring-blue-400;
-}
-
-.calendar-event-google {
-  @apply bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300;
-}
+.fresh-stagger > * { opacity: 0; transform: translateY(8px); animation: fresh-rise 520ms cubic-bezier(0.22,1,0.36,1) forwards; }
+.fresh-stagger > *:nth-child(1) { animation-delay: 40ms; }
+.fresh-stagger > *:nth-child(2) { animation-delay: 90ms; }
+.fresh-stagger > *:nth-child(3) { animation-delay: 140ms; }
+.fresh-stagger > *:nth-child(4) { animation-delay: 190ms; }
+.fresh-stagger > *:nth-child(5) { animation-delay: 240ms; }
+.fresh-stagger > *:nth-child(6) { animation-delay: 290ms; }

@@ -5,13 +5,18 @@
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>GTD - Getting Things Done</title>
+    <link rel="preconnect" href="https://api.fontshare.com" crossorigin />
+    <link rel="stylesheet" href="https://api.fontshare.com/v2/css?f[]=instrument-serif@400i,400&f[]=geist-mono@400,500&f[]=satoshi@400,500,700&display=swap" />
     <script>
-      (function() {
-        var t = localStorage.getItem('theme');
-        if (t === 'dark' || (!t && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-          document.documentElement.classList.add('dark');
-        }
-      })();
+      // Dark-only until the light palette ships. When it does, restore the
+      // commented logic below and remove the unconditional add.
+      // (function () {
+      //   var t = localStorage.getItem('theme');
+      //   if (t === 'dark' || (!t && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+      //     document.documentElement.classList.add('dark');
+      //   }
+      // })();
+      document.documentElement.classList.add('dark');
     </script>
   </head>
   <body>

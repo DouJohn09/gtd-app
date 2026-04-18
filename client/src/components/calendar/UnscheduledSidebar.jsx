@@ -3,12 +3,19 @@ import { Calendar, X } from 'lucide-react';
 import CalendarTaskCard from '../CalendarTaskCard';
 
 const LIST_FILTERS = [
-  { value: '', label: 'All Lists' },
-  { value: 'inbox', label: 'Inbox' },
-  { value: 'next_actions', label: 'Next Actions' },
-  { value: 'waiting_for', label: 'Waiting For' },
-  { value: 'someday_maybe', label: 'Someday/Maybe' },
+  { value: '',              label: 'all'      },
+  { value: 'inbox',         label: 'inbox'    },
+  { value: 'next_actions',  label: 'next'     },
+  { value: 'waiting_for',   label: 'waiting'  },
+  { value: 'someday_maybe', label: 'someday'  },
 ];
+
+const TONE_BY_FILTER = {
+  inbox: 'amber',
+  next_actions: 'mint',
+  waiting_for: 'rose',
+  someday_maybe: 'violet',
+};
 
 export default function UnscheduledSidebar({ tasks, onEditTask, onCompleteTask, isOpen, onToggle }) {
   const [filter, setFilter] = useState('');
@@ -20,36 +27,52 @@ export default function UnscheduledSidebar({ tasks, onEditTask, onCompleteTask, 
 
   const sidebar = (
     <div className="flex flex-col h-full">
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <h3 className="font-semibold text-gray-900 dark:text-gray-100">Unscheduled</h3>
-          <span className="gtd-badge bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-300">
-            {filteredTasks.length}
-          </span>
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-baseline gap-2">
+          <div className="mono-label">unscheduled</div>
+          <span className="font-mono text-[11px] text-text-2">{filteredTasks.length}</span>
         </div>
         <button
           onClick={onToggle}
-          className="md:hidden text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+          className="md:hidden grid place-items-center w-7 h-7 rounded-lg border border-white/10 hover:bg-white/5"
         >
-          <X className="w-5 h-5" />
+          <X className="w-3.5 h-3.5" />
         </button>
       </div>
 
-      <select
-        value={filter}
-        onChange={(e) => setFilter(e.target.value)}
-        className="gtd-input text-xs mb-3 py-1.5"
-      >
-        {LIST_FILTERS.map(f => (
-          <option key={f.value} value={f.value}>{f.label}</option>
-        ))}
-      </select>
+      <div className="flex flex-wrap gap-1 mb-4">
+        {LIST_FILTERS.map(f => {
+          const active = filter === f.value;
+          const tone = TONE_BY_FILTER[f.value];
+          return (
+            <button
+              key={f.value || 'all'}
+              onClick={() => setFilter(f.value)}
+              className="font-mono text-[10.5px] px-2 py-1 rounded-md transition-all"
+              style={
+                active
+                  ? {
+                      background: tone ? `rgb(var(--${tone}) / 0.14)` : 'rgba(255,255,255,0.08)',
+                      color: tone ? `rgb(var(--${tone}-glow))` : 'rgb(var(--text-1))',
+                      border: `1px solid ${tone ? `rgb(var(--${tone}) / 0.3)` : 'rgba(255,255,255,0.16)'}`,
+                    }
+                  : {
+                      color: 'rgb(var(--text-3))',
+                      border: '1px solid transparent',
+                    }
+              }
+            >
+              {f.label}
+            </button>
+          );
+        })}
+      </div>
 
-      <div className="flex-1 overflow-y-auto space-y-0.5 -mx-1 px-1">
+      <div className="flex-1 overflow-y-auto space-y-1 -mx-1 px-1">
         {filteredTasks.length === 0 ? (
-          <div className="text-center py-8 text-gray-400 dark:text-gray-600">
-            <Calendar className="w-8 h-8 mx-auto mb-2" />
-            <p className="text-xs">No unscheduled tasks</p>
+          <div className="text-center py-10">
+            <Calendar className="w-7 h-7 mx-auto mb-2 text-text-3" />
+            <p className="font-mono text-[10.5px] text-text-3">no_unscheduled_tasks</p>
           </div>
         ) : (
           filteredTasks.map(task => (
@@ -68,19 +91,18 @@ export default function UnscheduledSidebar({ tasks, onEditTask, onCompleteTask, 
   return (
     <>
       {/* Desktop sidebar */}
-      <div className="hidden md:block w-72 flex-shrink-0 bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 p-3 self-start sticky top-4 max-h-[calc(100vh-120px)] overflow-hidden flex flex-col">
+      <div className="hidden md:flex w-72 flex-shrink-0 self-start sticky top-4 max-h-[calc(100vh-120px)] overflow-hidden flex-col rounded-2xl glass p-4">
         {sidebar}
       </div>
 
       {/* Mobile overlay */}
       {isOpen && (
         <>
-          <div
-            className="md:hidden fixed inset-0 bg-black/50 z-40"
-            onClick={onToggle}
-          />
-          <div className="md:hidden fixed right-0 top-0 bottom-0 w-72 bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-700 p-3 z-50 animate-slide-in">
-            {sidebar}
+          <div className="md:hidden fixed inset-0 backdrop-blur-md z-40" style={{ background: 'rgba(8,8,14,0.55)' }} onClick={onToggle} />
+          <div className="md:hidden fixed right-0 top-0 bottom-0 w-80 z-50 animate-slide-in p-3">
+            <div className="h-full rounded-2xl glass p-4 shadow-glass-lg">
+              {sidebar}
+            </div>
           </div>
         </>
       )}

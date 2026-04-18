@@ -1,29 +1,26 @@
 import { useState, useEffect } from 'react';
-import { X, AlertCircle, Plus } from 'lucide-react';
+import { X, AlertCircle, Plus, Sparkles } from 'lucide-react';
 import { api } from '../lib/api';
 import { useToast } from './Toast';
 
-const lists = [
-  { value: 'inbox', label: 'Inbox' },
-  { value: 'next_actions', label: 'Next Actions' },
-  { value: 'waiting_for', label: 'Waiting For' },
-  { value: 'someday_maybe', label: 'Someday/Maybe' },
+const LISTS = [
+  { value: 'inbox',         label: 'Inbox',         tone: 'amber'  },
+  { value: 'next_actions',  label: 'Next Actions',  tone: 'mint'   },
+  { value: 'waiting_for',   label: 'Waiting For',   tone: 'rose'   },
+  { value: 'someday_maybe', label: 'Someday/Maybe', tone: 'violet' },
 ];
 
-const energyLevels = ['low', 'medium', 'high'];
+const ENERGY_LEVELS = [
+  { value: 'low',    label: 'low',    tone: 'mint'  },
+  { value: 'medium', label: 'medium', tone: 'amber' },
+  { value: 'high',   label: 'high',   tone: 'rose'  },
+];
 
 export default function TaskModal({ task, projects, onClose, onSave }) {
   const { addToast } = useToast();
   const [form, setForm] = useState({
-    title: '',
-    notes: '',
-    list: 'inbox',
-    context: '',
-    project_id: '',
-    waiting_for_person: '',
-    due_date: '',
-    energy_level: '',
-    time_estimate: '',
+    title: '', notes: '', list: 'inbox', context: '', project_id: '',
+    waiting_for_person: '', due_date: '', energy_level: '', time_estimate: '',
     is_daily_focus: false,
   });
   const [loading, setLoading] = useState(false);
@@ -53,6 +50,13 @@ export default function TaskModal({ task, projects, onClose, onSave }) {
     }
   }, [task]);
 
+  // Esc to close
+  useEffect(() => {
+    const handler = (e) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [onClose]);
+
   const handleAddContext = async () => {
     if (!newContextName.trim()) return;
     try {
@@ -61,16 +65,13 @@ export default function TaskModal({ task, projects, onClose, onSave }) {
       setForm({ ...form, context: created.name });
       setNewContextName('');
       setAddingContext(false);
-    } catch (err) {
-      addToast(err.message, 'error');
-    }
+    } catch (err) { addToast(err.message, 'error'); }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError(null);
     setLoading(true);
-
     try {
       const data = {
         title: form.title.trim(),
@@ -84,46 +85,63 @@ export default function TaskModal({ task, projects, onClose, onSave }) {
         time_estimate: form.time_estimate ? parseInt(form.time_estimate) : null,
         is_daily_focus: form.is_daily_focus ? 1 : 0,
       };
-
       if (task?.id) {
         await api.tasks.update(task.id, data);
-        addToast('Task updated successfully', 'success');
+        addToast('Task updated', 'success');
       } else {
         await api.tasks.create(data);
-        addToast('Task created successfully', 'success');
+        addToast('Task created', 'success');
       }
       onSave?.();
       onClose();
     } catch (err) {
       console.error('Failed to save task:', err);
       setError(err.message || 'Failed to save task. Please try again.');
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={onClose}>
-      <div className="bg-white dark:bg-gray-900 rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-auto mx-4 sm:mx-auto" onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between p-4 border-b dark:border-gray-700">
-          <h2 className="text-lg font-semibold">
-            {task?.id ? 'Edit Task' : 'New Task'}
-          </h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
-            <X className="w-5 h-5" />
+    <div
+      className="fixed inset-0 z-50 flex items-start justify-center p-4 sm:p-8 overflow-y-auto"
+      style={{ background: 'rgba(8,8,14,0.55)', backdropFilter: 'blur(8px)' }}
+      onClick={onClose}
+    >
+      <div
+        className="relative w-full max-w-lg my-6 rounded-2xl glass overflow-hidden"
+        onClick={e => e.stopPropagation()}
+        style={{ boxShadow: '0 24px 64px -16px rgba(0,0,0,0.55), inset 0 1px 0 rgb(255 255 255 / 0.06), inset 0 0 0 1px rgb(var(--violet) / 0.16)' }}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between p-5 border-b border-white/[0.05]">
+          <div>
+            <div className="mono-label" style={{ color: 'rgb(var(--violet-glow))' }}>
+              {task?.id ? 'edit_task' : 'new_task'}
+            </div>
+            <h2 className="font-display text-[24px] leading-tight mt-0.5">
+              {task?.id ? 'Edit Task' : 'New Task'}
+            </h2>
+          </div>
+          <button
+            onClick={onClose}
+            className="grid place-items-center w-8 h-8 rounded-lg text-text-3 hover:text-text-1 hover:bg-white/5 transition-colors"
+          >
+            <X className="w-4 h-4" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-4 space-y-4">
+        <form onSubmit={handleSubmit} className="p-5 space-y-4 max-h-[70vh] overflow-y-auto">
           {error && (
-            <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg p-3 flex items-start gap-2">
-              <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
-              <p className="text-sm text-red-700 dark:text-red-400">{error}</p>
+            <div
+              className="rounded-xl p-3 flex items-start gap-2"
+              style={{ background: 'rgb(var(--rose) / 0.08)', boxShadow: 'inset 0 0 0 1px rgb(var(--rose) / 0.25)' }}
+            >
+              <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: 'rgb(var(--rose-glow))' }} />
+              <p className="text-[12.5px] text-text-1">{error}</p>
             </div>
           )}
 
           <div>
-            <label className="gtd-label">Title *</label>
+            <label className="gtd-label">Title</label>
             <input
               type="text"
               value={form.title}
@@ -131,6 +149,7 @@ export default function TaskModal({ task, projects, onClose, onSave }) {
               className="gtd-input"
               required
               autoFocus
+              placeholder="What needs doing?"
             />
           </div>
 
@@ -139,29 +158,48 @@ export default function TaskModal({ task, projects, onClose, onSave }) {
             <textarea
               value={form.notes}
               onChange={(e) => setForm({ ...form, notes: e.target.value })}
-              className="gtd-input min-h-[80px]"
-              placeholder="Additional details..."
+              className="gtd-input min-h-[80px] resize-none"
+              placeholder="Anything else?"
             />
+          </div>
+
+          {/* List as segmented chips */}
+          <div>
+            <label className="gtd-label">List</label>
+            <div className="flex flex-wrap gap-1.5">
+              {LISTS.map(l => {
+                const active = form.list === l.value;
+                return (
+                  <button
+                    key={l.value}
+                    type="button"
+                    onClick={() => setForm({ ...form, list: l.value })}
+                    className="font-mono text-[11px] uppercase tracking-wider px-2.5 py-1.5 rounded-lg transition-all"
+                    style={
+                      active
+                        ? {
+                            background: `rgb(var(--${l.tone}) / 0.16)`,
+                            color: `rgb(var(--${l.tone}-glow))`,
+                            boxShadow: `inset 0 0 0 1px rgb(var(--${l.tone}) / 0.32)`,
+                          }
+                        : {
+                            color: 'rgb(var(--text-3))',
+                            boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.06)',
+                          }
+                    }
+                  >
+                    {l.label}
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="gtd-label">List *</label>
-              <select
-                value={form.list}
-                onChange={(e) => setForm({ ...form, list: e.target.value })}
-                className="gtd-input"
-              >
-                {lists.map(l => (
-                  <option key={l.value} value={l.value}>{l.label}</option>
-                ))}
-              </select>
-            </div>
-
-            <div>
               <label className="gtd-label">Context</label>
               {addingContext ? (
-                <div className="flex gap-1">
+                <div className="flex gap-1.5">
                   <input
                     type="text"
                     value={newContextName}
@@ -175,18 +213,15 @@ export default function TaskModal({ task, projects, onClose, onSave }) {
                     autoFocus
                   />
                   <button type="button" onClick={handleAddContext} className="gtd-btn gtd-btn-primary px-2">
-                    <Plus className="w-4 h-4" />
+                    <Plus className="w-3.5 h-3.5" />
                   </button>
                 </div>
               ) : (
                 <select
                   value={form.context}
                   onChange={(e) => {
-                    if (e.target.value === '__add_new__') {
-                      setAddingContext(true);
-                    } else {
-                      setForm({ ...form, context: e.target.value });
-                    }
+                    if (e.target.value === '__add_new__') setAddingContext(true);
+                    else setForm({ ...form, context: e.target.value });
                   }}
                   className="gtd-input"
                 >
@@ -194,54 +229,84 @@ export default function TaskModal({ task, projects, onClose, onSave }) {
                   {contexts.map(c => (
                     <option key={c.id} value={c.name}>{c.name}</option>
                   ))}
-                  <option value="__add_new__">+ Add new context...</option>
+                  <option value="__add_new__">+ Add new context…</option>
                 </select>
               )}
             </div>
-          </div>
 
-          <div>
-            <label className="gtd-label">Project</label>
-            <select
-              value={form.project_id}
-              onChange={(e) => setForm({ ...form, project_id: e.target.value })}
-              className="gtd-input"
-            >
-              <option value="">No project</option>
-              {projects?.map(p => (
-                <option key={p.id} value={p.id}>{p.name}</option>
-              ))}
-            </select>
+            <div>
+              <label className="gtd-label">Project</label>
+              <select
+                value={form.project_id}
+                onChange={(e) => setForm({ ...form, project_id: e.target.value })}
+                className="gtd-input"
+              >
+                <option value="">No project</option>
+                {projects?.map(p => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
+            </div>
           </div>
 
           {form.list === 'waiting_for' && (
             <div>
-              <label className="gtd-label">Waiting For (Person)</label>
+              <label className="gtd-label">Waiting on</label>
               <input
                 type="text"
                 value={form.waiting_for_person}
                 onChange={(e) => setForm({ ...form, waiting_for_person: e.target.value })}
                 className="gtd-input"
-                placeholder="Who are you waiting for?"
+                placeholder="Who?"
               />
             </div>
           )}
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div>
-              <label className="gtd-label">Energy</label>
-              <select
-                value={form.energy_level}
-                onChange={(e) => setForm({ ...form, energy_level: e.target.value })}
-                className="gtd-input"
+          {/* Energy as chips */}
+          <div>
+            <label className="gtd-label">Energy</label>
+            <div className="flex gap-1.5">
+              <button
+                type="button"
+                onClick={() => setForm({ ...form, energy_level: '' })}
+                className="font-mono text-[11px] uppercase tracking-wider px-2.5 py-1.5 rounded-lg transition-all"
+                style={
+                  !form.energy_level
+                    ? { background: 'rgba(255,255,255,0.06)', color: 'rgb(var(--text-1))', boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.16)' }
+                    : { color: 'rgb(var(--text-3))', boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.06)' }
+                }
               >
-                <option value="">--</option>
-                {energyLevels.map(e => (
-                  <option key={e} value={e}>{e}</option>
-                ))}
-              </select>
+                —
+              </button>
+              {ENERGY_LEVELS.map(e => {
+                const active = form.energy_level === e.value;
+                return (
+                  <button
+                    key={e.value}
+                    type="button"
+                    onClick={() => setForm({ ...form, energy_level: e.value })}
+                    className="font-mono text-[11px] uppercase tracking-wider px-2.5 py-1.5 rounded-lg transition-all"
+                    style={
+                      active
+                        ? {
+                            background: `rgb(var(--${e.tone}) / 0.16)`,
+                            color: `rgb(var(--${e.tone}-glow))`,
+                            boxShadow: `inset 0 0 0 1px rgb(var(--${e.tone}) / 0.32)`,
+                          }
+                        : {
+                            color: 'rgb(var(--text-3))',
+                            boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.06)',
+                          }
+                    }
+                  >
+                    {e.label}
+                  </button>
+                );
+              })}
             </div>
+          </div>
 
+          <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="gtd-label">Time (min)</label>
               <input
@@ -253,7 +318,6 @@ export default function TaskModal({ task, projects, onClose, onSave }) {
                 placeholder="30"
               />
             </div>
-
             <div>
               <label className="gtd-label">Due Date</label>
               <input
@@ -265,33 +329,56 @@ export default function TaskModal({ task, projects, onClose, onSave }) {
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              id="daily_focus"
-              checked={form.is_daily_focus}
-              onChange={(e) => setForm({ ...form, is_daily_focus: e.target.checked })}
-              className="w-4 h-4 rounded border-gray-300 dark:border-gray-600"
-            />
-            <label htmlFor="daily_focus" className="text-sm text-gray-700 dark:text-gray-300">
-              Add to today's focus
-            </label>
-          </div>
+          {/* Daily focus toggle */}
+          <button
+            type="button"
+            onClick={() => setForm({ ...form, is_daily_focus: !form.is_daily_focus })}
+            className="w-full flex items-center gap-3 p-3 rounded-xl transition-all text-left"
+            style={
+              form.is_daily_focus
+                ? { background: 'rgb(var(--amber) / 0.08)', boxShadow: 'inset 0 0 0 1px rgb(var(--amber) / 0.28)' }
+                : { background: 'rgba(255,255,255,0.02)', boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.06)' }
+            }
+          >
+            <div
+              className="w-9 h-5 rounded-full relative transition-all flex-shrink-0"
+              style={
+                form.is_daily_focus
+                  ? { background: 'rgb(var(--amber) / 0.6)', boxShadow: 'inset 0 0 0 1px rgb(var(--amber) / 0.5)' }
+                  : { background: 'rgba(255,255,255,0.05)', boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.10)' }
+              }
+            >
+              <div
+                className="absolute top-0.5 w-4 h-4 rounded-full transition-all"
+                style={{
+                  left: form.is_daily_focus ? '18px' : '2px',
+                  background: form.is_daily_focus ? 'rgb(var(--amber-glow))' : 'rgba(255,255,255,0.65)',
+                  boxShadow: form.is_daily_focus ? '0 0 8px rgb(var(--amber) / 0.55)' : 'none',
+                }}
+              />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="text-[13px] font-medium text-text-1 inline-flex items-center gap-1.5">
+                <Sparkles className="w-3 h-3" style={{ color: form.is_daily_focus ? 'rgb(var(--amber-glow))' : 'rgb(var(--text-3))' }} />
+                Add to today's focus
+              </div>
+            </div>
+          </button>
 
-          <div className="flex gap-2 pt-4 border-t dark:border-gray-700">
+          <div className="flex gap-2 pt-3 border-t border-white/[0.05]">
             <button
               type="button"
               onClick={onClose}
-              className="gtd-btn gtd-btn-secondary flex-1"
+              className="gtd-btn gtd-btn-secondary flex-1 text-[12.5px]"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={loading || !form.title.trim()}
-              className="gtd-btn gtd-btn-primary flex-1 disabled:opacity-50"
+              className="gtd-btn gtd-btn-primary flex-1 text-[12.5px] disabled:opacity-50"
             >
-              {loading ? 'Saving...' : 'Save Task'}
+              {loading ? 'Saving…' : 'Save Task'}
             </button>
           </div>
         </form>

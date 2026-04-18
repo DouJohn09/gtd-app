@@ -1,9 +1,10 @@
-import { useState, useRef } from 'react';
-import { Flame, Pencil, Trash2, Calendar } from 'lucide-react';
+import { useRef } from 'react';
+import { Flame, Pencil, Trash2, Calendar, Check } from 'lucide-react';
 
 export default function HabitCard({ habit, onToggle, onEdit, onDelete }) {
   const dateInputRef = useRef(null);
   const today = new Date().toISOString().split('T')[0];
+  const done = habit.completed_today;
 
   const handleDateChange = (e) => {
     const date = e.target.value;
@@ -14,55 +15,64 @@ export default function HabitCard({ habit, onToggle, onEdit, onDelete }) {
   };
 
   return (
-    <div className="gtd-card flex items-center gap-3">
+    <div
+      className="rounded-2xl glass p-3.5 flex items-center gap-3 group transition-all"
+      style={
+        done
+          ? { boxShadow: '0 8px 32px -12px rgba(0,0,0,0.4), inset 0 1px 0 rgb(255 255 255 / 0.05), inset 0 0 0 1px rgba(255,255,255,0.05), inset 3px 0 0 rgb(var(--mint-glow))' }
+          : undefined
+      }
+    >
       <button
         onClick={() => onToggle(habit.id)}
-        className={`w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
-          habit.completed_today
-            ? 'border-green-500 bg-green-500 text-white'
-            : 'border-gray-300 dark:border-gray-600 hover:border-green-400'
-        }`}
+        aria-pressed={done}
+        className="fresh-check w-6 h-6 rounded-full grid place-items-center transition-all flex-shrink-0"
+        style={
+          done
+            ? {
+                background: 'linear-gradient(180deg, rgb(var(--mint) / 0.85), rgb(var(--mint) / 0.65))',
+                boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.18), 0 0 14px rgb(var(--mint) / 0.4)',
+              }
+            : { boxShadow: 'inset 0 0 0 1.5px rgba(255,255,255,0.18)' }
+        }
       >
-        {habit.completed_today && (
-          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-          </svg>
-        )}
+        {done && <Check className="w-3.5 h-3.5 text-bg" strokeWidth={3} />}
       </button>
 
       <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2">
-          <span
-            className={`font-medium ${habit.completed_today ? 'text-gray-400 dark:text-gray-500 line-through' : 'text-gray-900 dark:text-gray-100'}`}
-          >
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className={`text-[14px] font-medium ${done ? 'line-through text-text-3' : 'text-text-1'}`}>
             {habit.name}
           </span>
           {habit.category && (
             <span
-              className="gtd-badge text-xs"
-              style={{ backgroundColor: habit.color + '20', color: habit.color }}
+              className="font-mono text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded-md"
+              style={{ background: `${habit.color}20`, color: habit.color, boxShadow: `inset 0 0 0 1px ${habit.color}40` }}
             >
               {habit.category}
             </span>
           )}
         </div>
         {habit.description && (
-          <p className="text-sm text-gray-500 dark:text-gray-400 truncate">{habit.description}</p>
+          <p className="text-[12px] text-text-3 truncate mt-0.5">{habit.description}</p>
         )}
       </div>
 
       {habit.streak > 0 && (
-        <div className="flex items-center gap-1 text-orange-500 text-sm font-medium flex-shrink-0">
-          <Flame className="w-4 h-4" />
-          {habit.streak}
+        <div
+          className="flex items-center gap-1 px-2 py-1 rounded-full flex-shrink-0"
+          style={{ background: 'rgb(var(--amber) / 0.10)', boxShadow: 'inset 0 0 0 1px rgb(var(--amber) / 0.22)' }}
+        >
+          <Flame className="w-3 h-3" style={{ color: 'rgb(var(--amber-glow))' }} />
+          <span className="font-mono text-[11px]" style={{ color: 'rgb(var(--amber-glow))' }}>{habit.streak}</span>
         </div>
       )}
 
-      <div className="flex items-center gap-1 flex-shrink-0">
+      <div className="flex items-center gap-0.5 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
         <div className="relative">
           <button
             onClick={() => dateInputRef.current?.showPicker?.() || dateInputRef.current?.click()}
-            className="text-gray-400 hover:text-blue-500 p-1"
+            className="p-1.5 text-text-3 hover:text-violet-glow rounded-lg transition-colors"
             title="Log for another date"
           >
             <Calendar className="w-3.5 h-3.5" />
@@ -76,10 +86,16 @@ export default function HabitCard({ habit, onToggle, onEdit, onDelete }) {
             tabIndex={-1}
           />
         </div>
-        <button onClick={() => onEdit(habit)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 p-1">
+        <button
+          onClick={() => onEdit(habit)}
+          className="p-1.5 text-text-3 hover:text-text-1 rounded-lg transition-colors"
+        >
           <Pencil className="w-3.5 h-3.5" />
         </button>
-        <button onClick={() => onDelete(habit.id)} className="text-gray-400 hover:text-red-500 p-1">
+        <button
+          onClick={() => onDelete(habit.id)}
+          className="p-1.5 text-text-3 hover:text-rose-glow rounded-lg transition-colors"
+        >
           <Trash2 className="w-3.5 h-3.5" />
         </button>
       </div>

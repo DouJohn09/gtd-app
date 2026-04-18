@@ -10,11 +10,7 @@ export default function WeekView({ days, itemsByDate, onEditTask, onCompleteTask
     e.dataTransfer.dropEffect = 'move';
     setDragOverDate(date);
   };
-
-  const handleDragLeave = () => {
-    setDragOverDate(null);
-  };
-
+  const handleDragLeave = () => setDragOverDate(null);
   const handleDrop = (e, date) => {
     e.preventDefault();
     setDragOverDate(null);
@@ -23,7 +19,7 @@ export default function WeekView({ days, itemsByDate, onEditTask, onCompleteTask
   };
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-7 gap-px bg-gray-200 dark:bg-gray-700 rounded-lg overflow-hidden">
+    <div className="grid grid-cols-1 md:grid-cols-7 gap-3">
       {days.map(({ date, day, dayName, isToday }) => {
         const items = itemsByDate[date] || [];
         const isDragOver = dragOverDate === date;
@@ -31,29 +27,37 @@ export default function WeekView({ days, itemsByDate, onEditTask, onCompleteTask
         return (
           <div
             key={date}
-            className={`bg-white dark:bg-gray-900 p-2 min-h-[120px] md:min-h-[300px]
-              ${isToday ? 'ring-2 ring-blue-500 ring-inset' : ''}
-              ${isDragOver ? 'calendar-drop-target' : ''}
-            `}
             onDragOver={(e) => handleDragOver(e, date)}
             onDragLeave={handleDragLeave}
             onDrop={(e) => handleDrop(e, date)}
+            className="rounded-2xl glass p-3 min-h-[120px] md:min-h-[320px] transition-colors"
+            style={{
+              boxShadow: isDragOver
+                ? '0 8px 32px -12px rgba(0,0,0,0.4), inset 0 0 0 1.5px rgba(167,139,250,0.6)'
+                : isToday
+                  ? '0 8px 32px -12px rgba(0,0,0,0.4), inset 0 0 0 1.5px rgb(var(--violet))'
+                  : undefined,
+              background: isDragOver ? 'rgba(167,139,250,0.06)' : undefined,
+            }}
           >
-            <div
-              className="text-center mb-2 cursor-pointer"
+            <button
               onClick={() => onDayClick?.(date)}
+              className="text-center mb-3 cursor-pointer w-full"
             >
-              <div className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                {dayName}
-              </div>
-              <div className={`text-lg font-semibold inline-block rounded-full w-8 h-8 flex items-center justify-center
-                ${isToday ? 'bg-blue-600 text-white' : 'text-gray-700 dark:text-gray-300'}
-              `}>
+              <div className="mono-label">{dayName}</div>
+              <div
+                className="font-display text-[24px] leading-none mt-1.5 inline-grid place-items-center w-9 h-9 rounded-full"
+                style={
+                  isToday
+                    ? { background: 'rgb(var(--violet))', color: '#0a0a0f', boxShadow: '0 0 14px rgba(167,139,250,0.55)' }
+                    : {}
+                }
+              >
                 {day}
               </div>
-            </div>
+            </button>
 
-            <div className="space-y-0.5">
+            <div className="space-y-1">
               {items.map(item => (
                 item.type === 'google_event' ? (
                   <CalendarEventCard key={item.id} event={item} />
@@ -67,8 +71,8 @@ export default function WeekView({ days, itemsByDate, onEditTask, onCompleteTask
                 )
               ))}
               {items.length === 0 && (
-                <div className="text-xs text-gray-400 dark:text-gray-600 text-center py-4 hidden md:block">
-                  No tasks
+                <div className="font-mono text-[10.5px] text-text-3 text-center py-6 hidden md:block">
+                  empty
                 </div>
               )}
             </div>

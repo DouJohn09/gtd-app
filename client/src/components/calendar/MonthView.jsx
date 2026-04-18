@@ -14,11 +14,7 @@ export default function MonthView({ days, itemsByDate, onEditTask, onCompleteTas
     e.dataTransfer.dropEffect = 'move';
     setDragOverDate(date);
   };
-
-  const handleDragLeave = () => {
-    setDragOverDate(null);
-  };
-
+  const handleDragLeave = () => setDragOverDate(null);
   const handleDrop = (e, date) => {
     e.preventDefault();
     setDragOverDate(null);
@@ -27,10 +23,10 @@ export default function MonthView({ days, itemsByDate, onEditTask, onCompleteTas
   };
 
   return (
-    <div>
-      <div className="grid grid-cols-7 mb-1">
+    <div className="rounded-2xl glass overflow-hidden">
+      <div className="grid grid-cols-7 border-b border-white/[0.05]">
         {dayNames.map(name => (
-          <div key={name} className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase text-center py-2">
+          <div key={name} className="mono-label text-center py-3">
             {name}
           </div>
         ))}
@@ -46,19 +42,29 @@ export default function MonthView({ days, itemsByDate, onEditTask, onCompleteTas
           return (
             <div
               key={date}
-              className={`calendar-cell ${isToday ? 'calendar-cell-today' : ''} ${!isCurrentMonth ? 'calendar-cell-other-month' : ''} ${isDragOver ? 'calendar-drop-target' : ''}`}
               onDragOver={(e) => handleDragOver(e, date)}
               onDragLeave={handleDragLeave}
               onDrop={(e) => handleDrop(e, date)}
+              className="relative min-h-[110px] p-1.5 transition-colors"
+              style={{
+                borderRight: '1px solid rgba(255,255,255,0.04)',
+                borderBottom: '1px solid rgba(255,255,255,0.04)',
+                background: isDragOver ? 'rgba(167,139,250,0.10)' : 'transparent',
+                boxShadow: isDragOver ? 'inset 0 0 0 1.5px rgba(167,139,250,0.6)' : 'none',
+                opacity: isCurrentMonth ? 1 : 0.35,
+              }}
             >
-              <div
-                className={`text-xs font-medium mb-1 cursor-pointer hover:text-blue-600 inline-block rounded-full w-6 h-6 flex items-center justify-center
-                  ${isToday ? 'bg-blue-600 text-white' : 'text-gray-700 dark:text-gray-300'}
-                `}
+              <button
                 onClick={() => onDayClick?.(date)}
+                className="font-mono text-[11px] mb-1 inline-flex items-center justify-center w-6 h-6 rounded-full transition-colors"
+                style={
+                  isToday
+                    ? { background: 'rgb(var(--violet))', color: '#0a0a0f', boxShadow: '0 0 14px rgba(167,139,250,0.55)' }
+                    : { color: isCurrentMonth ? 'rgb(var(--text-2))' : 'rgb(var(--text-3))' }
+                }
               >
                 {day}
-              </div>
+              </button>
 
               <div className="space-y-0.5">
                 {visibleItems.map(item => (
@@ -74,12 +80,12 @@ export default function MonthView({ days, itemsByDate, onEditTask, onCompleteTas
                   )
                 ))}
                 {overflow > 0 && (
-                  <div
-                    className="text-xs text-blue-600 dark:text-blue-400 cursor-pointer hover:underline pl-1"
+                  <button
                     onClick={() => onDayClick?.(date)}
+                    className="font-mono text-[10.5px] text-violet-glow hover:text-violet pl-1.5"
                   >
                     +{overflow} more
-                  </div>
+                  </button>
                 )}
               </div>
             </div>
