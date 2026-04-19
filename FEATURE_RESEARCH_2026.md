@@ -261,6 +261,47 @@ Speech as primary interaction. Todoist's "Ramble" (Jan 2026) turns unstructured 
 
 ---
 
+## Part 7: AI Quality & Trust — Strategy Menu (added 2026-04-19)
+
+The single biggest risk to AI features in productivity apps is wrong suggestions. Part 4 quotes ("AI that reduces friction, not reinvents processes") and Part 3 deal-breakers (loss of trust → abandonment) both confirm: one bad suggestion can permanently damage the user's willingness to engage with AI. This section captures what causes AI to be wrong in our app and the full menu of strategies considered.
+
+### Diagnosed root causes (from real bug investigation)
+
+**1. Cross-item bleed in batched prompts.** When `processInbox` and `importNotes` send all items in a single API call, the model treats neighboring items as context. Real example: an unrelated task got assigned to project "Courier Hub" purely because a sibling item in the same batch mentioned it. This is the dominant accuracy bug in batched AI features.
+
+**2. No abstention mechanism.** Without a "don't know" option, the model fills every field with its best guess. A wrong guess looks identical to a confident answer in the UI — the user can't distinguish.
+
+**3. Generic prompt, no user history.** AI doesn't know that *this user* always tags reports as @work and uses "Q3 Roadmap" not "q3 roadmap" — it has to guess fresh every time.
+
+**4. Cold-start, no feedback loop.** When a user edits an AI suggestion before applying, that correction is thrown away. The model never learns from it.
+
+### Full strategy menu (with effort/impact)
+
+| # | Strategy | Effort | Impact | Notes |
+|---|----------|--------|--------|-------|
+| 1 | **Confidence + abstention** in prompts (high/medium/low per field) | Low | High | Foundation for everything else. Lets the UI hide bad guesses. **Shipped 2026-04-19.** |
+| 2 | **Hide low-confidence output** in the UI; fade medium | Low | High | Pairs with #1. Trust is built by AI staying silent when uncertain. **Shipped 2026-04-19.** |
+| 3 | **Few-shot from user history** — inject 5–10 of user's recent processed tasks | Medium | High | Personalizes context detection, project matching, energy/time estimates. Likely the biggest accuracy win after #1+#2. |
+| 4 | **Capture corrections** — log every original→edited diff before apply | Medium | Medium | Becomes the corpus for #3 and a quality metric (high-confidence edit rate). |
+| 5 | **Inline edit everywhere** — let users fix wrong suggestions in place | Medium | High | Doesn't make AI smarter, but reduces the cost of being wrong from "go hunt the task in another list" to "click pencil." **Shipped 2026-04-19.** |
+| 6 | **Single-item processing** for inbox (one API call per item) | Medium | High | Eliminates #1 (cross-item bleed) at the API level. Tradeoff: more API calls = more cost + slower for large inboxes. |
+| 7 | **Two-pass review** — second model call critiques the first | Medium | Medium | Expensive but catches obvious errors. Better invested in #3 first. |
+| 8 | **Model upgrade per surface** — use GPT-4o for high-stakes (project matching), keep mini for cheap tasks | Low | Medium | Already partially done (Smart Capture uses mini, Process Inbox uses 4o). Worth re-auditing once #1–#5 ship. |
+
+### Decision (2026-04-19)
+
+Ship #1, #2, #5 first as a foundation. They're cheap, they reduce blast radius of wrong AI immediately, and they unblock the rest:
+- #3 needs the corrected-task corpus that #4 will produce, which needs #5 to be the place where corrections happen.
+- #6 needs the confidence schema from #1 to make per-item routing decisions.
+
+Next planned: #6 (single-item inbox), then #4 + #3 together (capture corrections, then few-shot from them).
+
+### Connection to user research
+
+Part 4 quote: *"AI that reduces friction, not reinvents processes."* The confidence-first strategy is the operational version of this — the AI does less when it's not sure, and the user does more (via inline edit). This is the opposite of Motion's "auto-schedule everything" approach that many users explicitly distrust.
+
+---
+
 ## Sources
 
 ### Review & Comparison Sites
