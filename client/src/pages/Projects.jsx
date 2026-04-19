@@ -446,7 +446,7 @@ function ProjectTaskList({ project, expandedData, onComplete, onEdit, onMove }) 
               )}
 
               <button onClick={() => onEdit(task)} className="flex-1 min-w-0 text-left">
-                <div className={`text-[14px] leading-snug ${isOptDone ? 'line-through opacity-50' : ''}`}>
+                <div className={`text-[14px] leading-snug [overflow-wrap:anywhere] ${isOptDone ? 'line-through opacity-50' : ''}`}>
                   {isQueued && <span className="font-mono text-[10.5px] text-text-3 mr-2">queued</span>}
                   {task.title}
                 </div>

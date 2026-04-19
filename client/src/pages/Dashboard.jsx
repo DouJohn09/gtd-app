@@ -259,7 +259,7 @@ function FocusRow({ task, first, onToggle, onEdit }) {
     >
       <FreshCheck checked={isDone} onChange={onToggle} className="mt-0.5" />
       <button onClick={onEdit} className="flex-1 min-w-0 text-left">
-        <div className={`text-[14.5px] leading-snug ${isDone ? 'line-through opacity-50' : ''}`}>
+        <div className={`text-[14.5px] leading-snug [overflow-wrap:anywhere] ${isDone ? 'line-through opacity-50' : ''}`}>
           {task.title}
         </div>
         <div className="mt-2 flex flex-wrap items-center gap-2">

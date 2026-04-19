@@ -48,13 +48,13 @@ export default function TaskCard({ task, onComplete, onEdit, showList = false, q
       <div className="flex-1 min-w-0">
         <button
           onClick={() => onEdit?.(task)}
-          className={`text-left text-[14px] font-medium break-words leading-snug transition-colors hover:text-violet-glow ${isCompleted ? 'line-through text-text-3' : 'text-text-1'}`}
+          className={`block w-full text-left text-[14px] font-medium leading-snug transition-colors hover:text-violet-glow [overflow-wrap:anywhere] ${isCompleted ? 'line-through text-text-3' : 'text-text-1'}`}
         >
           {task.title}
         </button>
 
         {task.notes && (
-          <p className="text-[12px] text-text-3 mt-1 line-clamp-2 leading-relaxed">{task.notes}</p>
+          <p className="text-[12px] text-text-3 mt-1 line-clamp-2 leading-relaxed [overflow-wrap:anywhere]">{task.notes}</p>
         )}
 
         <div className="flex flex-wrap items-center gap-1.5 mt-2">
