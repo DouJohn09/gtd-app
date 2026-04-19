@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Inbox as InboxIcon, Sparkles, Trash2 } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Inbox as InboxIcon, Sparkles, Trash2, Clock, ChevronRight, Zap } from 'lucide-react';
 import { api } from '../lib/api';
 import { useToast } from '../components/Toast';
 import QuickCapture from '../components/QuickCapture';
@@ -7,6 +8,22 @@ import TaskCard from '../components/TaskCard';
 import TaskModal from '../components/TaskModal';
 import SortDropdown, { sortTasks } from '../components/SortDropdown';
 import MonoLabel from '../components/ui/MonoLabel';
+import GlassCard from '../components/ui/GlassCard';
+
+function isToday(iso) {
+  if (!iso) return false;
+  const d = new Date(iso);
+  const now = new Date();
+  return d.getFullYear() === now.getFullYear()
+    && d.getMonth() === now.getMonth()
+    && d.getDate() === now.getDate();
+}
+
+function daysSince(iso) {
+  if (!iso) return 0;
+  const ms = Date.now() - new Date(iso).getTime();
+  return Math.max(0, Math.floor(ms / 86400000));
+}
 
 export default function Inbox() {
   const [tasks, setTasks] = useState([]);
@@ -47,10 +64,20 @@ export default function Inbox() {
 
   const sortedTasks = useMemo(() => sortTasks(tasks, sortBy), [tasks, sortBy]);
 
+  const capturedToday = useMemo(() => tasks.filter(t => isToday(t.created_at)).length, [tasks]);
+  const oldestDays = useMemo(() => {
+    if (!tasks.length) return 0;
+    const oldest = tasks.reduce((min, t) => {
+      if (!t.created_at) return min;
+      return !min || t.created_at < min ? t.created_at : min;
+    }, null);
+    return daysSince(oldest);
+  }, [tasks]);
+
   return (
-    <div className="px-6 lg:px-12 pt-10 pb-20 max-w-3xl">
-      {/* Header */}
-      <div className="mb-8">
+    <div className="px-6 lg:px-12 pt-10 pb-20 max-w-[1400px]">
+      {/* Headline */}
+      <div className="mb-10 fresh-stagger">
         <MonoLabel tone="amber" className="mb-3">capture</MonoLabel>
         <h1 className="font-display text-[52px] md:text-[60px] leading-[1] tracking-tight">
           Inbox
@@ -63,85 +90,73 @@ export default function Inbox() {
         </p>
       </div>
 
-      {/* Quick capture */}
-      <div className="rounded-2xl glass p-4 mb-5">
-        <QuickCapture onCapture={fetchData} />
-      </div>
-
-      {/* GTD tip card */}
-      <div
-        className="relative rounded-2xl glass p-5 mb-7 overflow-hidden"
-        style={{ boxShadow: '0 8px 32px -12px rgba(0,0,0,0.45), inset 0 1px 0 rgb(255 255 255 / 0.04), inset 0 0 0 1px rgb(var(--amber) / 0.18)' }}
-      >
-        <div
-          className="absolute -top-10 -right-10 w-40 h-40 rounded-full pointer-events-none"
-          style={{ background: 'radial-gradient(circle, rgb(var(--amber) / 0.18), transparent 70%)' }}
-        />
-        <div className="flex items-start gap-3 relative">
-          <div
-            className="grid place-items-center w-9 h-9 rounded-xl flex-shrink-0"
-            style={{ background: 'rgb(var(--amber) / 0.12)', boxShadow: 'inset 0 0 0 1px rgb(var(--amber) / 0.25)' }}
-          >
-            <Sparkles className="w-4 h-4" style={{ color: 'rgb(var(--amber-glow))' }} />
+      <div className="grid grid-cols-12 gap-5 fresh-stagger">
+        {/* Left — capture + list */}
+        <section className="col-span-12 xl:col-span-8 flex flex-col gap-5">
+          {/* Quick capture */}
+          <div className="rounded-2xl glass p-4">
+            <QuickCapture onCapture={fetchData} />
           </div>
-          <div className="flex-1">
-            <div className="mono-label" style={{ color: 'rgb(var(--amber-glow))' }}>processing_ritual</div>
-            <p className="font-display italic text-[18px] mt-1.5 leading-snug">
-              Is it actionable?
-            </p>
-            <p className="text-[13px] text-text-2 mt-1.5 leading-relaxed">
-              If yes &amp; under 2 minutes — do it now. Otherwise delegate, defer to <span className="font-mono text-[12px] text-mint-glow">next</span>, or park in <span className="font-mono text-[12px] text-violet-glow">someday</span>.
-            </p>
-          </div>
-        </div>
-      </div>
 
-      {/* Body */}
-      {loading ? (
-        <div className="min-h-[30vh] flex items-center justify-center">
-          <div className="w-6 h-6 rounded-full border-2 border-violet/30 border-t-violet animate-spin" />
-        </div>
-      ) : tasks.length === 0 ? (
-        <div className="rounded-2xl glass p-10 text-center relative overflow-hidden">
-          <div
-            className="absolute inset-0 pointer-events-none"
-            style={{ background: 'radial-gradient(circle at 50% 30%, rgb(var(--mint) / 0.10), transparent 60%)' }}
+          {/* Body */}
+          {loading ? (
+            <div className="min-h-[30vh] flex items-center justify-center">
+              <div className="w-6 h-6 rounded-full border-2 border-violet/30 border-t-violet animate-spin" />
+            </div>
+          ) : tasks.length === 0 ? (
+            <div className="rounded-2xl glass p-10 text-center relative overflow-hidden">
+              <div
+                className="absolute inset-0 pointer-events-none"
+                style={{ background: 'radial-gradient(circle at 50% 30%, rgb(var(--mint) / 0.10), transparent 60%)' }}
+              />
+              <div className="relative">
+                <div
+                  className="inline-grid place-items-center w-14 h-14 rounded-2xl mb-4"
+                  style={{ background: 'rgb(var(--mint) / 0.10)', boxShadow: 'inset 0 0 0 1px rgb(var(--mint) / 0.25)' }}
+                >
+                  <InboxIcon className="w-6 h-6" style={{ color: 'rgb(var(--mint-glow))' }} />
+                </div>
+                <div className="mono-label mb-2" style={{ color: 'rgb(var(--mint-glow))' }}>inbox_zero</div>
+                <div className="font-display italic text-[28px] mb-1">A clear mind.</div>
+                <p className="text-[13px] text-text-2">Capture new items above.</p>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between px-1">
+                <div className="font-mono text-[11px] text-text-3 uppercase tracking-wider">
+                  {sortedTasks.length} {sortedTasks.length === 1 ? 'item' : 'items'} to process
+                </div>
+                <SortDropdown value={sortBy} onChange={setSortBy} />
+              </div>
+
+              {sortedTasks.map(task => (
+                <div key={task.id} className="group relative">
+                  <TaskCard task={task} onComplete={handleComplete} onEdit={handleEdit} />
+                  <button
+                    onClick={() => handleDelete(task.id)}
+                    className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 text-text-3 hover:text-rose-glow transition-all"
+                    title="Delete"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+
+        {/* Right rail */}
+        <aside className="col-span-12 xl:col-span-4 flex flex-col gap-5">
+          <ProcessingStatsCard
+            count={tasks.length}
+            capturedToday={capturedToday}
+            oldestDays={oldestDays}
           />
-          <div className="relative">
-            <div
-              className="inline-grid place-items-center w-14 h-14 rounded-2xl mb-4"
-              style={{ background: 'rgb(var(--mint) / 0.10)', boxShadow: 'inset 0 0 0 1px rgb(var(--mint) / 0.25)' }}
-            >
-              <InboxIcon className="w-6 h-6" style={{ color: 'rgb(var(--mint-glow))' }} />
-            </div>
-            <div className="mono-label mb-2" style={{ color: 'rgb(var(--mint-glow))' }}>inbox_zero</div>
-            <div className="font-display italic text-[28px] mb-1">A clear mind.</div>
-            <p className="text-[13px] text-text-2">Capture new items above.</p>
-          </div>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          <div className="flex items-center justify-between px-1">
-            <div className="font-mono text-[11px] text-text-3 uppercase tracking-wider">
-              {sortedTasks.length} {sortedTasks.length === 1 ? 'item' : 'items'} to process
-            </div>
-            <SortDropdown value={sortBy} onChange={setSortBy} />
-          </div>
-
-          {sortedTasks.map(task => (
-            <div key={task.id} className="group relative">
-              <TaskCard task={task} onComplete={handleComplete} onEdit={handleEdit} />
-              <button
-                onClick={() => handleDelete(task.id)}
-                className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 text-text-3 hover:text-rose-glow transition-all"
-                title="Delete"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
+          <ClarifyCard />
+          <AIProcessCard inboxCount={tasks.length} />
+        </aside>
+      </div>
 
       {showModal && (
         <TaskModal
@@ -152,5 +167,124 @@ export default function Inbox() {
         />
       )}
     </div>
+  );
+}
+
+/* ============================================================ */
+
+function ProcessingStatsCard({ count, capturedToday, oldestDays }) {
+  const isZero = count === 0;
+  return (
+    <GlassCard>
+      <MonoLabel tone="amber" className="mb-4">processing</MonoLabel>
+      <div className="flex items-baseline gap-1.5">
+        <span className="font-display text-[44px] leading-none tabular-nums">{count}</span>
+        <span className="font-mono text-[12px] text-text-3">
+          {count === 1 ? 'item' : 'items'}
+        </span>
+      </div>
+      <div className="font-mono text-[11px] text-text-3 mt-1.5">
+        {isZero ? 'inbox at zero' : 'awaiting decision'}
+      </div>
+
+      <div className="mt-5 pt-4 border-t border-white/[0.05] grid grid-cols-2 gap-3">
+        <div>
+          <div className="font-display text-[22px] leading-none tabular-nums">{capturedToday}</div>
+          <MonoLabel className="mt-1.5">captured today</MonoLabel>
+        </div>
+        <div>
+          <div className="font-display text-[22px] leading-none tabular-nums inline-flex items-baseline gap-1">
+            {oldestDays}
+            <span className="font-mono text-[11px] text-text-3">d</span>
+          </div>
+          <MonoLabel className="mt-1.5">oldest item</MonoLabel>
+        </div>
+      </div>
+    </GlassCard>
+  );
+}
+
+function ClarifyCard() {
+  return (
+    <GlassCard className="relative overflow-hidden" padded={false}>
+      <div
+        className="absolute -top-10 -right-10 w-40 h-40 rounded-full pointer-events-none"
+        style={{ background: 'radial-gradient(circle, rgb(var(--amber) / 0.18), transparent 70%)' }}
+      />
+      <div className="p-6 relative">
+        <div className="flex items-center gap-2 mb-3">
+          <Sparkles className="w-3.5 h-3.5" style={{ color: 'rgb(var(--amber-glow))' }} />
+          <MonoLabel tone="amber">clarify ritual</MonoLabel>
+        </div>
+        <p className="font-display italic text-[20px] leading-snug">
+          Is it actionable?
+        </p>
+        <ul className="mt-3 space-y-2 text-[12.5px] text-text-2 leading-relaxed">
+          <li className="flex gap-2">
+            <span className="font-mono text-text-3 mt-0.5">01</span>
+            <span>Under 2 minutes — <span className="text-text-1">do it now</span>.</span>
+          </li>
+          <li className="flex gap-2">
+            <span className="font-mono text-text-3 mt-0.5">02</span>
+            <span>Defer to <span className="font-mono text-mint-glow">next</span> or schedule it.</span>
+          </li>
+          <li className="flex gap-2">
+            <span className="font-mono text-text-3 mt-0.5">03</span>
+            <span>Delegate to <span className="font-mono text-rose-glow">waiting</span>.</span>
+          </li>
+          <li className="flex gap-2">
+            <span className="font-mono text-text-3 mt-0.5">04</span>
+            <span>Park in <span className="font-mono text-violet-glow">someday</span> or trash.</span>
+          </li>
+        </ul>
+      </div>
+    </GlassCard>
+  );
+}
+
+function AIProcessCard({ inboxCount }) {
+  return (
+    <GlassCard className="relative overflow-hidden" padded={false}>
+      <div
+        className="absolute -right-8 -bottom-8 w-36 h-36 rounded-full pointer-events-none"
+        style={{ background: 'radial-gradient(circle, rgb(var(--violet) / 0.18), transparent 70%)' }}
+      />
+      <div className="p-5 relative">
+        <div className="flex items-center gap-2 mb-2.5">
+          <Zap className="w-3.5 h-3.5" style={{ color: 'rgb(var(--violet-glow))' }} />
+          <MonoLabel tone="violet">ai assist</MonoLabel>
+        </div>
+        {inboxCount > 0 ? (
+          <>
+            <div className="text-[13.5px] leading-snug">
+              Let AI categorize, set contexts, and propose due dates for{' '}
+              <span className="font-mono text-text-1">{inboxCount}</span>{' '}
+              {inboxCount === 1 ? 'item' : 'items'} in one pass.
+            </div>
+            <div className="mt-3.5">
+              <Link
+                to="/ai"
+                className="text-[11.5px] font-mono px-3 py-1.5 rounded-lg inline-flex items-center gap-1.5"
+                style={{ background: 'rgb(var(--violet) / 0.14)', color: 'rgb(var(--violet-glow))', boxShadow: 'inset 0 0 0 1px rgb(var(--violet) / 0.25)' }}
+              >
+                <Sparkles className="w-3 h-3" /> Process with AI
+                <ChevronRight className="w-3 h-3" />
+              </Link>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="text-[13.5px] leading-snug">
+              <span className="font-display italic text-mint-glow">Caught up.</span>{' '}
+              When new items land here, AI can clarify them in seconds.
+            </div>
+            <div className="mt-3.5 flex items-center gap-1.5 font-mono text-[10.5px] text-text-3">
+              <Clock className="w-3 h-3" />
+              ready when you are
+            </div>
+          </>
+        )}
+      </div>
+    </GlassCard>
   );
 }

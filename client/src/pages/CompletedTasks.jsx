@@ -109,7 +109,7 @@ export default function CompletedTasks() {
   }
 
   return (
-    <div className="px-6 lg:px-12 pt-10 pb-20 max-w-3xl">
+    <div className="px-6 lg:px-12 pt-10 pb-20 max-w-5xl">
       {/* Header */}
       <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4 mb-8">
         <div>
