@@ -15,12 +15,13 @@ GTD Flow is a productivity app implementing the Getting Things Done (GTD) method
 | Frontend   | React 18 + Vite 5 + Tailwind CSS   |
 | Backend    | Express 4 (Node.js, ES Modules)     |
 | Database   | sql.js (SQLite in-memory, persisted to file) |
-| AI         | OpenAI GPT-4o (JSON response format) |
+| AI         | OpenAI GPT-4o / GPT-4o-mini (JSON response format) |
 | Auth       | Google OAuth 2.0 + JWT              |
 | Deployment | Railway                             |
 
 - ES Modules throughout (`"type": "module"`)
-- Tailwind `darkMode: 'class'` strategy with `useTheme` hook
+- Tailwind `darkMode: 'class'` — currently locked to dark via boot script in `index.html`; `useTheme` is a no-op (light mode planned)
+- Design system: **Instrument Serif** (display) + **Geist Mono** (data) + **Satoshi** (body) via Fontshare; semantic CSS variables (`--violet`, `--mint`, `--amber`, `--rose` as RGB triplets); custom `.glass` / `.gtd-*` classes in `index.css`
 - Client-side sorting with `useMemo` for performance
 
 ---
@@ -34,9 +35,11 @@ gtd-app/
 ├── client/
 │   └── src/
 │       ├── App.jsx           # Routes
-│       ├── index.css          # Tailwind + custom dark mode classes
+│       ├── index.css          # Design tokens (RGB CSS vars), .glass/.gtd-* classes
 │       ├── components/
-│       │   ├── Layout.jsx     # Sidebar nav, dark mode toggle, mobile responsive
+│       │   ├── Layout.jsx     # 248px sidebar with grouped nav, ⌘K capture, mobile bottom-tabs
+│       │   ├── AuroraBackground.jsx  # Fixed radial-gradient mesh + grain (z-0)
+│       │   ├── CommandCapture.jsx    # Global ⌘K quick-capture modal
 │       │   ├── QuickCapture.jsx
 │       │   ├── TaskCard.jsx
 │       │   ├── TaskModal.jsx
@@ -48,6 +51,12 @@ gtd-app/
 │       │   │   ├── WeekView.jsx
 │       │   │   ├── DayView.jsx
 │       │   │   └── UnscheduledSidebar.jsx
+│       │   ├── ui/                   # Design-system primitives
+│       │   │   ├── GlassCard.jsx     # Frosted glass surface
+│       │   │   ├── MonoLabel.jsx     # Geist Mono uppercase eyebrow
+│       │   │   ├── Chip.jsx          # Tonal pill (mint/amber/rose/violet/neutral)
+│       │   │   ├── FreshCheck.jsx    # Animated checkbox with optimistic UI
+│       │   │   └── SectionHeader.jsx
 │       │   ├── HabitCard.jsx
 │       │   ├── HabitModal.jsx
 │       │   └── Toast.jsx
@@ -122,7 +131,7 @@ gtd-app/
 - Due dates with priority scoring
 
 ### AI Features (OpenAI)
-- **Smart Capture** (GPT-4o-mini) — Real-time AI on every Quick Capture: auto-categorizes list, context, priority, energy, time estimate; extracts due dates from natural language ("call mom tomorrow"); detects waiting-for patterns; sets daily focus for urgent tasks. Toggle on/off with sparkle icon.
+- **Smart Capture** (GPT-4o-mini) — Real-time AI on every Quick Capture: auto-categorizes list, context, priority, energy, time estimate; extracts due dates from natural language ("call mom tomorrow"); detects waiting-for patterns; sets daily focus for urgent/today tasks only; auto-matches tasks to existing projects by name/topic; detects personal vs work tasks for context assignment (@work, @home, @phone, etc.). Toggle on/off with sparkle icon.
 - **Process Inbox** (GPT-4o) — AI analyzes inbox tasks, suggests which list each belongs to, assigns priority/energy/time
 - **Daily Focus** (GPT-4o) — AI picks top priorities for today based on energy, deadlines, importance
 - **Find Duplicates** (GPT-4o) — AI scans all active tasks for duplicates, suggests which to keep/remove
@@ -141,8 +150,9 @@ gtd-app/
 
 ### Other
 - **Habit Tracking** — Daily/weekly habits with streak tracking, calendar view, past-date logging, default categories (Health, Fitness, Mindfulness, etc.), suggested habits quick-add, case-insensitive category deduplication
-- **Dark Mode** — Toggle with system preference detection, flash prevention
-- **Responsive Design** — Collapsible sidebar on mobile, touch-friendly
+- **Neo-modern glass UI** — Aurora gradient background, frosted glass cards, semantic color tones per GTD list (inbox→amber, next→mint, waiting→rose, someday→violet); Instrument Serif display headings, Geist Mono labels; ⌘K global capture
+- **Dark mode (locked)** — Aesthetic is dark-only at present; CSS-variable design tokens are architected so a future light theme is a single `:root:not(.dark)` override
+- **Responsive Design** — Sidebar on desktop, bottom-tab nav on mobile
 - **Google OAuth** — Secure login, multi-user support
 
 ---
@@ -406,6 +416,11 @@ Lifetime deals generate upfront cash and launch communities love them. Things 3 
 15. Calendar view with month/week/day views and drag-and-drop scheduling
 16. Google Calendar sync with opt-in OAuth connection
 17. AI Smart Capture with natural language date parsing and auto-categorization
+18. Smart Capture: project matching and personal/work context detection
+19. Fix task detail access from Today's Focus and Projects views
+20. Fix daily focus rule — only flag tasks due today, not tomorrow
+21. Redesign client with neo-modern glass aesthetic (dark-locked, design-token system, ⌘K capture, glass primitives)
+22. Inbox 2-column layout (processing stats + clarify ritual + AI assist sidebar); widen Lists/WeeklyReview/CompletedTasks
 
 ---
 

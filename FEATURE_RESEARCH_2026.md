@@ -67,7 +67,7 @@
 #### 1. Calendar Integration & Time Blocking
 The single most requested feature across the ecosystem. Users overwhelmingly want to see tasks and calendar events on the same screen, drag tasks into time slots, and time-block their day without switching apps. Todoist called their calendar view "maybe the most requested piece of the calendar puzzle so far." Apps without this are increasingly seen as incomplete.
 
-**GTD Flow status:** Not implemented
+**GTD Flow status:** Partial (Phase 1-2 complete: calendar view with month/week/day + Google Calendar sync. Phase 3-4 time blocking not yet implemented)
 
 #### 2. Start Dates / Defer Dates
 One of the most persistent feature gaps across major apps. Users want to set a date when a task becomes relevant (not just when it's due), and have it hidden until that start date arrives. OmniFocus has had this for years ("defer dates"). Todoist only partially addressed it with their 2025 "Deadlines" feature. True start dates that hide tasks remain one of the most persistent requests.
@@ -77,7 +77,7 @@ One of the most persistent feature gaps across major apps. Users want to set a d
 #### 3. Natural Language Input for Task Capture
 Users expect to type "call John next Monday at 2pm p1" and have the app parse the task, date, time, and priority automatically. This is cited as the #1 thing users miss when switching away from Todoist. Speed of task capture directly correlates with whether people actually use the app consistently.
 
-**GTD Flow status:** Not implemented
+**GTD Flow status:** Implemented (Smart Capture with GPT-4o-mini — parses dates, contexts, priority, energy, project matching, personal/work detection)
 
 #### 4. Cross-Platform Sync & Availability
 Tasks must follow users across iPhone, Android, Mac, Windows, web, and ideally watch/tablet. Sync must be fast and reliable. Apps that are platform-exclusive (Things = Apple only, OmniFocus = Apple only) lose large user segments. This is among the top deal-breakers.
@@ -219,7 +219,7 @@ Speech as primary interaction. Todoist's "Ramble" (Jan 2026) turns unstructured 
 - **Sequential/parallel projects** — Only OmniFocus matches this.
 - **Energy levels on tasks** — Almost no competitor has this.
 - **Web-based & cross-platform potential** — Unlike Things/OmniFocus (Apple-only).
-- **Modern UI with dark mode** — FacileThings and Nirvana feel dated.
+- **Distinctive UI** — Bespoke neo-modern glass aesthetic (Aurora gradient, frosted cards, Instrument Serif + Geist Mono); FacileThings and Nirvana feel dated, most competitors use generic shadcn-style defaults.
 
 ### Highest-Impact Features to Add
 
@@ -227,7 +227,7 @@ Speech as primary interaction. Todoist's "Ramble" (Jan 2026) turns unstructured 
 1. **Start/defer dates** — Persistent #1 GTD request. Hide tasks until actionable.
 2. **Calendar integration & time blocking** — Most requested feature ecosystem-wide. Two-way sync with Google Calendar + time-blocking view.
 3. **Recurring tasks** — Flexible recurrence patterns.
-4. **Natural language input** — Enhance Quick Capture to parse dates, priorities, contexts from typed text.
+4. ~~**Natural language input**~~ — ✅ Implemented as Smart Capture (GPT-4o-mini)
 5. **PWA / offline support** — Installable web app with offline capability. Addresses both mobile and offline without native apps.
 
 #### Medium Priority
