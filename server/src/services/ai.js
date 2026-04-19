@@ -229,6 +229,11 @@ export async function processInbox(tasks, userContexts) {
 
 ${taskList}
 
+CONFIDENCE RULES — be honest about uncertainty:
+- "high": the answer is explicitly stated or unambiguously implied by the title/notes
+- "medium": a reasonable inference from clear signals (verb form, named entities)
+- "low": a weak guess. Prefer null + "low" over speculation. Do not infer values from sibling items.
+
 For each item, respond with JSON:
 {
   "processed_items": [
@@ -239,6 +244,11 @@ For each item, respond with JSON:
       "suggested_title": "improved title if needed",
       "context": "${contextOptions}|null",
       "priority": 1-5,
+      "confidence": {
+        "list": "high|medium|low",
+        "context": "high|medium|low",
+        "priority": "high|medium|low"
+      },
       "reasoning": "brief explanation"
     }
   ],
@@ -256,11 +266,15 @@ For each item, respond with JSON:
   }
 }
 
-export async function importNotes(rawText, userContexts) {
+export async function importNotes(rawText, userContexts, projects = [], today, dayName) {
   if (!openai) return { error: 'OpenAI API key not configured' };
   const contextOptions = userContexts?.length
     ? userContexts.map(c => c.name || c).join('|')
     : '@home|@work|@errands|@computer|@phone|@anywhere';
+  const projectList = projects?.length
+    ? projects.map(p => `- ${p.name}`).join('\n')
+    : '(none)';
+  const dateLine = today ? `Today is ${dayName}, ${today}. Resolve relative dates (e.g. "tomorrow", "Friday", "next week") to absolute YYYY-MM-DD.` : '';
   try {
     const response = await openai.chat.completions.create({
       model: 'gpt-4o',
@@ -272,10 +286,23 @@ export async function importNotes(rawText, userContexts) {
 
 Split the text into logical items — each line, bullet point, or distinct thought should become a separate item. Ignore empty lines.
 
+${dateLine}
+
+Active projects (use exact name when an item belongs to one, otherwise null):
+${projectList}
+
 Text to import:
 """
 ${rawText}
 """
+
+CONFIDENCE RULES — be honest about uncertainty for every field:
+- "high": the answer is explicitly stated or unambiguously implied by THIS item's text alone
+- "medium": a reasonable inference from clear signals in THIS item (verb form, named entities, keywords)
+- "low": a weak guess. Prefer null + "low" over speculation.
+- CRITICAL: Treat each item INDEPENDENTLY. Do NOT infer values from sibling items in the same import. If item 3 mentions "Project X", that does NOT make item 5 part of "Project X". Each item must be judged on its own text.
+- Only assign project_name if the item itself contains keywords that match the project. If unsure, return null + "low".
+- Only set is_daily_focus = true if the item itself signals urgency ("today", "ASAP", "urgent"). Default false + "high".
 
 Respond with JSON:
 {
@@ -285,10 +312,24 @@ Respond with JSON:
       "notes": "any additional details from the original text, or null",
       "recommended_list": "inbox|next_actions|waiting_for|someday_maybe",
       "context": "${contextOptions}|null",
+      "project_name": "exact name from list above, or null",
+      "due_date": "YYYY-MM-DD or null",
+      "waiting_for_person": "name of person if recommended_list is waiting_for, else null",
+      "is_daily_focus": boolean (true only if clearly urgent/today),
       "priority": 1-5,
       "energy_level": "low|medium|high|null",
       "time_estimate": null or number in minutes,
       "is_project": boolean,
+      "confidence": {
+        "list": "high|medium|low",
+        "context": "high|medium|low",
+        "project": "high|medium|low",
+        "due_date": "high|medium|low",
+        "energy": "high|medium|low",
+        "time": "high|medium|low",
+        "waiting_for": "high|medium|low",
+        "daily_focus": "high|medium|low"
+      },
       "reasoning": "brief explanation of categorization"
     }
   ]
@@ -327,11 +368,18 @@ Current Stats:
 Available Next Actions:
 ${taskList}
 
+CONFIDENCE RULES — be honest about uncertainty for each suggestion:
+- "high": clear signal it belongs in today's focus (due today, urgent, blocking other work, perfectly matches available energy/time)
+- "medium": good candidate based on context, but not the strongest pick
+- "low": filler — only suggest if the user clearly needs more items. Prefer fewer high-confidence picks over padding the list with low-confidence ones.
+- It is OK to return fewer than 5 items if only a few are truly worth focusing on today.
+
 Respond with JSON:
 {
   "suggested_focus": [
     {
       "task_index": number,
+      "confidence": "high|medium|low",
       "reason": "why this should be a focus today"
     }
   ],

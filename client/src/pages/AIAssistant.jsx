@@ -1,7 +1,31 @@
-import { useState } from 'react';
-import { Sparkles, Inbox, Target, CheckCircle2, ArrowRight, FileText, Upload, Copy, Trash2, Check } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Sparkles, Inbox, Target, CheckCircle2, ArrowRight, FileText, Upload, Copy, Trash2, Check, Pencil, X } from 'lucide-react';
 import { api } from '../lib/api';
 import MonoLabel from '../components/ui/MonoLabel';
+
+const LIST_OPTIONS = [
+  { value: 'inbox', label: 'inbox' },
+  { value: 'next_actions', label: 'next actions' },
+  { value: 'waiting_for', label: 'waiting for' },
+  { value: 'someday_maybe', label: 'someday/maybe' },
+];
+const ENERGY_OPTIONS = [
+  { value: '', label: '—' },
+  { value: 'low', label: 'low' },
+  { value: 'medium', label: 'medium' },
+  { value: 'high', label: 'high' },
+];
+
+const CONF_RANK = { high: 3, medium: 2, low: 1 };
+const showField = (item, field, min = 'medium') => {
+  const c = item?.confidence?.[field];
+  if (!c) return true;
+  return CONF_RANK[c] >= CONF_RANK[min];
+};
+const fadeIfMedium = (item, field) => {
+  const c = item?.confidence?.[field];
+  return c === 'medium' ? 'opacity-60' : '';
+};
 
 export default function AIAssistant() {
   const [inboxResult, setInboxResult] = useState(null);
@@ -12,9 +36,19 @@ export default function AIAssistant() {
   const [importResult, setImportResult] = useState(null);
   const [importSelected, setImportSelected] = useState(new Set());
   const [importDone, setImportDone] = useState(null);
+  const [editingIndex, setEditingIndex] = useState(null);
+  const [editingInboxIndex, setEditingInboxIndex] = useState(null);
+  const [prioritiesKept, setPrioritiesKept] = useState(new Set());
+  const [contexts, setContexts] = useState([]);
+  const [projects, setProjects] = useState([]);
   const [dupResult, setDupResult] = useState(null);
   const [dupSelected, setDupSelected] = useState(new Set());
   const [dupDone, setDupDone] = useState(null);
+
+  useEffect(() => {
+    api.contexts.getAll().then(setContexts).catch(console.error);
+    api.projects.getAll().then(setProjects).catch(console.error);
+  }, []);
 
   const processInbox = async () => {
     setLoading(l => ({ ...l, inbox: true }));
@@ -25,9 +59,23 @@ export default function AIAssistant() {
 
   const getDailyPriorities = async () => {
     setLoading(l => ({ ...l, priorities: true }));
-    try { setPrioritiesResult(await api.ai.getDailyPriorities()); }
+    try {
+      const result = await api.ai.getDailyPriorities();
+      setPrioritiesResult(result);
+      if (result?.suggested_focus) {
+        setPrioritiesKept(new Set(result.suggested_focus.map(f => f.task_index)));
+      }
+    }
     catch (error) { console.error('Failed to get priorities:', error); }
     finally { setLoading(l => ({ ...l, priorities: false })); }
+  };
+
+  const togglePriorityKept = (taskIndex) => {
+    setPrioritiesKept(prev => {
+      const next = new Set(prev);
+      next.has(taskIndex) ? next.delete(taskIndex) : next.add(taskIndex);
+      return next;
+    });
   };
 
   const applyInboxProcessing = async () => {
@@ -40,16 +88,29 @@ export default function AIAssistant() {
       })).filter(item => item.task_id);
       await api.ai.applyInboxProcessing(items);
       setInboxResult(null);
+      setEditingInboxIndex(null);
     } finally { setApplying(false); }
+  };
+
+  const updateInboxItem = (index, patch) => {
+    setInboxResult(prev => {
+      if (!prev) return prev;
+      const processed_items = prev.processed_items.map((it, i) => (i === index ? { ...it, ...patch } : it));
+      return { ...prev, processed_items };
+    });
   };
 
   const applyDailyFocus = async () => {
     if (!prioritiesResult?.suggested_focus) return;
     setApplying(true);
     try {
-      const taskIds = prioritiesResult.suggested_focus.map(f => prioritiesResult.tasks[f.task_index - 1]?.id).filter(Boolean);
+      const taskIds = prioritiesResult.suggested_focus
+        .filter(f => prioritiesKept.has(f.task_index))
+        .map(f => prioritiesResult.tasks[f.task_index - 1]?.id)
+        .filter(Boolean);
       await api.ai.applyDailyFocus(taskIds);
       setPrioritiesResult(null);
+      setPrioritiesKept(new Set());
     } finally { setApplying(false); }
   };
 
@@ -57,12 +118,40 @@ export default function AIAssistant() {
     if (!importText.trim()) return;
     setLoading(l => ({ ...l, import: true }));
     setImportDone(null);
+    setEditingIndex(null);
     try {
       const result = await api.ai.importNotes(importText);
-      setImportResult(result);
+      setImportResult({ ...result, mode: 'ai' });
       if (result?.items) setImportSelected(new Set(result.items.map((_, i) => i)));
     } catch (error) { console.error('Failed to analyze notes:', error); }
     finally { setLoading(l => ({ ...l, import: false })); }
+  };
+
+  const splitImport = () => {
+    if (!importText.trim()) return;
+    setImportDone(null);
+    setEditingIndex(null);
+    const items = importText
+      .split('\n')
+      .map(l => l.replace(/^\s*[-*•]\s+/, '').trim())
+      .filter(Boolean)
+      .map(title => ({
+        title,
+        notes: null,
+        recommended_list: 'inbox',
+        context: null,
+        project_id: null,
+        due_date: null,
+        waiting_for_person: null,
+        is_daily_focus: false,
+        priority: null,
+        energy_level: null,
+        time_estimate: null,
+        reasoning: null,
+      }));
+    if (items.length === 0) return;
+    setImportResult({ items, mode: 'raw' });
+    setImportSelected(new Set(items.map((_, i) => i)));
   };
 
   const toggleImportItem = (index) => {
@@ -73,6 +162,14 @@ export default function AIAssistant() {
     });
   };
 
+  const updateImportItem = (index, patch) => {
+    setImportResult(prev => {
+      if (!prev) return prev;
+      const items = prev.items.map((item, i) => (i === index ? { ...item, ...patch } : item));
+      return { ...prev, items };
+    });
+  };
+
   const applyImport = async () => {
     if (!importResult?.items) return;
     setApplying(true);
@@ -80,7 +177,7 @@ export default function AIAssistant() {
       const items = importResult.items.filter((_, i) => importSelected.has(i));
       const result = await api.ai.applyImport(items);
       setImportDone(result.count);
-      setImportResult(null); setImportText(''); setImportSelected(new Set());
+      setImportResult(null); setImportText(''); setImportSelected(new Set()); setEditingIndex(null);
     } finally { setApplying(false); }
   };
 
@@ -152,26 +249,160 @@ export default function AIAssistant() {
 
           {inboxResult?.processed_items && (
             <div className="mt-4 pt-4 border-t border-white/[0.05] space-y-2">
-              {inboxResult.processed_items.map((item, i) => (
-                <div
-                  key={i}
-                  className="rounded-xl p-3"
-                  style={{ background: 'rgba(255,255,255,0.02)', boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.05)' }}
-                >
-                  <div className="flex items-center gap-2">
-                    <CheckCircle2 className="w-3.5 h-3.5" style={{ color: 'rgb(var(--mint-glow))' }} />
-                    <span className="text-[13px] font-medium text-text-1">
-                      {item.suggested_title || inboxResult.tasks[item.original_index - 1]?.title}
-                    </span>
+              {inboxResult.processed_items.map((item, i) => {
+                const editing = editingInboxIndex === i;
+                const originalTitle = inboxResult.tasks[item.original_index - 1]?.title;
+                return (
+                  <div
+                    key={i}
+                    className="rounded-xl p-3"
+                    style={{ background: 'rgba(255,255,255,0.02)', boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.05)' }}
+                  >
+                    <div className="flex items-start gap-2">
+                      <CheckCircle2 className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" style={{ color: 'rgb(var(--mint-glow))' }} />
+                      <div className="flex-1 min-w-0">
+                        {editing ? (
+                          <input
+                            type="text"
+                            value={item.suggested_title || originalTitle || ''}
+                            onChange={(e) => updateInboxItem(i, { suggested_title: e.target.value })}
+                            className="gtd-input text-[13px] font-medium py-1.5"
+                          />
+                        ) : (
+                          <span className="text-[13px] font-medium text-text-1">
+                            {item.suggested_title || originalTitle}
+                          </span>
+                        )}
+                        {!editing && (
+                          <div className="flex items-center gap-2 mt-2 flex-wrap">
+                            <ArrowRight className="w-3 h-3 text-text-3" />
+                            <span className={`gtd-badge list-${item.recommended_list} ${fadeIfMedium(item, 'list')}`}>
+                              {item.recommended_list.replace('_', ' ')}
+                            </span>
+                            {item.context && showField(item, 'context') && (
+                              <span className={`context-badge ${fadeIfMedium(item, 'context')}`}>{item.context}</span>
+                            )}
+                            {item.priority != null && showField(item, 'priority') && (
+                              <span className={`font-mono text-[10.5px] text-text-3 ${fadeIfMedium(item, 'priority')}`}>p{item.priority}</span>
+                            )}
+                          </div>
+                        )}
+                        {!editing && item.reasoning && (
+                          <p className="text-[11.5px] text-text-3 mt-1.5 leading-relaxed">{item.reasoning}</p>
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setEditingInboxIndex(editing ? null : i)}
+                        aria-label={editing ? 'Close edit' : 'Edit suggestion'}
+                        className="flex-shrink-0 w-7 h-7 rounded-lg grid place-items-center text-text-3 hover:text-text-1 transition-colors"
+                        style={{ background: 'rgba(255,255,255,0.03)', boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.06)' }}
+                      >
+                        {editing ? <X className="w-3.5 h-3.5" /> : <Pencil className="w-3.5 h-3.5" />}
+                      </button>
+                    </div>
+
+                    {editing && (
+                      <div className="mt-3 pl-6 space-y-3">
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="gtd-label">List</label>
+                            <select
+                              value={item.recommended_list}
+                              onChange={(e) => updateInboxItem(i, { recommended_list: e.target.value })}
+                              className="gtd-input text-[12.5px] py-2"
+                            >
+                              {LIST_OPTIONS.map(o => (
+                                <option key={o.value} value={o.value}>{o.label}</option>
+                              ))}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="gtd-label">Context</label>
+                            <select
+                              value={item.context || ''}
+                              onChange={(e) => updateInboxItem(i, { context: e.target.value || null })}
+                              className="gtd-input text-[12.5px] py-2"
+                            >
+                              <option value="">No context</option>
+                              {contexts.map(c => (
+                                <option key={c.id} value={c.name}>{c.name}</option>
+                              ))}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="gtd-label">Project</label>
+                            <select
+                              value={item.project_id ?? ''}
+                              onChange={(e) => updateInboxItem(i, { project_id: e.target.value ? Number(e.target.value) : null })}
+                              className="gtd-input text-[12.5px] py-2"
+                            >
+                              <option value="">No project</option>
+                              {projects.map(p => (
+                                <option key={p.id} value={p.id}>{p.name}</option>
+                              ))}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="gtd-label">Due Date</label>
+                            <input
+                              type="date"
+                              value={item.due_date || ''}
+                              onChange={(e) => updateInboxItem(i, { due_date: e.target.value || null })}
+                              className="gtd-input text-[12.5px] py-2"
+                            />
+                          </div>
+                          <div>
+                            <label className="gtd-label">Energy</label>
+                            <select
+                              value={item.energy_level || ''}
+                              onChange={(e) => updateInboxItem(i, { energy_level: e.target.value || null })}
+                              className="gtd-input text-[12.5px] py-2"
+                            >
+                              {ENERGY_OPTIONS.map(o => (
+                                <option key={o.value} value={o.value}>{o.label}</option>
+                              ))}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="gtd-label">Time (min)</label>
+                            <input
+                              type="number"
+                              min="0"
+                              value={item.time_estimate ?? ''}
+                              onChange={(e) => {
+                                const v = e.target.value;
+                                updateInboxItem(i, { time_estimate: v === '' ? null : Number(v) });
+                              }}
+                              className="gtd-input text-[12.5px] py-2"
+                              placeholder="—"
+                            />
+                          </div>
+                        </div>
+                        {item.recommended_list === 'waiting_for' && (
+                          <div>
+                            <label className="gtd-label">Waiting on</label>
+                            <input
+                              type="text"
+                              value={item.waiting_for_person || ''}
+                              onChange={(e) => updateInboxItem(i, { waiting_for_person: e.target.value || null })}
+                              className="gtd-input text-[12.5px] py-2"
+                              placeholder="Who?"
+                            />
+                          </div>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => setEditingInboxIndex(null)}
+                          className="gtd-btn gtd-btn-secondary w-full text-[12px]"
+                        >
+                          Done
+                        </button>
+                      </div>
+                    )}
                   </div>
-                  <div className="flex items-center gap-2 mt-2 flex-wrap">
-                    <ArrowRight className="w-3 h-3 text-text-3" />
-                    <span className={`gtd-badge list-${item.recommended_list}`}>{item.recommended_list.replace('_', ' ')}</span>
-                    {item.context && <span className="context-badge">{item.context}</span>}
-                  </div>
-                  <p className="text-[11.5px] text-text-3 mt-1.5 leading-relaxed">{item.reasoning}</p>
-                </div>
-              ))}
+                );
+              })}
               <button
                 onClick={applyInboxProcessing}
                 disabled={applying}
@@ -211,30 +442,63 @@ export default function AIAssistant() {
                 </div>
               )}
               <div className="space-y-2">
-                {prioritiesResult.suggested_focus.map((item, i) => (
-                  <div
-                    key={i}
-                    className="rounded-xl p-3 flex items-start gap-3"
-                    style={{ background: 'rgba(255,255,255,0.02)', boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.05)' }}
-                  >
-                    <span className="font-mono text-[11px] text-mint-glow mt-0.5 flex-shrink-0">
-                      {(i + 1).toString().padStart(2, '0')}
-                    </span>
-                    <div className="min-w-0">
-                      <div className="text-[13px] font-medium text-text-1">
-                        {prioritiesResult.tasks[item.task_index - 1]?.title}
+                {prioritiesResult.suggested_focus.map((item, i) => {
+                  const kept = prioritiesKept.has(item.task_index);
+                  const conf = item.confidence;
+                  return (
+                    <div
+                      key={i}
+                      className="rounded-xl p-3 flex items-start gap-3 transition-all"
+                      style={
+                        kept
+                          ? { background: 'rgba(255,255,255,0.02)', boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.05)' }
+                          : { background: 'rgba(255,255,255,0.01)', boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.04)', opacity: 0.45 }
+                      }
+                    >
+                      <span className="font-mono text-[11px] text-mint-glow mt-0.5 flex-shrink-0">
+                        {(i + 1).toString().padStart(2, '0')}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <div className={`text-[13px] font-medium text-text-1 ${kept ? '' : 'line-through'}`}>
+                          {prioritiesResult.tasks[item.task_index - 1]?.title}
+                        </div>
+                        {kept && conf && (
+                          <span
+                            className="inline-block font-mono text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded mt-1"
+                            style={
+                              conf === 'high'
+                                ? { background: 'rgb(var(--mint) / 0.12)', color: 'rgb(var(--mint-glow))' }
+                                : conf === 'medium'
+                                ? { background: 'rgba(255,255,255,0.04)', color: 'rgb(var(--text-3))' }
+                                : { background: 'rgb(var(--amber) / 0.10)', color: 'rgb(var(--amber-glow))' }
+                            }
+                          >
+                            {conf}
+                          </span>
+                        )}
+                        {kept && (
+                          <p className="text-[11.5px] text-text-3 mt-1 leading-relaxed">{item.reason}</p>
+                        )}
                       </div>
-                      <p className="text-[11.5px] text-text-3 mt-1 leading-relaxed">{item.reason}</p>
+                      <button
+                        type="button"
+                        onClick={() => togglePriorityKept(item.task_index)}
+                        aria-label={kept ? 'Remove from focus' : 'Restore to focus'}
+                        className="flex-shrink-0 w-7 h-7 rounded-lg grid place-items-center text-text-3 hover:text-text-1 transition-colors"
+                        style={{ background: 'rgba(255,255,255,0.03)', boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.06)' }}
+                      >
+                        {kept ? <X className="w-3.5 h-3.5" /> : <Check className="w-3.5 h-3.5" />}
+                      </button>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
               <button
                 onClick={applyDailyFocus}
-                disabled={applying}
+                disabled={applying || prioritiesKept.size === 0}
                 className="gtd-btn gtd-btn-primary w-full mt-3 text-[12.5px] disabled:opacity-60"
               >
-                {applying ? 'Applying…' : "Set as Today's Focus"}
+                {applying ? 'Applying…' : `Set ${prioritiesKept.size} as Today's Focus`}
               </button>
             </div>
           )}
@@ -379,14 +643,29 @@ export default function AIAssistant() {
               className="gtd-input min-h-[160px] mb-3 font-mono text-[12.5px]"
               placeholder={"Paste your notes here...\n\nExample:\n- Buy groceries for the week\n- Call dentist to schedule appointment\n- Waiting for Bob to send the report\n- Learn Spanish someday"}
             />
-            <PrimaryAction
-              tone="violet"
-              loading={loading.import}
-              onClick={analyzeImport}
-              disabled={!importText.trim()}
-              label="Analyze & Categorize"
-              loadingLabel="Analyzing…"
-            />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <PrimaryAction
+                tone="violet"
+                loading={loading.import}
+                onClick={analyzeImport}
+                disabled={!importText.trim()}
+                label="Analyze with AI"
+                loadingLabel="Analyzing…"
+              />
+              <button
+                type="button"
+                onClick={splitImport}
+                disabled={!importText.trim() || loading.import}
+                className="gtd-btn gtd-btn-secondary inline-flex items-center justify-center gap-2 text-[13px] disabled:opacity-50"
+              >
+                <Inbox className="w-3.5 h-3.5" />
+                Import as-is to inbox
+              </button>
+            </div>
+            <p className="text-[11.5px] text-text-3 mt-2 leading-relaxed">
+              <span className="text-text-2">AI</span> categorizes, tags, and estimates each item.
+              <span className="text-text-2"> As-is</span> drops every line into your inbox unchanged.
+            </p>
           </>
         )}
 
@@ -395,6 +674,7 @@ export default function AIAssistant() {
             <div className="flex items-center justify-between">
               <span className="font-mono text-[11px] text-text-3 uppercase tracking-wider">
                 {importResult.items.length} {importResult.items.length === 1 ? 'item' : 'items'} found
+                {importResult.mode === 'raw' && <span className="ml-2 text-text-2">· raw</span>}
               </span>
               <button
                 onClick={() => {
@@ -409,11 +689,11 @@ export default function AIAssistant() {
 
             {importResult.items.map((item, i) => {
               const sel = importSelected.has(i);
+              const editing = editingIndex === i;
               return (
-                <button
+                <div
                   key={i}
-                  onClick={() => toggleImportItem(i)}
-                  className="w-full text-left rounded-xl p-3 transition-all"
+                  className="rounded-xl p-3 transition-all"
                   style={
                     sel
                       ? { background: 'rgb(var(--violet) / 0.06)', boxShadow: 'inset 0 0 0 1px rgb(var(--violet) / 0.25)' }
@@ -421,7 +701,10 @@ export default function AIAssistant() {
                   }
                 >
                   <div className="flex items-start gap-3">
-                    <div
+                    <button
+                      type="button"
+                      onClick={() => toggleImportItem(i)}
+                      aria-label={sel ? 'Deselect item' : 'Select item'}
                       className="mt-0.5 w-4 h-4 rounded grid place-items-center flex-shrink-0 transition-all"
                       style={
                         sel
@@ -430,33 +713,219 @@ export default function AIAssistant() {
                       }
                     >
                       {sel && <Check className="w-3 h-3 text-white" strokeWidth={3} />}
-                    </div>
+                    </button>
                     <div className="flex-1 min-w-0">
-                      <span className="text-[13.5px] font-medium text-text-1">{item.title}</span>
-                      {item.notes && <p className="text-[11.5px] text-text-3 mt-0.5">{item.notes}</p>}
-                      <div className="flex flex-wrap items-center gap-2 mt-2">
-                        <ArrowRight className="w-3 h-3 text-text-3" />
-                        <span className={`gtd-badge list-${item.recommended_list}`}>
-                          {item.recommended_list.replace('_', ' ')}
-                        </span>
-                        {item.context && <span className="context-badge">{item.context}</span>}
-                        {item.energy_level && (
-                          <span className="font-mono text-[10.5px] text-text-3">energy:{item.energy_level}</span>
-                        )}
-                        {item.time_estimate && (
-                          <span className="font-mono text-[10.5px] text-text-3">{item.time_estimate}m</span>
-                        )}
-                      </div>
-                      <p className="text-[11.5px] text-text-3 mt-1.5 leading-relaxed">{item.reasoning}</p>
+                      {editing ? (
+                        <input
+                          type="text"
+                          value={item.title}
+                          onChange={(e) => updateImportItem(i, { title: e.target.value })}
+                          className="gtd-input text-[13.5px] font-medium py-1.5"
+                          placeholder="Title"
+                        />
+                      ) : (
+                        <span className="text-[13.5px] font-medium text-text-1">{item.title}</span>
+                      )}
+                      {!editing && item.notes && (
+                        <p className="text-[11.5px] text-text-3 mt-0.5">{item.notes}</p>
+                      )}
+                      {!editing && (
+                        <div className="flex flex-wrap items-center gap-2 mt-2">
+                          <ArrowRight className="w-3 h-3 text-text-3" />
+                          <span className={`gtd-badge list-${item.recommended_list} ${fadeIfMedium(item, 'list')}`}>
+                            {item.recommended_list.replace('_', ' ')}
+                          </span>
+                          {item.context && showField(item, 'context') && (
+                            <span className={`context-badge ${fadeIfMedium(item, 'context')}`}>{item.context}</span>
+                          )}
+                          {item.project_id && showField(item, 'project') && (
+                            <span className={`font-mono text-[10.5px] text-text-3 ${fadeIfMedium(item, 'project')}`}>
+                              proj:{projects.find(p => p.id === Number(item.project_id))?.name || '?'}
+                            </span>
+                          )}
+                          {item.due_date && showField(item, 'due_date') && (
+                            <span className={`font-mono text-[10.5px] text-text-3 ${fadeIfMedium(item, 'due_date')}`}>due:{item.due_date}</span>
+                          )}
+                          {item.waiting_for_person && showField(item, 'waiting_for') && (
+                            <span className={`font-mono text-[10.5px] text-text-3 ${fadeIfMedium(item, 'waiting_for')}`}>@{item.waiting_for_person}</span>
+                          )}
+                          {item.energy_level && showField(item, 'energy') && (
+                            <span className={`font-mono text-[10.5px] text-text-3 ${fadeIfMedium(item, 'energy')}`}>energy:{item.energy_level}</span>
+                          )}
+                          {item.time_estimate && showField(item, 'time') && (
+                            <span className={`font-mono text-[10.5px] text-text-3 ${fadeIfMedium(item, 'time')}`}>{item.time_estimate}m</span>
+                          )}
+                          {item.is_daily_focus && showField(item, 'daily_focus') && (
+                            <span className={`font-mono text-[10.5px] ${fadeIfMedium(item, 'daily_focus')}`} style={{ color: 'rgb(var(--amber-glow))' }}>★ today</span>
+                          )}
+                        </div>
+                      )}
+                      {!editing && item.reasoning && (
+                        <p className="text-[11.5px] text-text-3 mt-1.5 leading-relaxed">{item.reasoning}</p>
+                      )}
                     </div>
+                    <button
+                      type="button"
+                      onClick={() => setEditingIndex(editing ? null : i)}
+                      aria-label={editing ? 'Close edit' : 'Edit item'}
+                      className="flex-shrink-0 w-7 h-7 rounded-lg grid place-items-center text-text-3 hover:text-text-1 transition-colors"
+                      style={{ background: 'rgba(255,255,255,0.03)', boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.06)' }}
+                    >
+                      {editing ? <X className="w-3.5 h-3.5" /> : <Pencil className="w-3.5 h-3.5" />}
+                    </button>
                   </div>
-                </button>
+
+                  {editing && (
+                    <div className="mt-3 pl-7 space-y-3">
+                      <div>
+                        <label className="gtd-label">Notes</label>
+                        <textarea
+                          value={item.notes || ''}
+                          onChange={(e) => updateImportItem(i, { notes: e.target.value || null })}
+                          className="gtd-input text-[12.5px] min-h-[60px]"
+                          placeholder="Optional details"
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="gtd-label">List</label>
+                          <select
+                            value={item.recommended_list}
+                            onChange={(e) => updateImportItem(i, { recommended_list: e.target.value })}
+                            className="gtd-input text-[12.5px] py-2"
+                          >
+                            {LIST_OPTIONS.map(o => (
+                              <option key={o.value} value={o.value}>{o.label}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="gtd-label">Context</label>
+                          <select
+                            value={item.context || ''}
+                            onChange={(e) => updateImportItem(i, { context: e.target.value || null })}
+                            className="gtd-input text-[12.5px] py-2"
+                          >
+                            <option value="">No context</option>
+                            {contexts.map(c => (
+                              <option key={c.id} value={c.name}>{c.name}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="gtd-label">Project</label>
+                          <select
+                            value={item.project_id ?? ''}
+                            onChange={(e) => updateImportItem(i, { project_id: e.target.value ? Number(e.target.value) : null })}
+                            className="gtd-input text-[12.5px] py-2"
+                          >
+                            <option value="">No project</option>
+                            {projects.map(p => (
+                              <option key={p.id} value={p.id}>{p.name}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="gtd-label">Due Date</label>
+                          <input
+                            type="date"
+                            value={item.due_date || ''}
+                            onChange={(e) => updateImportItem(i, { due_date: e.target.value || null })}
+                            className="gtd-input text-[12.5px] py-2"
+                          />
+                        </div>
+                        <div>
+                          <label className="gtd-label">Energy</label>
+                          <select
+                            value={item.energy_level || ''}
+                            onChange={(e) => updateImportItem(i, { energy_level: e.target.value || null })}
+                            className="gtd-input text-[12.5px] py-2"
+                          >
+                            {ENERGY_OPTIONS.map(o => (
+                              <option key={o.value} value={o.value}>{o.label}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="gtd-label">Time (min)</label>
+                          <input
+                            type="number"
+                            min="0"
+                            value={item.time_estimate ?? ''}
+                            onChange={(e) => {
+                              const v = e.target.value;
+                              updateImportItem(i, { time_estimate: v === '' ? null : Number(v) });
+                            }}
+                            className="gtd-input text-[12.5px] py-2"
+                            placeholder="—"
+                          />
+                        </div>
+                      </div>
+
+                      {item.recommended_list === 'waiting_for' && (
+                        <div>
+                          <label className="gtd-label">Waiting on</label>
+                          <input
+                            type="text"
+                            value={item.waiting_for_person || ''}
+                            onChange={(e) => updateImportItem(i, { waiting_for_person: e.target.value || null })}
+                            className="gtd-input text-[12.5px] py-2"
+                            placeholder="Who?"
+                          />
+                        </div>
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={() => updateImportItem(i, { is_daily_focus: !item.is_daily_focus })}
+                        className="w-full flex items-center gap-3 p-2.5 rounded-xl transition-all text-left"
+                        style={
+                          item.is_daily_focus
+                            ? { background: 'rgb(var(--amber) / 0.08)', boxShadow: 'inset 0 0 0 1px rgb(var(--amber) / 0.28)' }
+                            : { background: 'rgba(255,255,255,0.02)', boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.06)' }
+                        }
+                      >
+                        <div
+                          className="w-9 h-5 rounded-full relative transition-all flex-shrink-0"
+                          style={
+                            item.is_daily_focus
+                              ? { background: 'rgb(var(--amber) / 0.6)', boxShadow: 'inset 0 0 0 1px rgb(var(--amber) / 0.5)' }
+                              : { background: 'rgba(255,255,255,0.05)', boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.10)' }
+                          }
+                        >
+                          <div
+                            className="absolute top-0.5 w-4 h-4 rounded-full transition-all"
+                            style={{
+                              left: item.is_daily_focus ? '18px' : '2px',
+                              background: item.is_daily_focus ? 'rgb(var(--amber-glow))' : 'rgba(255,255,255,0.65)',
+                              boxShadow: item.is_daily_focus ? '0 0 8px rgb(var(--amber) / 0.55)' : 'none',
+                            }}
+                          />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-[12.5px] font-medium text-text-1 inline-flex items-center gap-1.5">
+                            <Sparkles className="w-3 h-3" style={{ color: item.is_daily_focus ? 'rgb(var(--amber-glow))' : 'rgb(var(--text-3))' }} />
+                            Add to today's focus
+                          </div>
+                        </div>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setEditingIndex(null)}
+                        className="gtd-btn gtd-btn-secondary w-full text-[12px]"
+                      >
+                        Done
+                      </button>
+                    </div>
+                  )}
+                </div>
               );
             })}
 
             <div className="flex gap-2 pt-2">
               <button
-                onClick={() => setImportResult(null)}
+                onClick={() => { setImportResult(null); setEditingIndex(null); }}
                 className="gtd-btn gtd-btn-secondary flex-1 text-[12.5px]"
               >
                 Back

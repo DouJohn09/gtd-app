@@ -421,6 +421,27 @@ Lifetime deals generate upfront cash and launch communities love them. Things 3 
 20. Fix daily focus rule — only flag tasks due today, not tomorrow
 21. Redesign client with neo-modern glass aesthetic (dark-locked, design-token system, ⌘K capture, glass primitives)
 22. Inbox 2-column layout (processing stats + clarify ritual + AI assist sidebar); widen Lists/WeeklyReview/CompletedTasks
+23. AI quality pass: confidence levels in prompts, hide low-confidence badges, inline editor on Import Notes + Process Inbox cards, per-item prune on Daily Focus suggestions
+
+---
+
+## AI Quality Workstream
+
+Cross-cutting effort to make AI suggestions more trustworthy. Insight from FEATURE_RESEARCH_2026.md: users abandon AI features after a single bad suggestion, so the goal is not "more AI" but "AI that is honest about what it doesn't know."
+
+### Shipped
+- **Confidence levels in every AI prompt** — `processInbox`, `importNotes`, `getDailyPriorities` now return `confidence: high|medium|low` per inferred field. Prompts include explicit rules ("prefer null + low over speculation") and warn against cross-item bleed (don't infer item N's project from item N-1).
+- **Confidence-aware rendering** — Import Notes and Process Inbox cards hide low-confidence badges entirely and fade medium ones; high-confidence shows normally. Daily Focus shows a per-item confidence chip.
+- **Inline-edit-everywhere on AI surfaces** — Import Notes and Process Inbox cards have a pencil → full editor (title, list, context, project, due date, energy, time, waiting-on, daily focus). User can fix wrong suggestions in place instead of hunting them down later.
+- **Per-item prune on Daily Focus** — Each suggestion has a remove (X) toggle; "Set N as Today's Focus" only applies the kept ones.
+- **Backend wired** — `/apply-inbox-processing` accepts the full editable field set (project_id, due_date, energy, time, daily_focus, waiting_for_person), mirroring `/apply-import`.
+
+### Next (in priority order)
+1. **Few-shot prompting from user history** — Inject 5–10 of the user's recent processed tasks into prompts so AI learns their personal patterns (work vs home keywords, project naming, etc.). Should reduce wrong context/project guesses dramatically.
+2. **Capture corrections** — When the user edits an AI suggestion before applying, log the original→corrected diff. Use as future few-shot examples and as a quality metric.
+3. **Single-item processing for Process Inbox** — Send each inbox item in its own API call rather than a batch. Eliminates the cross-item bleed problem at the API level (batching was the root cause of the "Courier Hub assigned to unrelated tasks" bug).
+4. **Show "AI uncertain" affordance** — When AI returns mostly low confidence for an item, surface a hint ("AI wasn't sure about project + context") instead of silently hiding badges, so the user knows to check the editor.
+5. **Confidence calibration check** — Track how often "high" suggestions get edited vs "low" ones. If high gets edited often, the prompt is overconfident — tune.
 
 ---
 

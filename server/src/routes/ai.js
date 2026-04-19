@@ -89,11 +89,15 @@ router.post('/apply-inbox-processing', async (req, res) => {
       const updates = {
         list: item.recommended_list,
         context: item.context,
-        priority: item.priority
+        priority: item.priority,
       };
-      if (item.suggested_title) {
-        updates.title = item.suggested_title;
-      }
+      if (item.suggested_title) updates.title = item.suggested_title;
+      if (item.project_id !== undefined) updates.project_id = item.project_id ? parseInt(item.project_id) : null;
+      if (item.due_date !== undefined) updates.due_date = item.due_date || null;
+      if (item.energy_level !== undefined) updates.energy_level = item.energy_level || null;
+      if (item.time_estimate !== undefined) updates.time_estimate = item.time_estimate || null;
+      if (item.is_daily_focus !== undefined) updates.is_daily_focus = item.is_daily_focus ? 1 : 0;
+      if (item.waiting_for_person !== undefined) updates.waiting_for_person = item.waiting_for_person || null;
       return TaskModel.update(item.task_id, updates, req.user.id);
     });
 
@@ -137,9 +141,25 @@ router.post('/import-notes', async (req, res) => {
     }
 
     const userContexts = getUserContexts(req.user.id);
-    const result = await importNotes(text, userContexts);
+    const projects = ProjectModel.getAll(req.user.id).filter(p => p.status === 'active');
+    const now = new Date();
+    const today = now.toISOString().split('T')[0];
+    const dayName = now.toLocaleDateString('en-US', { weekday: 'long' });
+    const result = await importNotes(text, userContexts, projects, today, dayName);
     if (!result) {
       return res.status(500).json({ error: 'AI processing failed' });
+    }
+
+    // Resolve project_name → project_id for each item
+    if (Array.isArray(result.items)) {
+      result.items = result.items.map(item => {
+        let project_id = null;
+        if (item.project_name) {
+          const match = projects.find(p => p.name.toLowerCase() === item.project_name.toLowerCase());
+          if (match) project_id = match.id;
+        }
+        return { ...item, project_id };
+      });
     }
 
     res.json(result);
@@ -161,9 +181,13 @@ router.post('/apply-import', async (req, res) => {
         notes: item.notes || null,
         list: item.recommended_list || 'inbox',
         context: item.context || null,
+        project_id: item.project_id ? parseInt(item.project_id) : null,
+        waiting_for_person: item.waiting_for_person || null,
+        due_date: item.due_date || null,
         priority: item.priority || null,
         energy_level: item.energy_level || null,
         time_estimate: item.time_estimate || null,
+        is_daily_focus: item.is_daily_focus ? 1 : 0,
       }, req.user.id);
     });
 
