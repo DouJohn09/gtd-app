@@ -193,6 +193,9 @@ export default function TaskModal({ task, projects, onClose, onSave }) {
                 );
               })}
             </div>
+            <p className="font-mono text-[10px] text-text-3 mt-1.5">
+              inbox = unsorted &middot; next = do it &middot; waiting = delegated &middot; someday = later
+            </p>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
