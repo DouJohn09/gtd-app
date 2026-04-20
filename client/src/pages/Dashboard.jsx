@@ -50,6 +50,7 @@ export default function Dashboard() {
   const [stats, setStats] = useState(null);
   const [dailyFocus, setDailyFocus] = useState([]);
   const [habits, setHabits] = useState([]);
+  const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [editingTask, setEditingTask] = useState(null);
   const [showModal, setShowModal] = useState(false);
@@ -57,14 +58,16 @@ export default function Dashboard() {
 
   const fetchData = async () => {
     try {
-      const [statsData, focusData, habitsData] = await Promise.all([
+      const [statsData, focusData, habitsData, projectsData] = await Promise.all([
         api.tasks.getStats(),
         api.tasks.getDailyFocus(),
         api.habits.getAll(),
+        api.projects.getAll(),
       ]);
       setStats(statsData);
       setDailyFocus(focusData);
       setHabits(habitsData);
+      setProjects(projectsData);
     } catch (error) {
       console.error('Failed to fetch dashboard data:', error);
     } finally {
@@ -242,6 +245,7 @@ export default function Dashboard() {
       {showModal && (
         <TaskModal
           task={editingTask}
+          projects={projects}
           onClose={() => { setShowModal(false); setEditingTask(null); }}
           onSave={fetchData}
         />
