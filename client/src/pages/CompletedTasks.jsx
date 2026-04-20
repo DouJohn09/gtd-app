@@ -47,7 +47,9 @@ export default function CompletedTasks() {
   const { addToast } = useToast();
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [sortBy, setSortBy] = useState('completed_newest');
+  const [sortBy, setSortBy] = useState(() => localStorage.getItem('sort_completed') || 'completed_newest');
+
+  useEffect(() => { localStorage.setItem('sort_completed', sortBy); }, [sortBy]);
 
   const fetchData = async () => {
     try {

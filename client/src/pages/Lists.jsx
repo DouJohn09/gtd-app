@@ -49,8 +49,11 @@ export default function Lists() {
   const [loading, setLoading] = useState(true);
   const [editingTask, setEditingTask] = useState(null);
   const [showModal, setShowModal] = useState(false);
-  const [sortBy, setSortBy] = useState('priority');
+  const [sortBy, setSortBy] = useState(() => localStorage.getItem(`sort_list_${list}`) || 'priority');
   const { addToast } = useToast();
+
+  useEffect(() => { setSortBy(localStorage.getItem(`sort_list_${list}`) || 'priority'); }, [list]);
+  useEffect(() => { localStorage.setItem(`sort_list_${list}`, sortBy); }, [sortBy, list]);
 
   const fetchData = async () => {
     setLoading(true);

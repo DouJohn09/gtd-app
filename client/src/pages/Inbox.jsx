@@ -31,8 +31,10 @@ export default function Inbox() {
   const [loading, setLoading] = useState(true);
   const [editingTask, setEditingTask] = useState(null);
   const [showModal, setShowModal] = useState(false);
-  const [sortBy, setSortBy] = useState('date_added_newest');
+  const [sortBy, setSortBy] = useState(() => localStorage.getItem('sort_inbox') || 'date_added_newest');
   const { addToast } = useToast();
+
+  useEffect(() => { localStorage.setItem('sort_inbox', sortBy); }, [sortBy]);
 
   const fetchData = async () => {
     try {
