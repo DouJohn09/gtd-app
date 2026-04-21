@@ -21,16 +21,19 @@ router.post('/smart-capture', async (req, res) => {
     if (!text?.trim()) {
       return res.status(400).json({ error: 'Text is required' });
     }
+    const rawText = text.trim();
+    const urls = rawText.match(/https?:\/\/[^\s]+/gi) || [];
     const contexts = getUserContexts(req.user.id);
     const projects = ProjectModel.getAll(req.user.id).filter(p => p.status === 'active');
     const now = new Date();
     const today = now.toISOString().split('T')[0];
     const dayName = now.toLocaleDateString('en-US', { weekday: 'long' });
-    const ai = await smartCapture(text.trim(), contexts, projects, today, dayName);
+    const ai = await smartCapture(rawText, contexts, projects, today, dayName);
 
     if (!ai) {
-      // AI failed — fallback to plain inbox capture
-      const task = TaskModel.create({ title: text.trim() }, req.user.id);
+      const taskData = { title: rawText };
+      if (urls.length) taskData.notes = urls.join('\n');
+      const task = TaskModel.create(taskData, req.user.id);
       return res.json({ task, ai: null, fallback: true });
     }
 
@@ -41,8 +44,12 @@ router.post('/smart-capture', async (req, res) => {
       if (match) projectId = match.id;
     }
 
+    let notes = null;
+    if (urls.length) notes = urls.join('\n');
+
     const taskData = {
-      title: ai.title || text.trim(),
+      title: ai.title || rawText,
+      notes,
       list: ai.list || 'inbox',
       context: ai.context || null,
       project_id: projectId,

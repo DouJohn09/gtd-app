@@ -77,6 +77,9 @@ export default function Dashboard() {
 
   useEffect(() => {
     fetchData();
+    const onCapture = () => fetchData();
+    window.addEventListener('task-captured', onCapture);
+    return () => window.removeEventListener('task-captured', onCapture);
   }, []);
 
   const handleComplete = async (id) => {

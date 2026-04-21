@@ -43,6 +43,7 @@ export default function QuickCapture({ onCapture, placeholder = "Quick capture â
         setTitle('');
         addToast('Captured to inbox', 'success');
       }
+      window.dispatchEvent(new Event('task-captured'));
       onCapture?.();
     } catch (error) {
       console.error('Failed to capture:', error);
