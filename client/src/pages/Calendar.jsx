@@ -74,9 +74,14 @@ export default function Calendar() {
     const map = {};
     for (const task of scheduledTasks) {
       const key = task.due_date;
-      if (!key) continue;
-      if (!map[key]) map[key] = [];
-      map[key].push(task);
+      if (key) {
+        if (!map[key]) map[key] = [];
+        map[key].push(task);
+      }
+      if (task.start_date && task.start_date !== key) {
+        if (!map[task.start_date]) map[task.start_date] = [];
+        map[task.start_date].push({ ...task, _calendarDate: 'start' });
+      }
     }
     for (const event of googleEvents) {
       const key = event.due_date;

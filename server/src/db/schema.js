@@ -107,6 +107,23 @@ export async function initDb() {
   db.run('CREATE INDEX IF NOT EXISTS idx_tasks_position ON tasks(project_id, position)');
   db.run('CREATE INDEX IF NOT EXISTS idx_tasks_user_due_date ON tasks(user_id, due_date)');
 
+  // Migration: add start_date (defer dates) to tasks
+  const tasksColumnsRefresh = db.exec("PRAGMA table_info(tasks)");
+  const hasStartDate = tasksColumnsRefresh[0]?.values.some(col => col[1] === 'start_date');
+  if (!hasStartDate) {
+    db.run('ALTER TABLE tasks ADD COLUMN start_date DATE');
+  }
+
+  // Migration: add recurrence columns to tasks
+  const hasRecurrenceRule = tasksColumnsRefresh[0]?.values.some(col => col[1] === 'recurrence_rule');
+  if (!hasRecurrenceRule) {
+    db.run("ALTER TABLE tasks ADD COLUMN recurrence_rule TEXT");
+    db.run("ALTER TABLE tasks ADD COLUMN recurrence_interval INTEGER DEFAULT 1");
+    db.run("ALTER TABLE tasks ADD COLUMN recurrence_days TEXT");
+    db.run("ALTER TABLE tasks ADD COLUMN recurrence_type TEXT DEFAULT 'absolute'");
+  }
+  db.run('CREATE INDEX IF NOT EXISTS idx_tasks_start_date ON tasks(user_id, start_date)');
+
   // Contexts table
   db.run(`
     CREATE TABLE IF NOT EXISTS contexts (

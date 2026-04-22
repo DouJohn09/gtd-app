@@ -48,6 +48,7 @@ export const api = {
     update: (id, updates) => fetchApi(`/tasks/${id}`, { method: 'PUT', body: JSON.stringify(updates) }),
     delete: (id) => fetchApi(`/tasks/${id}`, { method: 'DELETE' }),
     complete: (id) => fetchApi(`/tasks/${id}/complete`, { method: 'POST' }),
+    getDeferred: (list) => fetchApi(`/tasks/deferred?list=${list}`),
     analyze: (id) => fetchApi(`/tasks/${id}/analyze`, { method: 'POST' }),
   },
 

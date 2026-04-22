@@ -31,6 +31,7 @@ export const TaskModel = {
           SELECT t.*, p.name as project_name FROM tasks t
           LEFT JOIN projects p ON t.project_id = p.id
           WHERE t.list = 'next_actions' AND t.user_id = ?
+            AND (t.start_date IS NULL OR t.start_date <= date('now'))
             AND (
               p.execution_mode IS NULL
               OR p.execution_mode = 'parallel'
@@ -45,7 +46,8 @@ export const TaskModel = {
         stmt.bind([userId, userId]);
         return rowsToObjects(stmt);
       }
-      const stmt = db.prepare(`SELECT t.*, p.name as project_name FROM tasks t LEFT JOIN projects p ON t.project_id = p.id WHERE t.list = ? AND t.user_id = ? ORDER BY ${orderBy}`);
+      const deferFilter = list === 'completed' ? '' : " AND (t.start_date IS NULL OR t.start_date <= date('now'))";
+      const stmt = db.prepare(`SELECT t.*, p.name as project_name FROM tasks t LEFT JOIN projects p ON t.project_id = p.id WHERE t.list = ? AND t.user_id = ?${deferFilter} ORDER BY ${orderBy}`);
       stmt.bind([list, userId]);
       return rowsToObjects(stmt);
     } else {
@@ -64,7 +66,7 @@ export const TaskModel = {
 
   getDailyFocus(userId) {
     const db = getDb();
-    const stmt = db.prepare(`SELECT t.*, p.name as project_name FROM tasks t LEFT JOIN projects p ON t.project_id = p.id WHERE t.is_daily_focus = 1 AND t.list != 'completed' AND t.user_id = ? ORDER BY t.priority DESC`);
+    const stmt = db.prepare(`SELECT t.*, p.name as project_name FROM tasks t LEFT JOIN projects p ON t.project_id = p.id WHERE t.is_daily_focus = 1 AND t.list != 'completed' AND t.user_id = ? AND (t.start_date IS NULL OR t.start_date <= date('now')) ORDER BY t.priority DESC`);
     stmt.bind([userId]);
     return rowsToObjects(stmt);
   },
@@ -76,15 +78,31 @@ export const TaskModel = {
     return rowsToObjects(stmt);
   },
 
+  getDeferred(list, userId) {
+    const db = getDb();
+    const stmt = db.prepare(`
+      SELECT t.*, p.name as project_name FROM tasks t
+      LEFT JOIN projects p ON t.project_id = p.id
+      WHERE t.list = ? AND t.user_id = ? AND t.start_date > date('now')
+      ORDER BY t.start_date ASC, t.priority DESC
+    `);
+    stmt.bind([list, userId]);
+    return rowsToObjects(stmt);
+  },
+
   getByDateRange(startDate, endDate, userId) {
     const db = getDb();
     const stmt = db.prepare(`
       SELECT t.*, p.name as project_name FROM tasks t
       LEFT JOIN projects p ON t.project_id = p.id
-      WHERE t.user_id = ? AND t.due_date >= ? AND t.due_date <= ? AND t.list != 'completed'
-      ORDER BY t.due_date ASC, t.priority DESC
+      WHERE t.user_id = ? AND t.list != 'completed'
+        AND (
+          (t.due_date >= ? AND t.due_date <= ?)
+          OR (t.start_date >= ? AND t.start_date <= ?)
+        )
+      ORDER BY COALESCE(t.start_date, t.due_date) ASC, t.priority DESC
     `);
-    stmt.bind([userId, startDate, endDate]);
+    stmt.bind([userId, startDate, endDate, startDate, endDate]);
     return rowsToObjects(stmt);
   },
 
@@ -111,8 +129,8 @@ export const TaskModel = {
     }
 
     db.run(`
-      INSERT INTO tasks (title, notes, list, context, project_id, waiting_for_person, due_date, energy_level, time_estimate, priority, is_daily_focus, position, user_id)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO tasks (title, notes, list, context, project_id, waiting_for_person, due_date, start_date, energy_level, time_estimate, priority, is_daily_focus, position, recurrence_rule, recurrence_interval, recurrence_days, recurrence_type, user_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `, [
       task.title,
       task.notes || null,
@@ -121,11 +139,16 @@ export const TaskModel = {
       task.project_id || null,
       task.waiting_for_person || null,
       task.due_date || null,
+      task.start_date || null,
       task.energy_level || null,
       task.time_estimate || null,
       task.priority || 0,
       task.is_daily_focus || 0,
       position,
+      task.recurrence_rule || null,
+      task.recurrence_interval || 1,
+      task.recurrence_days || null,
+      task.recurrence_type || 'absolute',
       userId
     ]);
 
@@ -138,7 +161,7 @@ export const TaskModel = {
 
   update(id, updates, userId) {
     const db = getDb();
-    const allowedFields = ['title', 'notes', 'list', 'context', 'project_id', 'waiting_for_person', 'due_date', 'energy_level', 'time_estimate', 'priority', 'is_daily_focus', 'completed_at', 'position'];
+    const allowedFields = ['title', 'notes', 'list', 'context', 'project_id', 'waiting_for_person', 'due_date', 'start_date', 'energy_level', 'time_estimate', 'priority', 'is_daily_focus', 'completed_at', 'position', 'recurrence_rule', 'recurrence_interval', 'recurrence_days', 'recurrence_type'];
     const fields = Object.keys(updates).filter(k => allowedFields.includes(k) && updates[k] !== undefined);
 
     if (fields.length === 0) return this.getById(id, userId);
@@ -186,6 +209,11 @@ export const TaskModel = {
 
   complete(id, userId) {
     const task = this.getById(id, userId);
+
+    if (task && task.recurrence_rule) {
+      return this._completeRecurring(task, userId);
+    }
+
     const result = this.update(id, { list: 'completed', completed_at: new Date().toISOString(), is_daily_focus: 0 }, userId);
 
     // Auto-promote next task in sequential projects
@@ -210,6 +238,91 @@ export const TaskModel = {
     return result;
   },
 
+  _completeRecurring(task, userId) {
+    // Create a completed snapshot for history
+    const db = getDb();
+    db.run(`
+      INSERT INTO tasks (title, notes, list, context, project_id, waiting_for_person, due_date, start_date, energy_level, time_estimate, priority, is_daily_focus, position, completed_at, user_id)
+      VALUES (?, ?, 'completed', ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)
+    `, [
+      task.title, task.notes, task.context, task.project_id, task.waiting_for_person,
+      task.due_date, task.start_date, task.energy_level, task.time_estimate,
+      task.priority, task.position, new Date().toISOString(), userId
+    ]);
+    saveDb();
+
+    // Calculate next due date
+    const nextDue = this._nextDueDate(task);
+    const nextStart = task.start_date ? this._advanceDate(task.start_date, task) : null;
+
+    this.update(task.id, {
+      due_date: nextDue,
+      start_date: nextStart,
+      is_daily_focus: 0,
+      completed_at: null,
+    }, userId);
+
+    return this.getById(task.id, userId);
+  },
+
+  _nextDueDate(task) {
+    const base = task.recurrence_type === 'relative'
+      ? new Date().toISOString().split('T')[0]
+      : (task.due_date || new Date().toISOString().split('T')[0]);
+    return this._advanceDate(base, task);
+  },
+
+  _advanceDate(dateStr, task) {
+    const d = new Date(dateStr + 'T12:00:00');
+    const interval = task.recurrence_interval || 1;
+
+    switch (task.recurrence_rule) {
+      case 'daily':
+        d.setDate(d.getDate() + interval);
+        break;
+      case 'weekdays': {
+        let added = 0;
+        while (added < interval) {
+          d.setDate(d.getDate() + 1);
+          const day = d.getDay();
+          if (day !== 0 && day !== 6) added++;
+        }
+        break;
+      }
+      case 'weekly':
+        d.setDate(d.getDate() + 7 * interval);
+        break;
+      case 'monthly':
+        d.setMonth(d.getMonth() + interval);
+        break;
+      case 'yearly':
+        d.setFullYear(d.getFullYear() + interval);
+        break;
+      case 'custom': {
+        if (task.recurrence_days) {
+          const dayMap = { sun: 0, mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6 };
+          const targetDays = task.recurrence_days.split(',').map(x => dayMap[x.trim()]).filter(x => x !== undefined).sort((a, b) => a - b);
+          if (targetDays.length) {
+            const currentDay = d.getDay();
+            const next = targetDays.find(x => x > currentDay) ?? targetDays[0];
+            let daysToAdd = next - currentDay;
+            if (daysToAdd <= 0) daysToAdd += 7 * interval;
+            d.setDate(d.getDate() + daysToAdd);
+          } else {
+            d.setDate(d.getDate() + interval);
+          }
+        } else {
+          d.setDate(d.getDate() + interval);
+        }
+        break;
+      }
+      default:
+        d.setDate(d.getDate() + 1);
+    }
+
+    return d.toISOString().split('T')[0];
+  },
+
   reorderTasks(projectId, taskIds, userId) {
     const db = getDb();
     taskIds.forEach((taskId, index) => {
@@ -230,6 +343,7 @@ export const TaskModel = {
           SELECT COUNT(*) as cnt FROM tasks t
           LEFT JOIN projects p ON t.project_id = p.id
           WHERE t.list = 'next_actions' AND t.user_id = ?
+            AND (t.start_date IS NULL OR t.start_date <= date('now'))
             AND (
               p.execution_mode IS NULL
               OR p.execution_mode = 'parallel'
@@ -244,7 +358,7 @@ export const TaskModel = {
         const row = rowToObject(stmt);
         return row ? row.cnt : 0;
       }
-      const stmt = db.prepare(`SELECT COUNT(*) as cnt FROM tasks WHERE list = ? AND user_id = ?`);
+      const stmt = db.prepare(`SELECT COUNT(*) as cnt FROM tasks WHERE list = ? AND user_id = ? AND (start_date IS NULL OR start_date <= date('now'))`);
       stmt.bind([list, userId]);
       const row = rowToObject(stmt);
       return row ? row.cnt : 0;

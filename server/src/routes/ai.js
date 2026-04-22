@@ -57,8 +57,12 @@ router.post('/smart-capture', async (req, res) => {
       energy_level: ai.energy_level || 'medium',
       time_estimate: ai.time_estimate_minutes || null,
       due_date: ai.due_date || null,
+      start_date: ai.start_date || null,
       is_daily_focus: ai.is_daily_focus ? 1 : 0,
       waiting_for_person: ai.waiting_for_person || null,
+      recurrence_rule: ai.recurrence_rule || null,
+      recurrence_interval: ai.recurrence_interval || null,
+      recurrence_days: ai.recurrence_days || null,
     };
     const task = TaskModel.create(taskData, req.user.id);
     res.json({ task, ai });

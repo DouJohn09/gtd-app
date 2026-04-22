@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, AlertCircle, Plus, Sparkles, ExternalLink } from 'lucide-react';
+import { X, AlertCircle, Plus, Sparkles, ExternalLink, Repeat } from 'lucide-react';
 import { api } from '../lib/api';
 import { useToast } from './Toast';
 
@@ -16,12 +16,33 @@ const ENERGY_LEVELS = [
   { value: 'high',   label: 'high',   tone: 'rose'  },
 ];
 
+const RECURRENCE_RULES = [
+  { value: '',         label: 'No repeat' },
+  { value: 'daily',    label: 'Daily' },
+  { value: 'weekdays', label: 'Weekdays' },
+  { value: 'weekly',   label: 'Weekly' },
+  { value: 'monthly',  label: 'Monthly' },
+  { value: 'yearly',   label: 'Yearly' },
+  { value: 'custom',   label: 'Custom…' },
+];
+
+const DAY_OPTIONS = [
+  { value: 'mon', label: 'M' },
+  { value: 'tue', label: 'T' },
+  { value: 'wed', label: 'W' },
+  { value: 'thu', label: 'T' },
+  { value: 'fri', label: 'F' },
+  { value: 'sat', label: 'S' },
+  { value: 'sun', label: 'S' },
+];
+
 export default function TaskModal({ task, projects, onClose, onSave }) {
   const { addToast } = useToast();
   const [form, setForm] = useState({
     title: '', notes: '', list: 'inbox', context: '', project_id: '',
-    waiting_for_person: '', due_date: '', energy_level: '', time_estimate: '',
+    waiting_for_person: '', due_date: '', start_date: '', energy_level: '', time_estimate: '',
     is_daily_focus: false,
+    recurrence_rule: '', recurrence_interval: 1, recurrence_days: '', recurrence_type: 'absolute',
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -43,9 +64,14 @@ export default function TaskModal({ task, projects, onClose, onSave }) {
         project_id: task.project_id || '',
         waiting_for_person: task.waiting_for_person || '',
         due_date: task.due_date || '',
+        start_date: task.start_date || '',
         energy_level: task.energy_level || '',
         time_estimate: task.time_estimate || '',
         is_daily_focus: task.is_daily_focus === 1,
+        recurrence_rule: task.recurrence_rule || '',
+        recurrence_interval: task.recurrence_interval || 1,
+        recurrence_days: task.recurrence_days || '',
+        recurrence_type: task.recurrence_type || 'absolute',
       });
     }
   }, [task]);
@@ -81,9 +107,14 @@ export default function TaskModal({ task, projects, onClose, onSave }) {
         project_id: form.project_id ? parseInt(form.project_id) : null,
         waiting_for_person: form.waiting_for_person.trim() || null,
         due_date: form.due_date || null,
+        start_date: form.start_date || null,
         energy_level: form.energy_level || null,
         time_estimate: form.time_estimate ? parseInt(form.time_estimate) : null,
         is_daily_focus: form.is_daily_focus ? 1 : 0,
+        recurrence_rule: form.recurrence_rule || null,
+        recurrence_interval: form.recurrence_rule ? (parseInt(form.recurrence_interval) || 1) : null,
+        recurrence_days: form.recurrence_rule === 'custom' ? (form.recurrence_days || null) : null,
+        recurrence_type: form.recurrence_rule ? form.recurrence_type : null,
       };
       if (task?.id) {
         await api.tasks.update(task.id, data);
@@ -310,7 +341,7 @@ export default function TaskModal({ task, projects, onClose, onSave }) {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-3 gap-4">
             <div>
               <label className="gtd-label">Time (min)</label>
               <input
@@ -323,6 +354,15 @@ export default function TaskModal({ task, projects, onClose, onSave }) {
               />
             </div>
             <div>
+              <label className="gtd-label">Start Date</label>
+              <input
+                type="date"
+                value={form.start_date}
+                onChange={(e) => setForm({ ...form, start_date: e.target.value })}
+                className="gtd-input"
+              />
+            </div>
+            <div>
               <label className="gtd-label">Due Date</label>
               <input
                 type="date"
@@ -331,6 +371,78 @@ export default function TaskModal({ task, projects, onClose, onSave }) {
                 className="gtd-input"
               />
             </div>
+          </div>
+
+          {/* Recurrence */}
+          <div>
+            <label className="gtd-label">Repeat</label>
+            <div className="flex flex-wrap items-center gap-2">
+              <select
+                value={form.recurrence_rule}
+                onChange={(e) => setForm({ ...form, recurrence_rule: e.target.value })}
+                className="gtd-input w-auto"
+              >
+                {RECURRENCE_RULES.map(r => (
+                  <option key={r.value} value={r.value}>{r.label}</option>
+                ))}
+              </select>
+              {form.recurrence_rule === 'custom' && (
+                <>
+                  <span className="font-mono text-[11px] text-text-3">every</span>
+                  <input
+                    type="number"
+                    value={form.recurrence_interval}
+                    onChange={(e) => setForm({ ...form, recurrence_interval: e.target.value })}
+                    className="gtd-input w-16 text-center"
+                    min="1"
+                  />
+                  <span className="font-mono text-[11px] text-text-3">days on</span>
+                </>
+              )}
+              {form.recurrence_rule === 'custom' && (
+                <div className="flex gap-1 w-full mt-1">
+                  {DAY_OPTIONS.map((d, i) => {
+                    const selected = (form.recurrence_days || '').split(',').includes(d.value);
+                    return (
+                      <button
+                        key={d.value}
+                        type="button"
+                        onClick={() => {
+                          const days = (form.recurrence_days || '').split(',').filter(Boolean);
+                          const next = selected ? days.filter(x => x !== d.value) : [...days, d.value];
+                          setForm({ ...form, recurrence_days: next.join(',') });
+                        }}
+                        className="w-8 h-8 rounded-lg font-mono text-[11px] transition-all"
+                        style={selected
+                          ? { background: 'rgb(var(--violet) / 0.16)', color: 'rgb(var(--violet-glow))', boxShadow: 'inset 0 0 0 1px rgb(var(--violet) / 0.32)' }
+                          : { color: 'rgb(var(--text-3))', boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.06)' }
+                        }
+                      >
+                        {d.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+            {form.recurrence_rule && (
+              <div className="flex gap-1.5 mt-2">
+                {['absolute', 'relative'].map(t => (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => setForm({ ...form, recurrence_type: t })}
+                    className="font-mono text-[10px] uppercase tracking-wider px-2 py-1 rounded-lg transition-all"
+                    style={form.recurrence_type === t
+                      ? { background: 'rgb(var(--violet) / 0.16)', color: 'rgb(var(--violet-glow))', boxShadow: 'inset 0 0 0 1px rgb(var(--violet) / 0.32)' }
+                      : { color: 'rgb(var(--text-3))', boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.06)' }
+                    }
+                  >
+                    {t === 'absolute' ? 'fixed date' : 'after completion'}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Daily focus toggle */}

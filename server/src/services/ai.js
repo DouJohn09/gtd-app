@@ -90,8 +90,21 @@ PROJECT MATCHING:
 - If no project matches, set project_name to null.
 - Do NOT invent project names — only use names from the list above.
 ` : ''}
+RECURRENCE RULES:
+- Detect recurring patterns: "every day", "daily", "every Monday", "weekly", "every month", "every 2 weeks", "weekdays", etc.
+- recurrence_rule: "daily", "weekly", "monthly", "yearly", "weekdays", or "custom"
+- recurrence_interval: number (e.g., 2 for "every 2 weeks")
+- recurrence_days: comma-separated day codes for custom rules: "mon,wed,fri"
+- If no recurrence detected, all recurrence fields should be null
+- When recurrence is detected, set due_date to the FIRST occurrence (e.g., "every Monday" → next Monday)
+
+START DATE RULES:
+- Detect "starting from", "from Monday", "beginning next week" → extract as start_date
+- start_date is when the task becomes actionable (different from due_date which is the deadline)
+- If not mentioned, start_date should be null
+
 OTHER RULES:
-- Clean the title: remove parsed date/time references but keep the core action. Make it action-oriented (start with a verb).
+- Clean the title: remove parsed date/time references and recurrence patterns but keep the core action. Make it action-oriented (start with a verb).
 - Detect "waiting for [person]" patterns → list: waiting_for, extract person name.
 - Detect vague/aspirational items ("someday", "maybe", "one day", "would be nice") → list: someday_maybe.
 - Default to next_actions if the task is clearly actionable.
@@ -106,9 +119,13 @@ Respond with JSON:
   "energy_level": "low|medium|high",
   "time_estimate_minutes": number or null,
   "due_date": "YYYY-MM-DD or null",
+  "start_date": "YYYY-MM-DD or null",
   "is_daily_focus": boolean,
   "waiting_for_person": "person name or null",
   "project_name": "exact project name from list or null",
+  "recurrence_rule": "daily|weekly|monthly|yearly|weekdays|custom|null",
+  "recurrence_interval": number or null,
+  "recurrence_days": "mon,wed,fri or null",
   "reasoning": "brief explanation of what was detected and why"
 }`
         }

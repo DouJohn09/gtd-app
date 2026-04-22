@@ -1,4 +1,4 @@
-import { Check, Clock, Zap, Tag, FolderOpen, User, ExternalLink } from 'lucide-react';
+import { Check, Clock, Zap, Tag, FolderOpen, User, ExternalLink, Repeat, CalendarClock } from 'lucide-react';
 
 const ENERGY_TONES = {
   low: 'mint',
@@ -136,6 +136,23 @@ export default function TaskCard({ task, onComplete, onEdit, showList = false, q
             >
               <User className="w-2.5 h-2.5" />
               {task.waiting_for_person}
+            </span>
+          )}
+
+          {task.recurrence_rule && (
+            <span
+              className="font-mono text-[10.5px] inline-flex items-center gap-1"
+              style={{ color: 'rgb(var(--violet-glow))' }}
+            >
+              <Repeat className="w-2.5 h-2.5" />
+              {task.recurrence_rule}
+            </span>
+          )}
+
+          {task.start_date && (
+            <span className="font-mono text-[10.5px] text-text-3 inline-flex items-center gap-1">
+              <CalendarClock className="w-2.5 h-2.5" />
+              starts {task.start_date}
             </span>
           )}
         </div>

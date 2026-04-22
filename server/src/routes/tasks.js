@@ -16,6 +16,17 @@ router.get('/', (req, res) => {
   }
 });
 
+router.get('/deferred', (req, res) => {
+  try {
+    const { list } = req.query;
+    if (!list) return res.status(400).json({ error: 'list query parameter is required' });
+    const tasks = TaskModel.getDeferred(list, req.user.id);
+    res.json(tasks);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 router.get('/stats', (req, res) => {
   try {
     const stats = TaskModel.getStats(req.user.id);

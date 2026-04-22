@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { Inbox as InboxIcon, Sparkles, Trash2, Clock, ChevronRight, Zap } from 'lucide-react';
+import { Inbox as InboxIcon, Sparkles, Trash2, Clock, ChevronRight, Zap, CalendarClock } from 'lucide-react';
 import { api } from '../lib/api';
 import { useToast } from '../components/Toast';
 import QuickCapture from '../components/QuickCapture';
@@ -27,14 +27,17 @@ function daysSince(iso) {
 
 export default function Inbox() {
   const [tasks, setTasks] = useState([]);
+  const [deferredTasks, setDeferredTasks] = useState([]);
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [editingTask, setEditingTask] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [sortBy, setSortBy] = useState(() => localStorage.getItem('sort_inbox') || 'date_added_newest');
+  const [showDeferred, setShowDeferred] = useState(() => localStorage.getItem('deferred_inbox') === 'true');
   const { addToast } = useToast();
 
   useEffect(() => { localStorage.setItem('sort_inbox', sortBy); }, [sortBy]);
+  useEffect(() => { localStorage.setItem('deferred_inbox', showDeferred); }, [showDeferred]);
 
   const fetchData = async () => {
     try {
@@ -44,6 +47,12 @@ export default function Inbox() {
       ]);
       setTasks(tasksData);
       setProjects(projectsData);
+      if (showDeferred) {
+        const deferred = await api.tasks.getDeferred('inbox');
+        setDeferredTasks(deferred);
+      } else {
+        setDeferredTasks([]);
+      }
     } catch (error) {
       console.error('Failed to fetch inbox:', error);
     } finally {
@@ -51,7 +60,7 @@ export default function Inbox() {
     }
   };
 
-  useEffect(() => { fetchData(); }, []);
+  useEffect(() => { fetchData(); }, [showDeferred]);
 
   const handleComplete = async (id) => {
     try { await api.tasks.complete(id); addToast('Processed', 'success'); fetchData(); }
@@ -79,6 +88,7 @@ export default function Inbox() {
   return (
     <div className="px-6 lg:px-12 pt-10 pb-20 max-w-[1400px]">
       {/* Headline */}
+      {/* Headline */}
       <div className="mb-10 fresh-stagger">
         <MonoLabel tone="amber" className="mb-3">capture</MonoLabel>
         <h1 className="font-display text-[52px] md:text-[60px] leading-[1] tracking-tight">
@@ -99,6 +109,32 @@ export default function Inbox() {
           <div className="rounded-2xl glass p-4">
             <QuickCapture onCapture={fetchData} />
           </div>
+
+          {/* Controls bar */}
+          {!loading && (
+            <div className="flex items-center justify-between px-1">
+              <div className="font-mono text-[11px] text-text-3 uppercase tracking-wider">
+                {tasks.length > 0
+                  ? `${sortedTasks.length} ${sortedTasks.length === 1 ? 'item' : 'items'} to process`
+                  : 'inbox at zero'}
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setShowDeferred(prev => !prev)}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-mono uppercase tracking-wider transition-all"
+                  style={
+                    showDeferred
+                      ? { background: 'rgb(var(--violet) / 0.14)', color: 'rgb(var(--violet-glow))', boxShadow: 'inset 0 0 0 1px rgb(var(--violet) / 0.28)' }
+                      : { background: 'rgba(255,255,255,0.04)', color: 'rgb(var(--text-3))', boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.06)' }
+                  }
+                >
+                  <CalendarClock className="w-2.5 h-2.5" />
+                  Deferred{deferredTasks.length > 0 && showDeferred ? ` (${deferredTasks.length})` : ''}
+                </button>
+                <SortDropdown value={sortBy} onChange={setSortBy} />
+              </div>
+            </div>
+          )}
 
           {/* Body */}
           {loading ? (
@@ -125,13 +161,6 @@ export default function Inbox() {
             </div>
           ) : (
             <div className="space-y-3">
-              <div className="flex items-center justify-between px-1">
-                <div className="font-mono text-[11px] text-text-3 uppercase tracking-wider">
-                  {sortedTasks.length} {sortedTasks.length === 1 ? 'item' : 'items'} to process
-                </div>
-                <SortDropdown value={sortBy} onChange={setSortBy} />
-              </div>
-
               {sortedTasks.map(task => (
                 <div key={task.id} className="group relative">
                   <TaskCard task={task} onComplete={handleComplete} onEdit={handleEdit} />
@@ -144,6 +173,34 @@ export default function Inbox() {
                   </button>
                 </div>
               ))}
+            </div>
+          )}
+          {showDeferred && deferredTasks.length > 0 && (
+            <div className="mt-5">
+              <div className="flex items-baseline gap-3 mb-3 px-1">
+                <div className="mono-label" style={{ color: 'rgb(var(--violet-glow))' }}>
+                  <CalendarClock className="w-3 h-3 inline mr-1.5" />
+                  deferred
+                </div>
+                <span className="font-mono text-[10.5px] text-text-3">
+                  {deferredTasks.length.toString().padStart(2, '0')}
+                </span>
+                <div className="flex-1 h-px" style={{ background: 'linear-gradient(to right, rgb(var(--violet) / 0.15), transparent)' }} />
+              </div>
+              <div className="space-y-3">
+                {deferredTasks.map(task => (
+                  <div key={task.id} className="group relative" style={{ opacity: 0.6 }}>
+                    <TaskCard task={task} onComplete={handleComplete} onEdit={handleEdit} />
+                    <button
+                      onClick={() => handleDelete(task.id)}
+                      className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 text-text-3 hover:text-rose-glow transition-all"
+                      title="Delete"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </section>

@@ -69,6 +69,7 @@ gtd-app/
 │       │   ├── Habits.jsx
 │       │   ├── AIAssistant.jsx    # All AI features UI
 │       │   ├── WeeklyReview.jsx   # 4-step review wizard
+│       │   ├── Calendar.jsx      # Month/week/day calendar with Google Calendar sync
 │       │   └── Login.jsx
 │       ├── contexts/
 │       │   └── AuthContext.jsx    # Google OAuth + JWT
@@ -104,7 +105,7 @@ gtd-app/
 
 ### Tables
 - **users** — `id`, `google_id`, `email`, `name`, `picture`, `google_calendar_access_token`, `google_calendar_refresh_token`, `google_calendar_token_expiry`, `created_at`, `last_login`
-- **tasks** — `id`, `title`, `notes`, `list` (inbox|next_actions|waiting_for|someday_maybe|completed), `context`, `project_id`, `waiting_for_person`, `due_date`, `energy_level` (low|medium|high), `time_estimate`, `priority`, `is_daily_focus`, `position`, `completed_at`, `user_id`, `created_at`, `updated_at`
+- **tasks** — `id`, `title`, `notes`, `list` (inbox|next_actions|waiting_for|someday_maybe|completed), `context`, `project_id`, `waiting_for_person`, `due_date`, `start_date`, `energy_level` (low|medium|high), `time_estimate`, `priority`, `is_daily_focus`, `position`, `completed_at`, `recurrence_rule` (daily|weekdays|weekly|monthly|yearly|custom), `recurrence_interval`, `recurrence_days`, `recurrence_type` (absolute|relative), `user_id`, `created_at`, `updated_at`
 - **projects** — `id`, `name`, `description`, `status` (active|completed|on_hold), `outcome`, `execution_mode` (parallel|sequential), `user_id`, `created_at`, `updated_at`
 - **weekly_reviews** — `id`, `user_id`, `completed_at`, `inbox_count_at_start`, `tasks_completed`, `tasks_moved`, `tasks_deleted`, `ai_summary`, `created_at`
 - **contexts** — `id`, `name`, `user_id`, `created_at`
@@ -129,6 +130,9 @@ gtd-app/
 - Custom user-defined contexts (e.g., @home, @office, @errands)
 - Energy levels and time estimates on tasks
 - Due dates with priority scoring
+- **Recurring tasks** — Daily, weekdays, weekly, monthly, yearly, custom (specific days + interval). Absolute (advance from due date) or relative (advance from completion date) recurrence. On completion, creates a completed snapshot for history and advances the original task's dates.
+- **Start/defer dates** — Tasks with a future `start_date` are hidden from active lists (Next Actions, Waiting For, etc.) until the start date arrives. Deferred toggle chip on each list view reveals hidden tasks at reduced opacity for quick editing.
+- **Clickable URL previews** — URLs in task notes render as interactive hostname badges in TaskCard and TaskModal
 
 ### AI Features (OpenAI)
 - **Smart Capture** (GPT-4o-mini) — Real-time AI on every Quick Capture: auto-categorizes list, context, priority, energy, time estimate; extracts due dates from natural language ("call mom tomorrow"); detects waiting-for patterns; sets daily focus for urgent/today tasks only; auto-matches tasks to existing projects by name/topic; detects personal vs work tasks for context assignment (@work, @home, @phone, etc.). Toggle on/off with sparkle icon.
@@ -160,10 +164,11 @@ gtd-app/
 ## API Endpoints
 
 ### Tasks: `/api/tasks`
-- `GET /` — Get all tasks (optional `?list=` filter)
+- `GET /` — Get all tasks (optional `?list=` filter; excludes deferred tasks)
+- `GET /deferred?list=` — Get deferred tasks (start_date > today) for a given list
 - `POST /` — Create task
 - `PUT /:id` — Update task
-- `PUT /:id/complete` — Mark complete
+- `PUT /:id/complete` — Mark complete (recurring tasks auto-advance dates)
 - `DELETE /:id` — Delete task
 
 ### Projects: `/api/projects`
@@ -342,10 +347,10 @@ Unique combination (AI inbox processing + weekly review + habit tracking + seque
 
 ### Must-Ship Before Launch
 
-Two deal-breakers for GTD practitioners:
+Two deal-breakers for GTD practitioners — **both shipped:**
 
-1. **Recurring tasks** — Without this, users can't manage real workflows. Every competitor has it.
-2. **Start/defer dates** — The #1 GTD-specific request. "Show me tasks only when they're actionable" is core GTD philosophy.
+1. ~~**Recurring tasks**~~ — Daily/weekdays/weekly/monthly/yearly/custom with absolute or relative recurrence. **Done.**
+2. ~~**Start/defer dates**~~ — Tasks hidden until start date, toggle chip to reveal deferred tasks on each list. **Done.**
 
 ### Launch Sequence
 
@@ -389,7 +394,7 @@ Lifetime deals generate upfront cash and launch communities love them. Things 3 
 
 ### Priority Order
 
-1. Ship recurring tasks + start dates (table stakes)
+1. ~~Ship recurring tasks + start dates (table stakes)~~ **Done**
 2. Migrate off sql.js to real persistent DB
 3. Add PWA support
 4. Soft launch on r/gtd with free tier + $30/yr Pro
@@ -422,6 +427,8 @@ Lifetime deals generate upfront cash and launch communities love them. Things 3 
 21. Redesign client with neo-modern glass aesthetic (dark-locked, design-token system, ⌘K capture, glass primitives)
 22. Inbox 2-column layout (processing stats + clarify ritual + AI assist sidebar); widen Lists/WeeklyReview/CompletedTasks
 23. AI quality pass: confidence levels in prompts, hide low-confidence badges, inline editor on Import Notes + Process Inbox cards, per-item prune on Daily Focus suggestions
+24. Sort persistence, project fix in Today modal, Today screen refresh on capture, URL link previews, GTD flow summaries
+25. Recurring tasks (daily/weekdays/weekly/monthly/yearly/custom, absolute/relative), start/defer dates, deferred task toggle on list views
 
 ---
 
@@ -450,11 +457,11 @@ Cross-cutting effort to make AI suggestions more trustworthy. Insight from FEATU
 Features to build, ordered by impact and launch-readiness.
 
 ### P0 — Must-ship before public launch
-| # | Feature | Why | Effort |
-|---|---------|-----|--------|
-| 1 | **Recurring tasks** | Table stakes — every competitor has it. Users can't manage real workflows without it. | Medium |
-| 2 | **Start/defer dates** | #1 GTD-specific request. Hide tasks until actionable. Core GTD philosophy. | Medium |
-| 3 | **Migrate off sql.js** | In-memory SQLite is fragile. A crash or Railway restart = data loss. Can't take money on this. | High |
+| # | Feature | Why | Effort | Status |
+|---|---------|-----|--------|--------|
+| 1 | **Recurring tasks** | Table stakes — every competitor has it. Users can't manage real workflows without it. | Medium | **Shipped** |
+| 2 | **Start/defer dates** | #1 GTD-specific request. Hide tasks until actionable. Core GTD philosophy. | Medium | **Shipped** |
+| 3 | **Migrate off sql.js** | In-memory SQLite is fragile. A crash or Railway restart = data loss. Can't take money on this. | High | |
 
 ### P1 — High impact, build before or shortly after launch
 | # | Feature | Why | Effort |
