@@ -6,10 +6,28 @@ const ENERGY_TONES = {
   high: 'rose',
 };
 
+function parseNotes(notes) {
+  if (!notes) return { text: '', urls: [] };
+  const lines = notes.split('\n');
+  const urls = [];
+  const textLines = [];
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (/^https?:\/\/[^\s]+$/i.test(trimmed)) urls.push(trimmed);
+    else textLines.push(line);
+  }
+  return { text: textLines.join('\n').trim(), urls };
+}
+
+function hostname(url) {
+  try { return new URL(url).hostname.replace('www.', ''); } catch { return 'link'; }
+}
+
 export default function TaskCard({ task, onComplete, onEdit, showList = false, queued = false }) {
   const isCompleted = task.list === 'completed';
   const focus = task.is_daily_focus === 1 && !queued && !isCompleted;
   const energyTone = ENERGY_TONES[task.energy_level];
+  const { text: notesText, urls: noteUrls } = parseNotes(task.notes);
 
   return (
     <div
@@ -53,7 +71,9 @@ export default function TaskCard({ task, onComplete, onEdit, showList = false, q
           {task.title}
         </button>
 
-        {task.notes && <NotesDisplay notes={task.notes} />}
+        {notesText && (
+          <p className="text-[12px] text-text-3 mt-1 line-clamp-2 leading-relaxed [overflow-wrap:anywhere]">{notesText}</p>
+        )}
 
         <div className="flex flex-wrap items-center gap-1.5 mt-2">
           {showList && (
@@ -76,6 +96,21 @@ export default function TaskCard({ task, onComplete, onEdit, showList = false, q
               {task.project_name}
             </span>
           )}
+
+          {noteUrls.map((url, i) => (
+            <a
+              key={i}
+              href={url}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={e => e.stopPropagation()}
+              className="gtd-badge relative z-10 inline-flex items-center gap-1 no-underline cursor-pointer transition-all hover:brightness-125 hover:scale-105"
+              style={{ background: 'rgb(var(--mint) / 0.10)', color: 'rgb(var(--mint-glow))', boxShadow: 'inset 0 0 0 1px rgb(var(--mint) / 0.20)' }}
+            >
+              <ExternalLink className="w-2.5 h-2.5" />
+              {hostname(url)}
+            </a>
+          ))}
 
           {task.energy_level && (
             <span
@@ -129,39 +164,3 @@ export default function TaskCard({ task, onComplete, onEdit, showList = false, q
   );
 }
 
-function NotesDisplay({ notes }) {
-  const URL_RE = /https?:\/\/[^\s]+/gi;
-  const lines = notes.split('\n');
-  const urls = [];
-  const textLines = [];
-  for (const line of lines) {
-    if (URL_RE.test(line.trim()) && line.trim().match(URL_RE)[0] === line.trim()) {
-      urls.push(line.trim());
-    } else {
-      textLines.push(line);
-    }
-    URL_RE.lastIndex = 0;
-  }
-  const text = textLines.join('\n').trim();
-  const hostname = (url) => { try { return new URL(url).hostname.replace('www.', ''); } catch { return 'link'; } };
-
-  return (
-    <div className="mt-1 flex flex-col gap-1">
-      {text && <p className="text-[12px] text-text-3 line-clamp-2 leading-relaxed [overflow-wrap:anywhere]">{text}</p>}
-      {urls.map((url, i) => (
-        <a
-          key={i}
-          href={url}
-          target="_blank"
-          rel="noopener noreferrer"
-          onClick={e => e.stopPropagation()}
-          className="inline-flex items-center gap-1 text-[10.5px] font-mono w-fit px-2 py-0.5 rounded-md transition-colors hover:opacity-80"
-          style={{ background: 'rgb(var(--mint) / 0.10)', color: 'rgb(var(--mint-glow))', boxShadow: 'inset 0 0 0 1px rgb(var(--mint) / 0.20)' }}
-        >
-          <ExternalLink className="w-2.5 h-2.5" />
-          {hostname(url)}
-        </a>
-      ))}
-    </div>
-  );
-}

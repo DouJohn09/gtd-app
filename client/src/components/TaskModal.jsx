@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, AlertCircle, Plus, Sparkles } from 'lucide-react';
+import { X, AlertCircle, Plus, Sparkles, ExternalLink } from 'lucide-react';
 import { api } from '../lib/api';
 import { useToast } from './Toast';
 
@@ -161,6 +161,7 @@ export default function TaskModal({ task, projects, onClose, onSave }) {
               className="gtd-input min-h-[80px] resize-none"
               placeholder="Anything else?"
             />
+            <NotesLinks notes={form.notes} />
           </div>
 
           {/* List as segmented chips */}
@@ -386,6 +387,30 @@ export default function TaskModal({ task, projects, onClose, onSave }) {
           </div>
         </form>
       </div>
+    </div>
+  );
+}
+
+function NotesLinks({ notes }) {
+  if (!notes) return null;
+  const urls = notes.match(/https?:\/\/[^\s]+/gi);
+  if (!urls?.length) return null;
+  const hostname = (url) => { try { return new URL(url).hostname.replace('www.', ''); } catch { return 'link'; } };
+  return (
+    <div className="flex flex-wrap gap-1.5 mt-2">
+      {urls.map((url, i) => (
+        <a
+          key={i}
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1.5 text-[11px] font-mono px-2.5 py-1 rounded-lg cursor-pointer transition-all hover:brightness-125"
+          style={{ background: 'rgb(var(--mint) / 0.10)', color: 'rgb(var(--mint-glow))', boxShadow: 'inset 0 0 0 1px rgb(var(--mint) / 0.25)' }}
+        >
+          <ExternalLink className="w-3 h-3" />
+          {hostname(url)}
+        </a>
+      ))}
     </div>
   );
 }
