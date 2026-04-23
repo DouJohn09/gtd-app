@@ -77,7 +77,8 @@ gtd-app/
 │       │   ├── useApi.js
 │       │   └── useTheme.js        # Dark mode hook
 │       └── lib/
-│           └── api.js             # API client with namespaces
+│           ├── api.js             # API client with namespaces
+│           └── dateUtils.js       # Calendar date helpers (formatDateKey, getMonthDays, etc.)
 └── server/
     └── src/
         ├── index.js               # Express server entry
@@ -135,7 +136,7 @@ gtd-app/
 - **Clickable URL previews** — URLs in task notes render as interactive hostname badges in TaskCard and TaskModal
 
 ### AI Features (OpenAI)
-- **Smart Capture** (GPT-4o-mini) — Real-time AI on every Quick Capture: auto-categorizes list, context, priority, energy, time estimate; extracts due dates from natural language ("call mom tomorrow"); detects waiting-for patterns; sets daily focus for urgent/today tasks only; auto-matches tasks to existing projects by name/topic; detects personal vs work tasks for context assignment (@work, @home, @phone, etc.). Toggle on/off with sparkle icon.
+- **Smart Capture** (GPT-4o-mini) — Real-time AI on every Quick Capture: auto-categorizes list, context, priority, energy, time estimate; extracts due dates and start dates from natural language ("call mom tomorrow", "starting next week"); detects waiting-for patterns; sets daily focus for urgent/today tasks only; auto-matches tasks to existing projects by name/topic; detects personal vs work tasks for context assignment (@work, @home, @phone, etc.); detects recurrence patterns ("every Monday", "daily"). Toggle on/off with sparkle icon.
 - **Process Inbox** (GPT-4o) — AI analyzes inbox tasks, suggests which list each belongs to, assigns priority/energy/time
 - **Daily Focus** (GPT-4o) — AI picks top priorities for today based on energy, deadlines, importance
 - **Find Duplicates** (GPT-4o) — AI scans all active tasks for duplicates, suggests which to keep/remove
@@ -143,7 +144,7 @@ gtd-app/
 - **Weekly Review Analysis** (GPT-4o) — AI evaluates system health (1-10 score), identifies stale items, flags projects needing attention, suggests follow-ups on waiting-for items, provides actionable recommendations
 
 ### Calendar
-- **Calendar view** — Month/week/day grids with tasks by due date, unscheduled sidebar, drag-and-drop scheduling
+- **Calendar view** — Month/week/day grids with tasks by due date and start date, unscheduled sidebar, drag-and-drop scheduling
 - **Google Calendar sync** — Opt-in OAuth connection, reads events and displays alongside tasks with indigo styling, read-only (not draggable), click to open in Google Calendar
 
 ### Project Execution Modes
@@ -227,22 +228,25 @@ gtd-app/
 
 ### GTD Flow Differentiators
 - **Web-based & cross-platform** (unlike OmniFocus, Things)
-- **AI-powered features** (inbox processing, duplicate detection, daily focus, weekly review analysis — most competitors don't have this)
+- **AI-powered features** (smart capture, inbox processing, duplicate detection, daily focus, weekly review analysis — most competitors don't have this)
 - **Weekly Review workflow** (only OmniFocus and FacileThings have this — our version adds AI insights)
 - **Sequential/parallel projects** (like OmniFocus, unlike most competitors)
+- **Recurring tasks with absolute + relative recurrence** (matches OmniFocus flexibility)
+- **Start/defer dates with deferred toggle** (like OmniFocus defer dates, with easy toggle to reveal hidden tasks)
 - **Built-in habit tracking** (only TickTick does this among competitors)
 - **Modern UI with dark mode** (FacileThings and Nirvana feel dated)
 - **Energy levels & time estimates** on tasks
+- **Natural language smart capture** with AI auto-categorization (unique — no competitor does this with GPT)
 
 ### Potential Future Features (Prioritized by User Demand)
 
 Based on community research across Reddit (r/productivity, r/todoist, r/gtd, r/ticktick, r/omnifocus — 3.7M+ combined members), Facebook groups, review sites, and market analyses (April 2026). Full report: `FEATURE_RESEARCH_2026.md`
 
 #### High Priority (most requested across all communities)
-1. **Start/defer dates** — Hide tasks until actionable; #1 persistent GTD request
-2. **Calendar integration & time blocking** — Unified tasks + calendar view, drag-to-schedule; single most requested feature ecosystem-wide
-3. **Recurring tasks** — Flexible patterns ("every 3 days", "on completion", specific days)
-4. **Natural language input** — Parse "call John Monday at 2pm p1" into task + date + priority
+1. ~~**Start/defer dates**~~ — ✅ Shipped. Tasks hidden until start_date, deferred toggle chip on lists.
+2. **Calendar integration & time blocking** — Phase 1-2 shipped (calendar view + Google Calendar sync). Phase 3-4 (time blocking + AI scheduling) remaining.
+3. ~~**Recurring tasks**~~ — ✅ Shipped. Daily/weekdays/weekly/monthly/yearly/custom, absolute + relative recurrence.
+4. ~~**Natural language input**~~ — ✅ Shipped as Smart Capture (GPT-4o-mini).
 5. **PWA / offline support** — Installable web app with offline capability; addresses mobile + offline without native apps
 
 #### Medium Priority (strong differentiators)
@@ -476,7 +480,7 @@ Features to build, ordered by impact and launch-readiness.
 | # | Feature | Why | Effort |
 |---|---------|-----|--------|
 | 9 | **Built-in Pomodoro timer** | Low effort, high perceived value. TickTick's is "oddly effective." | Low |
-| 10 | **Recurring task flexibility** | Beyond basic recurrence: "every 3rd weekday", "2 days after completion", relative vs absolute. | Medium |
+| 10 | **Recurring task flexibility** | Beyond current recurrence: "every 3rd weekday", "2 days after completion" (relative recurrence shipped, advanced patterns remaining). | Medium |
 | 11 | **Task dependencies (cross-project)** | "Task B blocked by Task A" beyond sequential projects. | Medium |
 | 12 | **Free AI provider backend** | Swap to Gemini/Groq for free-tier users to eliminate API costs at scale. | Medium |
 

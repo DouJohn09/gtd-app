@@ -72,7 +72,7 @@ The single most requested feature across the ecosystem. Users overwhelmingly wan
 #### 2. Start Dates / Defer Dates
 One of the most persistent feature gaps across major apps. Users want to set a date when a task becomes relevant (not just when it's due), and have it hidden until that start date arrives. OmniFocus has had this for years ("defer dates"). Todoist only partially addressed it with their 2025 "Deadlines" feature. True start dates that hide tasks remain one of the most persistent requests.
 
-**GTD Flow status:** Not implemented (in roadmap)
+**GTD Flow status:** ✅ Implemented (tasks hidden from active lists until start_date, deferred toggle chip on each list view to reveal/edit)
 
 #### 3. Natural Language Input for Task Capture
 Users expect to type "call John next Monday at 2pm p1" and have the app parse the task, date, time, and priority automatically. This is cited as the #1 thing users miss when switching away from Todoist. Speed of task capture directly correlates with whether people actually use the app consistently.
@@ -129,12 +129,12 @@ Power users want saved views combining multiple criteria (labels, priorities, da
 #### 13. Collaboration & Shared Lists
 Share projects/lists, assign tasks, communicate within the app. Things 3 and OmniFocus have zero collaboration — a deal-breaker for teams/couples/families. Shared grocery lists and household chores are a massive use case.
 
-**GTD Flow status:** Not implemented (in roadmap)
+**GTD Flow status:** Not implemented (in backlog)
 
 #### 14. Recurring Task Flexibility
 Advanced recurrence beyond "every Monday" — "every 3rd weekday," "2 days after completion," preset options. Users want both "absolute" recurrence (same date regardless) and "relative" recurrence (based on completion date).
 
-**GTD Flow status:** Not implemented
+**GTD Flow status:** ✅ Implemented (daily/weekdays/weekly/monthly/yearly/custom with specific days + interval, absolute and relative recurrence types. On completion, creates completed snapshot and advances original task's dates)
 
 ### Tier 3 — Growing Demand / Emerging Trends
 
@@ -224,9 +224,9 @@ Speech as primary interaction. Todoist's "Ramble" (Jan 2026) turns unstructured 
 ### Highest-Impact Features to Add
 
 #### High Priority
-1. **Start/defer dates** — Persistent #1 GTD request. Hide tasks until actionable.
-2. **Calendar integration & time blocking** — Most requested feature ecosystem-wide. Two-way sync with Google Calendar + time-blocking view.
-3. **Recurring tasks** — Flexible recurrence patterns.
+1. ~~**Start/defer dates**~~ — ✅ Shipped 2026-04-22. Tasks hidden until start_date, deferred toggle chip on each list view.
+2. **Calendar integration & time blocking** — Most requested feature ecosystem-wide. Phase 1-2 shipped (calendar view + Google Calendar sync). Phase 3-4 (time blocking + AI scheduling) remaining.
+3. ~~**Recurring tasks**~~ — ✅ Shipped 2026-04-22. Daily/weekdays/weekly/monthly/yearly/custom, absolute and relative recurrence.
 4. ~~**Natural language input**~~ — ✅ Implemented as Smart Capture (GPT-4o-mini)
 5. **PWA / offline support** — Installable web app with offline capability. Addresses both mobile and offline without native apps.
 
