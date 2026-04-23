@@ -22,6 +22,16 @@ function formatAiToast(ai) {
   return `Added to ${parts.join(' · ')}`;
 }
 
+function formatBookedToast(bookedSlot) {
+  const d = new Date(bookedSlot.date + 'T00:00:00');
+  const dayLabel = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  const [h, m] = bookedSlot.time.split(':').map(Number);
+  const ampm = h < 12 ? 'am' : 'pm';
+  const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
+  const timeLabel = m === 0 ? `${h12}${ampm}` : `${h12}:${String(m).padStart(2, '0')}${ampm}`;
+  return `Booked ${dayLabel} at ${timeLabel} (${bookedSlot.duration}m)`;
+}
+
 export default function QuickCapture({ onCapture, placeholder = "Quick capture — what's on your mind?", autoFocus = false }) {
   const [title, setTitle] = useState('');
   const [loading, setLoading] = useState(false);
@@ -34,9 +44,11 @@ export default function QuickCapture({ onCapture, placeholder = "Quick capture �
     setLoading(true);
     try {
       if (smartMode) {
-        const { ai, fallback } = await api.ai.smartCapture(title.trim());
+        const { ai, fallback, bookedSlot, slotSearchFailed } = await api.ai.smartCapture(title.trim());
         setTitle('');
         if (fallback || !ai) addToast('Captured to inbox (AI unavailable)', 'info');
+        else if (bookedSlot) addToast(formatBookedToast(bookedSlot), 'success');
+        else if (slotSearchFailed) addToast('No free slot found — captured without booking', 'info');
         else addToast(formatAiToast(ai), 'success');
       } else {
         await api.tasks.create({ title: title.trim() });

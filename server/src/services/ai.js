@@ -111,6 +111,13 @@ TIME-OF-DAY RULES (time blocking):
 - If a scheduled_time is set, also set due_date to that day (today/tomorrow/etc.)
 - If no time-of-day mentioned, scheduled_time and duration must be null
 
+FREE-SLOT INTENT RULES (auto-scheduling):
+- Detect intents like "find time tomorrow", "book me 30 minutes Friday", "schedule this for the afternoon", "fit it in my calendar this week"
+- When detected: set find_free_slot=true, leave scheduled_time=null (the server will find an open slot and set it)
+- Always set due_date to the target day (today/tomorrow/etc.). If "this week" with no day, use the next weekday.
+- Always set duration (default 30 if user didn't specify). The slot search needs it.
+- Do NOT set find_free_slot when an explicit time is given — that case is already handled by scheduled_time.
+
 OTHER RULES:
 - Clean the title: remove parsed date/time references and recurrence patterns but keep the core action. Make it action-oriented (start with a verb).
 - Detect "waiting for [person]" patterns → list: waiting_for, extract person name.
@@ -130,6 +137,7 @@ Respond with JSON:
   "start_date": "YYYY-MM-DD or null",
   "scheduled_time": "HH:MM 24-hour or null",
   "duration": "minutes as number or null",
+  "find_free_slot": "boolean — true if user wants the server to find an open slot",
   "is_daily_focus": boolean,
   "waiting_for_person": "person name or null",
   "project_name": "exact project name from list or null",

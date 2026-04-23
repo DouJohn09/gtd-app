@@ -3,6 +3,7 @@ import { TaskModel, ProjectModel, WeeklyReviewModel } from '../db/models.js';
 import { getDb } from '../db/schema.js';
 import { processInbox, getDailyPriorities, importNotes, findDuplicates, weeklyReviewAnalysis, smartCapture } from '../services/ai.js';
 import { syncTaskToCalendar } from '../services/googleCalendar.js';
+import { findFreeSlot } from '../services/scheduling.js';
 
 function getUserContexts(userId) {
   const db = getDb();
@@ -48,6 +49,26 @@ router.post('/smart-capture', async (req, res) => {
     let notes = null;
     if (urls.length) notes = urls.join('\n');
 
+    // AI-assisted scheduling: find a free slot if requested
+    let bookedSlot = null;
+    let slotSearchFailed = false;
+    if (ai.find_free_slot && ai.due_date && !ai.scheduled_time) {
+      const duration = ai.duration || 30;
+      try {
+        const slot = await findFreeSlot(req.user.id, ai.due_date, duration);
+        if (slot) {
+          ai.scheduled_time = slot;
+          ai.duration = duration;
+          bookedSlot = { date: ai.due_date, time: slot, duration };
+        } else {
+          slotSearchFailed = true;
+        }
+      } catch (err) {
+        console.error('findFreeSlot error:', err);
+        slotSearchFailed = true;
+      }
+    }
+
     const taskData = {
       title: ai.title || rawText,
       notes,
@@ -68,7 +89,7 @@ router.post('/smart-capture', async (req, res) => {
       recurrence_days: ai.recurrence_days || null,
     };
     const task = TaskModel.create(taskData, req.user.id);
-    res.json({ task, ai });
+    res.json({ task, ai, bookedSlot, slotSearchFailed });
     syncTaskToCalendar(req.user.id, task).catch(err => console.error('syncTaskToCalendar (smart-capture):', err));
   } catch (error) {
     console.error('Smart capture error:', error);
