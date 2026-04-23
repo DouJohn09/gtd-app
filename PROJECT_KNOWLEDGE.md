@@ -381,6 +381,8 @@ Lifetime deals generate upfront cash and launch communities love them. Things 3 
 
 - **Migrate off sql.js** — In-memory SQLite is fragile for production. A crash or Railway restart risks data loss. Move to PostgreSQL or SQLite on persistent storage before taking money.
 - **Add PWA support** — Installable web app, works on mobile. Low effort, eliminates "no mobile app" objection without native apps.
+- **Record a short demo video (60-90s)** — Show capture → AI processing → calendar time blocking → weekly review. Embed on landing page and reuse on Reddit/Product Hunt.
+- **Build a landing page** — Hero, demo video, feature highlights, pricing, signup CTA. Needed before any soft-launch post drives traffic.
 
 ### Growth Channels (No Budget)
 
@@ -401,9 +403,10 @@ Lifetime deals generate upfront cash and launch communities love them. Things 3 
 1. ~~Ship recurring tasks + start dates (table stakes)~~ **Done**
 2. Migrate off sql.js to real persistent DB
 3. Add PWA support
-4. Soft launch on r/gtd with free tier + $30/yr Pro
-5. Expand to r/productivity + Product Hunt
-6. Iterate based on feedback
+4. Record demo video + ship landing page
+5. Soft launch on r/gtd with free tier + $30/yr Pro
+6. Expand to r/productivity + Product Hunt
+7. Iterate based on feedback
 
 ---
 
