@@ -66,7 +66,7 @@ export const TaskModel = {
 
   getDailyFocus(userId) {
     const db = getDb();
-    const stmt = db.prepare(`SELECT t.*, p.name as project_name FROM tasks t LEFT JOIN projects p ON t.project_id = p.id WHERE t.is_daily_focus = 1 AND t.list != 'completed' AND t.user_id = ? AND (t.start_date IS NULL OR t.start_date <= date('now')) ORDER BY t.priority DESC`);
+    const stmt = db.prepare(`SELECT t.*, p.name as project_name FROM tasks t LEFT JOIN projects p ON t.project_id = p.id WHERE (t.is_daily_focus = 1 OR t.due_date <= date('now')) AND t.list != 'completed' AND t.list != 'someday_maybe' AND t.user_id = ? AND (t.start_date IS NULL OR t.start_date <= date('now')) ORDER BY t.priority DESC, t.due_date ASC`);
     stmt.bind([userId]);
     return rowsToObjects(stmt);
   },
@@ -367,7 +367,7 @@ export const TaskModel = {
       return row ? row.cnt : 0;
     };
     const getDailyFocusCount = () => {
-      const stmt = db.prepare(`SELECT COUNT(*) as cnt FROM tasks WHERE is_daily_focus = 1 AND list != 'completed' AND user_id = ?`);
+      const stmt = db.prepare(`SELECT COUNT(*) as cnt FROM tasks WHERE (is_daily_focus = 1 OR due_date <= date('now')) AND list != 'completed' AND list != 'someday_maybe' AND user_id = ? AND (start_date IS NULL OR start_date <= date('now'))`);
       stmt.bind([userId]);
       const row = rowToObject(stmt);
       return row ? row.cnt : 0;
