@@ -23,6 +23,14 @@ function hostname(url) {
   try { return new URL(url).hostname.replace('www.', ''); } catch { return 'link'; }
 }
 
+function formatScheduledTime(time) {
+  if (!time) return '';
+  const [h, m] = time.split(':').map(Number);
+  const ampm = h < 12 ? 'am' : 'pm';
+  const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
+  return m === 0 ? `${h12}${ampm}` : `${h12}:${String(m).padStart(2, '0')}${ampm}`;
+}
+
 export default function TaskCard({ task, onComplete, onEdit, showList = false, queued = false }) {
   const isCompleted = task.list === 'completed';
   const focus = task.is_daily_focus === 1 && !queued && !isCompleted;
@@ -153,6 +161,17 @@ export default function TaskCard({ task, onComplete, onEdit, showList = false, q
             <span className="font-mono text-[10.5px] text-text-3 inline-flex items-center gap-1">
               <CalendarClock className="w-2.5 h-2.5" />
               starts {task.start_date}
+            </span>
+          )}
+
+          {task.scheduled_time && (
+            <span
+              className="font-mono text-[10.5px] inline-flex items-center gap-1"
+              style={{ color: 'rgb(var(--violet-glow))' }}
+            >
+              <Clock className="w-2.5 h-2.5" />
+              {formatScheduledTime(task.scheduled_time)}
+              {task.duration ? ` · ${task.duration}m` : ''}
             </span>
           )}
         </div>

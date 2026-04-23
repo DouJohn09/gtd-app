@@ -141,10 +141,24 @@ export default function Calendar() {
   };
   const handleEdit = (task) => { setEditingTask(task); setShowModal(true); };
 
-  const handleDropTask = async (taskId, newDate) => {
+  const handleDropTask = async (taskId, newDate, newTime = undefined) => {
     try {
-      await api.tasks.update(taskId, { due_date: newDate });
-      addToast('Task rescheduled', 'success');
+      const updates = { due_date: newDate };
+      if (newTime !== undefined) {
+        updates.scheduled_time = newTime;
+        if (newTime && !scheduledTasks.find(t => t.id === taskId)?.duration) {
+          updates.duration = 60;
+        }
+      }
+      await api.tasks.update(taskId, updates);
+      addToast(newTime ? 'Task time-blocked' : 'Task rescheduled', 'success');
+      fetchData();
+    } catch (err) { addToast(err.message, 'error'); }
+  };
+
+  const handleUpdateTask = async (taskId, updates) => {
+    try {
+      await api.tasks.update(taskId, updates);
       fetchData();
     } catch (err) { addToast(err.message, 'error'); }
   };
@@ -305,6 +319,7 @@ export default function Calendar() {
                 onCompleteTask={handleComplete}
                 onDropTask={handleDropTask}
                 onDayClick={handleDayClick}
+                onUpdateTask={handleUpdateTask}
               />
             )}
             {viewType === 'day' && (
@@ -314,6 +329,7 @@ export default function Calendar() {
                 onEditTask={handleEdit}
                 onCompleteTask={handleComplete}
                 onDropTask={handleDropTask}
+                onUpdateTask={handleUpdateTask}
               />
             )}
           </div>

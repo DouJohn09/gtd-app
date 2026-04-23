@@ -58,6 +58,8 @@ router.post('/smart-capture', async (req, res) => {
       time_estimate: ai.time_estimate_minutes || null,
       due_date: ai.due_date || null,
       start_date: ai.start_date || null,
+      scheduled_time: ai.scheduled_time || null,
+      duration: ai.duration || null,
       is_daily_focus: ai.is_daily_focus ? 1 : 0,
       waiting_for_person: ai.waiting_for_person || null,
       recurrence_rule: ai.recurrence_rule || null,

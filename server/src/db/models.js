@@ -129,8 +129,8 @@ export const TaskModel = {
     }
 
     db.run(`
-      INSERT INTO tasks (title, notes, list, context, project_id, waiting_for_person, due_date, start_date, energy_level, time_estimate, priority, is_daily_focus, position, recurrence_rule, recurrence_interval, recurrence_days, recurrence_type, user_id)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO tasks (title, notes, list, context, project_id, waiting_for_person, due_date, start_date, scheduled_time, duration, energy_level, time_estimate, priority, is_daily_focus, position, recurrence_rule, recurrence_interval, recurrence_days, recurrence_type, user_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `, [
       task.title,
       task.notes || null,
@@ -140,6 +140,8 @@ export const TaskModel = {
       task.waiting_for_person || null,
       task.due_date || null,
       task.start_date || null,
+      task.scheduled_time || null,
+      task.duration || null,
       task.energy_level || null,
       task.time_estimate || null,
       task.priority || 0,
@@ -161,7 +163,7 @@ export const TaskModel = {
 
   update(id, updates, userId) {
     const db = getDb();
-    const allowedFields = ['title', 'notes', 'list', 'context', 'project_id', 'waiting_for_person', 'due_date', 'start_date', 'energy_level', 'time_estimate', 'priority', 'is_daily_focus', 'completed_at', 'position', 'recurrence_rule', 'recurrence_interval', 'recurrence_days', 'recurrence_type'];
+    const allowedFields = ['title', 'notes', 'list', 'context', 'project_id', 'waiting_for_person', 'due_date', 'start_date', 'scheduled_time', 'duration', 'energy_level', 'time_estimate', 'priority', 'is_daily_focus', 'completed_at', 'position', 'recurrence_rule', 'recurrence_interval', 'recurrence_days', 'recurrence_type'];
     const fields = Object.keys(updates).filter(k => allowedFields.includes(k) && updates[k] !== undefined);
 
     if (fields.length === 0) return this.getById(id, userId);
@@ -242,11 +244,12 @@ export const TaskModel = {
     // Create a completed snapshot for history
     const db = getDb();
     db.run(`
-      INSERT INTO tasks (title, notes, list, context, project_id, waiting_for_person, due_date, start_date, energy_level, time_estimate, priority, is_daily_focus, position, completed_at, user_id)
-      VALUES (?, ?, 'completed', ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)
+      INSERT INTO tasks (title, notes, list, context, project_id, waiting_for_person, due_date, start_date, scheduled_time, duration, energy_level, time_estimate, priority, is_daily_focus, position, completed_at, user_id)
+      VALUES (?, ?, 'completed', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)
     `, [
       task.title, task.notes, task.context, task.project_id, task.waiting_for_person,
-      task.due_date, task.start_date, task.energy_level, task.time_estimate,
+      task.due_date, task.start_date, task.scheduled_time, task.duration,
+      task.energy_level, task.time_estimate,
       task.priority, task.position, new Date().toISOString(), userId
     ]);
     saveDb();

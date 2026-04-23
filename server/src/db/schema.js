@@ -124,6 +124,13 @@ export async function initDb() {
   }
   db.run('CREATE INDEX IF NOT EXISTS idx_tasks_start_date ON tasks(user_id, start_date)');
 
+  // Migration: add time blocking columns to tasks
+  const hasScheduledTime = tasksColumnsRefresh[0]?.values.some(col => col[1] === 'scheduled_time');
+  if (!hasScheduledTime) {
+    db.run('ALTER TABLE tasks ADD COLUMN scheduled_time TEXT');
+    db.run('ALTER TABLE tasks ADD COLUMN duration INTEGER');
+  }
+
   // Contexts table
   db.run(`
     CREATE TABLE IF NOT EXISTS contexts (

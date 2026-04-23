@@ -40,7 +40,8 @@ export default function TaskModal({ task, projects, onClose, onSave }) {
   const { addToast } = useToast();
   const [form, setForm] = useState({
     title: '', notes: '', list: 'inbox', context: '', project_id: '',
-    waiting_for_person: '', due_date: '', start_date: '', energy_level: '', time_estimate: '',
+    waiting_for_person: '', due_date: '', start_date: '', scheduled_time: '', duration: '',
+    energy_level: '', time_estimate: '',
     is_daily_focus: false,
     recurrence_rule: '', recurrence_interval: 1, recurrence_days: '', recurrence_type: 'absolute',
   });
@@ -65,6 +66,8 @@ export default function TaskModal({ task, projects, onClose, onSave }) {
         waiting_for_person: task.waiting_for_person || '',
         due_date: task.due_date || '',
         start_date: task.start_date || '',
+        scheduled_time: task.scheduled_time || '',
+        duration: task.duration || '',
         energy_level: task.energy_level || '',
         time_estimate: task.time_estimate || '',
         is_daily_focus: task.is_daily_focus === 1,
@@ -108,6 +111,8 @@ export default function TaskModal({ task, projects, onClose, onSave }) {
         waiting_for_person: form.waiting_for_person.trim() || null,
         due_date: form.due_date || null,
         start_date: form.start_date || null,
+        scheduled_time: form.scheduled_time || null,
+        duration: form.duration ? parseInt(form.duration) : null,
         energy_level: form.energy_level || null,
         time_estimate: form.time_estimate ? parseInt(form.time_estimate) : null,
         is_daily_focus: form.is_daily_focus ? 1 : 0,
@@ -369,6 +374,35 @@ export default function TaskModal({ task, projects, onClose, onSave }) {
                 value={form.due_date}
                 onChange={(e) => setForm({ ...form, due_date: e.target.value })}
                 className="gtd-input"
+              />
+            </div>
+          </div>
+
+          {/* Time blocking */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="gtd-label">Scheduled Time</label>
+              <input
+                type="time"
+                value={form.scheduled_time}
+                onChange={(e) => setForm({ ...form, scheduled_time: e.target.value })}
+                className="gtd-input"
+              />
+              <p className="font-mono text-[10px] text-text-3 mt-1">
+                {form.scheduled_time ? 'shown as a time block on the calendar' : 'leave empty for all-day'}
+              </p>
+            </div>
+            <div>
+              <label className="gtd-label">Duration (min)</label>
+              <input
+                type="number"
+                value={form.duration}
+                onChange={(e) => setForm({ ...form, duration: e.target.value })}
+                className="gtd-input"
+                min="15"
+                step="15"
+                placeholder="60"
+                disabled={!form.scheduled_time}
               />
             </div>
           </div>

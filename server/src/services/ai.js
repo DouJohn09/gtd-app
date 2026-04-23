@@ -103,6 +103,14 @@ START DATE RULES:
 - start_date is when the task becomes actionable (different from due_date which is the deadline)
 - If not mentioned, start_date should be null
 
+TIME-OF-DAY RULES (time blocking):
+- Detect explicit times: "at 2pm", "at 14:00", "at 9:30am", "from 3 to 4pm"
+- Detect rough times: "this morning" → 09:00, "this afternoon" → 14:00, "this evening" → 18:00, "tonight" → 19:00, "lunch" → 12:00
+- scheduled_time format: "HH:MM" 24-hour (e.g., "14:00", "09:30")
+- duration in minutes: extract from "for 30 minutes", "1 hour", "from 3 to 4pm" (= 60). Default 60 if scheduled_time set but duration not specified.
+- If a scheduled_time is set, also set due_date to that day (today/tomorrow/etc.)
+- If no time-of-day mentioned, scheduled_time and duration must be null
+
 OTHER RULES:
 - Clean the title: remove parsed date/time references and recurrence patterns but keep the core action. Make it action-oriented (start with a verb).
 - Detect "waiting for [person]" patterns → list: waiting_for, extract person name.
@@ -120,6 +128,8 @@ Respond with JSON:
   "time_estimate_minutes": number or null,
   "due_date": "YYYY-MM-DD or null",
   "start_date": "YYYY-MM-DD or null",
+  "scheduled_time": "HH:MM 24-hour or null",
+  "duration": "minutes as number or null",
   "is_daily_focus": boolean,
   "waiting_for_person": "person name or null",
   "project_name": "exact project name from list or null",
