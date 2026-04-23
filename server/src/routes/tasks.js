@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { TaskModel } from '../db/models.js';
 import { getDb } from '../db/schema.js';
 import { analyzeTask } from '../services/ai.js';
-import { getCalendarEvents } from '../services/googleCalendar.js';
+import { getCalendarEvents, syncTaskToCalendar, deleteTaskFromCalendar } from '../services/googleCalendar.js';
 
 const router = Router();
 
@@ -83,6 +83,7 @@ router.post('/', (req, res) => {
   try {
     const task = TaskModel.create(req.body, req.user.id);
     res.status(201).json(task);
+    syncTaskToCalendar(req.user.id, task).catch(err => console.error('syncTaskToCalendar (create):', err));
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -95,6 +96,7 @@ router.put('/:id', (req, res) => {
       return res.status(404).json({ error: 'Task not found' });
     }
     res.json(task);
+    syncTaskToCalendar(req.user.id, task).catch(err => console.error('syncTaskToCalendar (update):', err));
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -102,9 +104,14 @@ router.put('/:id', (req, res) => {
 
 router.delete('/:id', (req, res) => {
   try {
+    const existing = TaskModel.getById(req.params.id, req.user.id);
+    const eventId = existing?.google_event_id || null;
     // TaskModel.delete handles sequential promotion internally
     TaskModel.delete(req.params.id, req.user.id);
     res.status(204).send();
+    if (eventId) {
+      deleteTaskFromCalendar(req.user.id, eventId).catch(err => console.error('deleteTaskFromCalendar:', err));
+    }
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -117,6 +124,11 @@ router.post('/:id/complete', (req, res) => {
       return res.status(404).json({ error: 'Task not found' });
     }
     res.json(task);
+    // For one-shot completion: leave the event as a time log (no action).
+    // For recurring tasks: the original task survives with a new due_date — push the move.
+    if (task.list !== 'completed' && task.scheduled_time) {
+      syncTaskToCalendar(req.user.id, task).catch(err => console.error('syncTaskToCalendar (complete recurring):', err));
+    }
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

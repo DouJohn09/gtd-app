@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { ChevronLeft, ChevronRight, PanelRightOpen, Link as LinkIcon, Unlink } from 'lucide-react';
+import { ChevronLeft, ChevronRight, PanelRightOpen, Link as LinkIcon, Unlink, AlertCircle } from 'lucide-react';
 import { useGoogleLogin } from '@react-oauth/google';
 import { api } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
@@ -33,6 +33,7 @@ export default function Calendar() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [calendarConnected, setCalendarConnected] = useState(false);
+  const [hasWriteScope, setHasWriteScope] = useState(false);
   const [calendarLoading, setCalendarLoading] = useState(false);
   const { user } = useAuth();
   const { addToast } = useToast();
@@ -44,6 +45,9 @@ export default function Calendar() {
   useEffect(() => {
     if (user?.google_calendar_connected !== undefined) {
       setCalendarConnected(user.google_calendar_connected);
+    }
+    if (user?.google_calendar_write !== undefined) {
+      setHasWriteScope(user.google_calendar_write);
     }
   }, [user]);
 
@@ -171,14 +175,15 @@ export default function Calendar() {
 
   const connectGoogleCalendar = useGoogleLogin({
     flow: 'auth-code',
-    scope: 'https://www.googleapis.com/auth/calendar.readonly',
+    scope: 'https://www.googleapis.com/auth/calendar',
     prompt: 'consent',
     onSuccess: async (response) => {
       setCalendarLoading(true);
       try {
-        await api.calendar.connect(response.code);
+        const result = await api.calendar.connect(response.code);
         setCalendarConnected(true);
-        addToast('Google Calendar connected', 'success');
+        setHasWriteScope(!!result?.hasWriteScope);
+        addToast(result?.hasWriteScope ? 'Google Calendar connected — time blocks will sync' : 'Google Calendar connected (read-only)', 'success');
         fetchData();
       } catch {
         addToast('Failed to connect Google Calendar', 'error');
@@ -273,6 +278,31 @@ export default function Calendar() {
           </button>
         </div>
       </div>
+
+      {/* Re-consent banner: connected but no write scope */}
+      {calendarConnected && !hasWriteScope && (
+        <div
+          className="rounded-2xl glass p-4 mb-5 flex items-start gap-3"
+          style={{ boxShadow: 'inset 0 0 0 1px rgb(var(--amber) / 0.28)', background: 'rgb(var(--amber) / 0.06)' }}
+        >
+          <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" style={{ color: 'rgb(var(--amber-glow))' }} />
+          <div className="flex-1 min-w-0">
+            <div className="text-[13px] font-medium text-text-1">
+              Reconnect Google to push time blocks to your calendar
+            </div>
+            <p className="font-mono text-[11px] text-text-3 mt-1 leading-relaxed">
+              You're connected with read-only access. Reconnect with write access and we'll push your time blocks to a dedicated <span style={{ color: 'rgb(var(--violet-glow))' }}>GTD Flow</span> calendar — your primary calendar stays untouched.
+            </p>
+          </div>
+          <button
+            onClick={() => connectGoogleCalendar()}
+            disabled={calendarLoading}
+            className="gtd-btn gtd-btn-primary text-[12px]"
+          >
+            Reconnect
+          </button>
+        </div>
+      )}
 
       {/* Period nav */}
       <div className="flex items-center gap-3 mb-5">

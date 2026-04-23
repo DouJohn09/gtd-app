@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { TaskModel, ProjectModel, WeeklyReviewModel } from '../db/models.js';
 import { getDb } from '../db/schema.js';
 import { processInbox, getDailyPriorities, importNotes, findDuplicates, weeklyReviewAnalysis, smartCapture } from '../services/ai.js';
+import { syncTaskToCalendar } from '../services/googleCalendar.js';
 
 function getUserContexts(userId) {
   const db = getDb();
@@ -68,6 +69,7 @@ router.post('/smart-capture', async (req, res) => {
     };
     const task = TaskModel.create(taskData, req.user.id);
     res.json({ task, ai });
+    syncTaskToCalendar(req.user.id, task).catch(err => console.error('syncTaskToCalendar (smart-capture):', err));
   } catch (error) {
     console.error('Smart capture error:', error);
     res.status(500).json({ error: error.message });

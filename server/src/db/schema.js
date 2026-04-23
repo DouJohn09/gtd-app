@@ -131,6 +131,21 @@ export async function initDb() {
     db.run('ALTER TABLE tasks ADD COLUMN duration INTEGER');
   }
 
+  // Migration: add google_event_id to tasks (for one-way push to Google Calendar)
+  const tasksColumnsAfterTimeBlocking = db.exec("PRAGMA table_info(tasks)");
+  const hasGoogleEventId = tasksColumnsAfterTimeBlocking[0]?.values.some(col => col[1] === 'google_event_id');
+  if (!hasGoogleEventId) {
+    db.run('ALTER TABLE tasks ADD COLUMN google_event_id TEXT');
+  }
+
+  // Migration: add gtd_calendar_id and granted scopes to users
+  const usersColumnsRefresh = db.exec("PRAGMA table_info(users)");
+  const hasGtdCalendarId = usersColumnsRefresh[0]?.values.some(col => col[1] === 'gtd_calendar_id');
+  if (!hasGtdCalendarId) {
+    db.run('ALTER TABLE users ADD COLUMN gtd_calendar_id TEXT');
+    db.run('ALTER TABLE users ADD COLUMN google_calendar_scopes TEXT');
+  }
+
   // Contexts table
   db.run(`
     CREATE TABLE IF NOT EXISTS contexts (

@@ -77,12 +77,14 @@ router.get('/me', (req, res) => {
   try {
     const payload = jwt.verify(authHeader.split(' ')[1], process.env.JWT_SECRET);
     const db = getDb();
-    const stmt = db.prepare('SELECT id, email, name, picture, (google_calendar_refresh_token IS NOT NULL OR google_calendar_access_token IS NOT NULL) as google_calendar_connected FROM users WHERE id = ?');
+    const stmt = db.prepare('SELECT id, email, name, picture, (google_calendar_refresh_token IS NOT NULL OR google_calendar_access_token IS NOT NULL) as google_calendar_connected, google_calendar_scopes FROM users WHERE id = ?');
     stmt.bind([payload.userId]);
     if (stmt.step()) {
       const user = stmt.getAsObject();
       stmt.free();
       user.google_calendar_connected = !!user.google_calendar_connected;
+      user.google_calendar_write = (user.google_calendar_scopes || '').includes('https://www.googleapis.com/auth/calendar');
+      delete user.google_calendar_scopes;
       return res.json({ user });
     }
     stmt.free();
@@ -113,17 +115,17 @@ router.post('/google-calendar', requireAuth, async (req, res) => {
     // If Google didn't return a refresh_token (re-authorization), keep the existing one
     if (tokens.refresh_token) {
       db.run(
-        'UPDATE users SET google_calendar_access_token = ?, google_calendar_refresh_token = ?, google_calendar_token_expiry = ? WHERE id = ?',
-        [tokens.access_token, tokens.refresh_token, tokens.expiry_date, req.user.id]
+        'UPDATE users SET google_calendar_access_token = ?, google_calendar_refresh_token = ?, google_calendar_token_expiry = ?, google_calendar_scopes = ? WHERE id = ?',
+        [tokens.access_token, tokens.refresh_token, tokens.expiry_date, tokens.scope, req.user.id]
       );
     } else {
       db.run(
-        'UPDATE users SET google_calendar_access_token = ?, google_calendar_token_expiry = ? WHERE id = ?',
-        [tokens.access_token, tokens.expiry_date, req.user.id]
+        'UPDATE users SET google_calendar_access_token = ?, google_calendar_token_expiry = ?, google_calendar_scopes = ? WHERE id = ?',
+        [tokens.access_token, tokens.expiry_date, tokens.scope, req.user.id]
       );
     }
     saveDb();
-    res.json({ connected: true });
+    res.json({ connected: true, hasWriteScope: (tokens.scope || '').includes('https://www.googleapis.com/auth/calendar') });
   } catch (error) {
     console.error('Google Calendar connect error:', error);
     res.status(400).json({ error: 'Failed to connect Google Calendar' });

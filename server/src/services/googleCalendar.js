@@ -48,6 +48,8 @@ function clearUserTokens(userId) {
   saveDb();
 }
 
+export const CALENDAR_WRITE_SCOPE = 'https://www.googleapis.com/auth/calendar';
+
 export async function exchangeCodeForTokens(code) {
   const client = createOAuth2Client();
   const { tokens } = await client.getToken(code);
@@ -55,7 +57,21 @@ export async function exchangeCodeForTokens(code) {
     access_token: tokens.access_token,
     refresh_token: tokens.refresh_token,
     expiry_date: tokens.expiry_date ? new Date(tokens.expiry_date).toISOString() : null,
+    scope: tokens.scope || null,
   };
+}
+
+export function userHasWriteScope(userId) {
+  const db = getDb();
+  const stmt = db.prepare('SELECT google_calendar_scopes FROM users WHERE id = ?');
+  stmt.bind([userId]);
+  if (stmt.step()) {
+    const row = stmt.getAsObject();
+    stmt.free();
+    return (row.google_calendar_scopes || '').includes(CALENDAR_WRITE_SCOPE);
+  }
+  stmt.free();
+  return false;
 }
 
 async function getValidAccessToken(userId) {
@@ -217,4 +233,182 @@ export async function revokeCalendarAccess(userId) {
 export function isCalendarConnected(userId) {
   const tokens = getUserTokens(userId);
   return !!(tokens?.refresh_token || tokens?.access_token);
+}
+
+function getGtdCalendarId(userId) {
+  const db = getDb();
+  const stmt = db.prepare('SELECT gtd_calendar_id FROM users WHERE id = ?');
+  stmt.bind([userId]);
+  if (stmt.step()) {
+    const row = stmt.getAsObject();
+    stmt.free();
+    return row.gtd_calendar_id || null;
+  }
+  stmt.free();
+  return null;
+}
+
+function setGtdCalendarId(userId, id) {
+  const db = getDb();
+  db.run('UPDATE users SET gtd_calendar_id = ? WHERE id = ?', [id, userId]);
+  saveDb();
+}
+
+async function ensureGtdCalendar(userId, accessToken) {
+  const existing = getGtdCalendarId(userId);
+  if (existing) return existing;
+  const response = await fetch(`${CALENDAR_API_BASE}/calendars`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      summary: 'GTD Flow',
+      description: 'Time blocks pushed from GTD Flow',
+      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    }),
+  });
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(`Failed to create GTD Flow calendar: ${response.status} ${err}`);
+  }
+  const data = await response.json();
+  setGtdCalendarId(userId, data.id);
+  return data.id;
+}
+
+function buildEventPayload(task) {
+  const startDate = task.due_date;
+  const startTime = task.scheduled_time;
+  const duration = task.duration || 60;
+  if (!startDate || !startTime) return null;
+
+  const [h, m] = startTime.split(':').map(Number);
+  const startMins = h * 60 + (m || 0);
+  const endMins = startMins + duration;
+  const endH = Math.floor(endMins / 60) % 24;
+  const endM = endMins % 60;
+  const endTime = `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`;
+  const endDate = endMins >= 24 * 60
+    ? new Date(new Date(startDate + 'T00:00:00').getTime() + 86400000).toISOString().slice(0, 10)
+    : startDate;
+
+  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  return {
+    summary: task.title,
+    description: task.notes || undefined,
+    start: { dateTime: `${startDate}T${startTime}:00`, timeZone: tz },
+    end: { dateTime: `${endDate}T${endTime}:00`, timeZone: tz },
+  };
+}
+
+function setTaskEventId(taskId, eventId) {
+  const db = getDb();
+  db.run('UPDATE tasks SET google_event_id = ? WHERE id = ?', [eventId, taskId]);
+  saveDb();
+}
+
+export async function pushTaskToCalendar(userId, task) {
+  if (!task || !task.scheduled_time || !task.due_date) return;
+  const accessToken = await getValidAccessToken(userId);
+  if (!accessToken) return;
+  if (!userHasWriteScope(userId)) return;
+
+  try {
+    const calendarId = await ensureGtdCalendar(userId, accessToken);
+    const payload = buildEventPayload(task);
+    if (!payload) return;
+
+    if (task.google_event_id) {
+      // Update existing event
+      const r = await fetch(
+        `${CALENDAR_API_BASE}/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(task.google_event_id)}`,
+        {
+          method: 'PATCH',
+          headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        }
+      );
+      if (r.status === 404) {
+        // Event was deleted on Google side — recreate
+        const created = await fetch(
+          `${CALENDAR_API_BASE}/calendars/${encodeURIComponent(calendarId)}/events`,
+          {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          }
+        );
+        if (created.ok) {
+          const data = await created.json();
+          setTaskEventId(task.id, data.id);
+        }
+      } else if (!r.ok) {
+        console.error('Failed to update GTD Flow event:', r.status, await r.text());
+      }
+    } else {
+      const r = await fetch(
+        `${CALENDAR_API_BASE}/calendars/${encodeURIComponent(calendarId)}/events`,
+        {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        }
+      );
+      if (r.ok) {
+        const data = await r.json();
+        setTaskEventId(task.id, data.id);
+      } else {
+        console.error('Failed to create GTD Flow event:', r.status, await r.text());
+      }
+    }
+  } catch (err) {
+    console.error('pushTaskToCalendar error:', err.message);
+  }
+}
+
+function clearTaskEventId(taskId) {
+  const db = getDb();
+  db.run('UPDATE tasks SET google_event_id = NULL WHERE id = ?', [taskId]);
+  saveDb();
+}
+
+// Sync a task's state to its Google Calendar event.
+// Push when task has scheduled_time + due_date and isn't completed.
+// Delete when task lost its scheduled_time but still has an event id.
+// Skip on completed tasks (event remains as a time log).
+export async function syncTaskToCalendar(userId, task) {
+  if (!task) return;
+  if (task.list === 'completed') return;
+  if (task.scheduled_time && task.due_date) {
+    await pushTaskToCalendar(userId, task);
+  } else if (task.google_event_id) {
+    await deleteTaskFromCalendar(userId, task.google_event_id);
+    clearTaskEventId(task.id);
+  }
+}
+
+export async function deleteTaskFromCalendar(userId, eventId) {
+  if (!eventId) return;
+  const accessToken = await getValidAccessToken(userId);
+  if (!accessToken) return;
+  if (!userHasWriteScope(userId)) return;
+
+  try {
+    const calendarId = getGtdCalendarId(userId);
+    if (!calendarId) return;
+    const r = await fetch(
+      `${CALENDAR_API_BASE}/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(eventId)}`,
+      {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${accessToken}` },
+      }
+    );
+    if (!r.ok && r.status !== 404 && r.status !== 410) {
+      console.error('Failed to delete GTD Flow event:', r.status, await r.text());
+    }
+  } catch (err) {
+    console.error('deleteTaskFromCalendar error:', err.message);
+  }
 }
