@@ -124,4 +124,9 @@ export const api = {
     json: () => downloadFile('/export/json', 'gtdflow-export.json'),
     csv: () => downloadFile('/export/csv', 'gtdflow-export.csv'),
   },
+
+  import: {
+    preview: (filename, content) => fetchApi('/import/preview', { method: 'POST', body: JSON.stringify({ filename, content }) }),
+    commit: (format, payload) => fetchApi('/import/commit', { method: 'POST', body: JSON.stringify({ format, payload }) }),
+  },
 };
