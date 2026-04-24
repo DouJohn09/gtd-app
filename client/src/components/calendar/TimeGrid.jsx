@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { CalendarDays } from 'lucide-react';
 
 const HOUR_START = 0;
@@ -31,6 +31,81 @@ function snapMinutes(mins) {
   return Math.round(mins / SNAP_MINUTES) * SNAP_MINUTES;
 }
 
+// Lay overlapping events out as side-by-side columns.
+// Each item gets `_col` (0-indexed) and `_totalCols` (cluster width divisor).
+function computeLayout(blocks) {
+  if (!blocks.length) return [];
+  const items = blocks
+    .map(b => {
+      const start = timeToMinutes(b.scheduled_time) ?? 0;
+      const end = start + (b.duration || 60);
+      return { ...b, _start: start, _end: end };
+    })
+    .sort((a, b) => a._start - b._start || b._end - a._end);
+
+  // Greedy column assignment in sweep order.
+  const colEnds = [];
+  for (const item of items) {
+    let placed = false;
+    for (let i = 0; i < colEnds.length; i++) {
+      if (colEnds[i] <= item._start) {
+        item._col = i;
+        colEnds[i] = item._end;
+        placed = true;
+        break;
+      }
+    }
+    if (!placed) {
+      item._col = colEnds.length;
+      colEnds.push(item._end);
+    }
+  }
+
+  // Cluster items transitively (chain of overlaps), then divide width by the
+  // cluster's max-concurrent count so non-overlapping events keep full width.
+  const visited = new Set();
+  for (const seed of items) {
+    if (visited.has(seed)) continue;
+    const cluster = [];
+    const queue = [seed];
+    while (queue.length) {
+      const cur = queue.shift();
+      if (visited.has(cur)) continue;
+      visited.add(cur);
+      cluster.push(cur);
+      for (const other of items) {
+        if (visited.has(other)) continue;
+        if (other._start < cur._end && other._end > cur._start) queue.push(other);
+      }
+    }
+    const events = [];
+    for (const it of cluster) {
+      events.push({ time: it._start, delta: 1 });
+      events.push({ time: it._end, delta: -1 });
+    }
+    events.sort((a, b) => a.time - b.time || a.delta - b.delta);
+    let cur = 0, max = 1;
+    for (const e of events) {
+      cur += e.delta;
+      if (cur > max) max = cur;
+    }
+    for (const it of cluster) it._totalCols = max;
+  }
+
+  return items;
+}
+
+function blockPositionStyle(top, height, col = 0, totalCols = 1) {
+  const widthPct = 100 / totalCols;
+  const leftPct = (col * 100) / totalCols;
+  return {
+    top: `${top}px`,
+    height: `${height}px`,
+    left: `${leftPct}%`,
+    width: `calc(${widthPct}% - 2px)`,
+  };
+}
+
 export default function TimeGrid({
   date,
   timeBlocks,
@@ -49,6 +124,8 @@ export default function TimeGrid({
   const hourHeight = compact ? 40 : HOUR_HEIGHT;
   const totalHours = HOUR_END - HOUR_START;
   const scrollHeight = compact ? 420 : 560;
+
+  const layoutBlocks = useMemo(() => computeLayout(timeBlocks), [timeBlocks]);
 
   // Scroll to 7am on mount (or earliest scheduled block, whichever is sooner)
   useEffect(() => {
@@ -167,8 +244,8 @@ export default function TimeGrid({
 
         {/* Time blocks */}
         <div className="absolute left-10 right-1 top-0 bottom-0 pointer-events-none">
-          {timeBlocks.map(task => {
-            const startMins = timeToMinutes(task.scheduled_time);
+          {layoutBlocks.map(task => {
+            const startMins = task._start;
             if (startMins === null) return null;
             const duration = task.duration || 60;
             const top = ((startMins - HOUR_START * 60) / 60) * hourHeight;
@@ -181,6 +258,8 @@ export default function TimeGrid({
                 task={task}
                 top={top}
                 height={height}
+                col={task._col}
+                totalCols={task._totalCols}
                 compact={compact}
                 onEdit={onEditTask}
                 onComplete={onCompleteTask}
@@ -195,9 +274,9 @@ export default function TimeGrid({
   );
 }
 
-function TimeBlock({ task, top, height, compact, onEdit, onComplete, onResizeStart, isCompleted }) {
+function TimeBlock({ task, top, height, col, totalCols, compact, onEdit, onComplete, onResizeStart, isCompleted }) {
   if (task.type === 'google_event') {
-    return <GoogleEventBlock event={task} top={top} height={height} compact={compact} />;
+    return <GoogleEventBlock event={task} top={top} height={height} col={col} totalCols={totalCols} compact={compact} />;
   }
 
   const tone = task.list === 'inbox' ? 'amber' :
@@ -212,10 +291,9 @@ function TimeBlock({ task, top, height, compact, onEdit, onComplete, onResizeSta
         e.dataTransfer.effectAllowed = 'move';
       }}
       onClick={() => onEdit?.(task)}
-      className="absolute left-0 right-0 rounded-lg cursor-pointer transition-all overflow-hidden pointer-events-auto group"
+      className="absolute rounded-lg cursor-pointer transition-all overflow-hidden pointer-events-auto group"
       style={{
-        top: `${top}px`,
-        height: `${height}px`,
+        ...blockPositionStyle(top, height, col, totalCols),
         background: `rgb(var(--${tone}) / 0.12)`,
         boxShadow: `inset 0 0 0 1px rgb(var(--${tone}) / 0.30), inset 3px 0 0 rgb(var(--${tone}-glow))`,
         opacity: isCompleted ? 0.5 : 1,
@@ -254,17 +332,16 @@ function TimeBlock({ task, top, height, compact, onEdit, onComplete, onResizeSta
   );
 }
 
-function GoogleEventBlock({ event, top, height, compact }) {
+function GoogleEventBlock({ event, top, height, col, totalCols, compact }) {
   const handleClick = () => {
     if (event.html_link) window.open(event.html_link, '_blank', 'noopener');
   };
   return (
     <div
       onClick={handleClick}
-      className="absolute left-0 right-0 rounded-lg cursor-pointer pointer-events-auto overflow-hidden"
+      className="absolute rounded-lg cursor-pointer pointer-events-auto overflow-hidden"
       style={{
-        top: `${top}px`,
-        height: `${height}px`,
+        ...blockPositionStyle(top, height, col, totalCols),
         background: 'rgb(var(--violet) / 0.12)',
         boxShadow: 'inset 0 0 0 1px rgb(var(--violet) / 0.30), inset 3px 0 0 rgb(var(--violet-glow))',
       }}
