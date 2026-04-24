@@ -70,6 +70,7 @@ gtd-app/
 │       │   ├── AIAssistant.jsx    # All AI features UI
 │       │   ├── WeeklyReview.jsx   # 4-step review wizard
 │       │   ├── Calendar.jsx      # Month/week/day calendar with Google Calendar sync
+│       │   ├── Settings.jsx     # Data export (JSON/CSV) + import (preview/commit)
 │       │   └── Login.jsx
 │       ├── contexts/
 │       │   └── AuthContext.jsx    # Google OAuth + JWT
@@ -94,7 +95,9 @@ gtd-app/
         │   ├── contexts.js
         │   ├── habits.js
         │   ├── auth.js            # Login + Google Calendar auth
-        │   └── ai.js              # All AI endpoints
+        │   ├── ai.js              # All AI endpoints
+        │   ├── export.js          # JSON full backup + Todoist-compatible CSV
+        │   └── import.js          # Two-step preview/commit for JSON + CSV
         └── services/
             ├── ai.js              # OpenAI integration
             └── googleCalendar.js  # Google Calendar token management & event fetching
@@ -145,7 +148,18 @@ gtd-app/
 
 ### Calendar
 - **Calendar view** — Month/week/day grids with tasks by due date and start date, unscheduled sidebar, drag-and-drop scheduling
-- **Google Calendar sync** — Opt-in OAuth connection, reads events and displays alongside tasks with indigo styling, read-only (not draggable), click to open in Google Calendar
+- **Google Calendar sync** — Opt-in OAuth connection, reads events and displays alongside tasks with violet styling, click to open in Google Calendar. Timed events render in the hour grid at their actual start; all-day events live in the all-day strip
+- **Time blocking** — Tasks can hold `scheduled_time` (HH:MM) + `duration` (minutes). Drag tasks onto specific time slots in Day/Week views; blocks snap to 15-min increments and resize via the bottom edge
+- **Push to Google Calendar** — When a task has a scheduled time, it's pushed (one-way) to a dedicated "GTD Flow" calendar so the user's primary calendar stays untouched. Requires the calendar-write OAuth scope; a banner prompts re-consent for users who connected before that scope existed
+- **AI-assisted scheduling (MVP)** — Smart Capture detects free-slot intent ("find me 30 min tomorrow afternoon"), reads tasks + Google events for the target day inside hardcoded working hours (9-18 weekdays, 10-16 weekends), and auto-books the first open window. Fallback toast if no slot fits
+- **Overlap layout** — Concurrent blocks at the same hour cluster transitively and render as side-by-side columns sized by `1 / cluster max-concurrent`. Non-overlapping blocks keep full width
+
+### Today's Focus
+- **Auto-surface due-today and overdue tasks** — The Today list isn't just `is_daily_focus = 1` anymore. It also picks up anything `due_date <= today` (excluding `someday_maybe`, respecting `start_date`). Matches Things/Todoist behavior so a task created with `due_date = tomorrow` shows up automatically when tomorrow arrives
+
+### Data export & import
+- **Export** — Settings → Data offers JSON (full backup of tasks, projects, contexts, habits, habit_logs) and CSV (Todoist-compatible columns + GTD extras at the end so a round-trip back into GTD Flow keeps `LIST`, `CONTEXT`, `PROJECT`, `ENERGY`, `RECURRENCE`, etc.). Priority is inverted on CSV export to match Todoist's 1=highest convention
+- **Import** — Two-step preview/commit flow under the same Settings page. Auto-detects format by extension + content sniff. JSON path merges projects + habits by name (case-insensitive); habit logs preserve dates via `INSERT OR IGNORE`. CSV path re-inverts priority back to our 4=highest scheme, opportunistically reads our extras when present, and falls back to Inbox when no `LIST` column. Append-only (no duplicate detection — users can run AI duplicate finder afterward)
 
 ### Project Execution Modes
 - **Parallel** (default) — All project tasks visible in Next Actions simultaneously
@@ -199,6 +213,14 @@ gtd-app/
 - `POST /weekly-review` — Full system analysis with AI insights
 - `POST /complete-review` — Apply review changes and record completion
 
+### Export: `/api/export`
+- `GET /json` — Full backup (tasks, projects, contexts, habits, habit_logs) as a downloadable JSON file
+- `GET /csv` — Tasks as Todoist-compatible CSV (priority inverted to 1=highest) with GTD extras (`LIST`, `CONTEXT`, `PROJECT`, `ENERGY`, `RECURRENCE`, etc.) appended for lossless round-trip
+
+### Import: `/api/import`
+- `POST /preview` — Accepts `{ filename, content }`, sniffs format (`gtdflow-json` or `todoist-csv`), returns counts + first 5 task titles for confirmation
+- `POST /commit` — Accepts `{ format, payload }`, creates records (merges projects/habits/contexts by name, preserves habit_log dates via `INSERT OR IGNORE`, falls back to Inbox when CSV has no LIST). Append-only — duplicates left for the AI duplicate finder
+
 ### Auth: `/api/auth`
 - `POST /google` — Google OAuth login
 - `GET /me` — Get current user (includes `google_calendar_connected`)
@@ -244,7 +266,7 @@ Based on community research across Reddit (r/productivity, r/todoist, r/gtd, r/t
 
 #### High Priority (most requested across all communities)
 1. ~~**Start/defer dates**~~ — ✅ Shipped. Tasks hidden until start_date, deferred toggle chip on lists.
-2. **Calendar integration & time blocking** — Phase 1-2 shipped (calendar view + Google Calendar sync). Phase 3-4 (time blocking + AI scheduling) remaining.
+2. ~~**Calendar integration & time blocking**~~ — ✅ All four phases shipped: calendar view, Google Calendar sync (read + write), time blocking (drag onto slots, snap, resize, push to dedicated "GTD Flow" calendar), and AI-assisted free-slot booking via Smart Capture.
 3. ~~**Recurring tasks**~~ — ✅ Shipped. Daily/weekdays/weekly/monthly/yearly/custom, absolute + relative recurrence.
 4. ~~**Natural language input**~~ — ✅ Shipped as Smart Capture (GPT-4o-mini).
 5. **PWA / offline support** — Installable web app with offline capability; addresses mobile + offline without native apps
@@ -267,24 +289,27 @@ Based on community research across Reddit (r/productivity, r/todoist, r/gtd, r/t
 
 The #1 most requested feature ecosystem-wide. Users describe 4 levels of sophistication:
 
-**Phase 1 — Calendar view of tasks:**
+**Phase 1 — Calendar view of tasks (shipped):**
 - Day/week/month calendar grid showing tasks by due date
 - Unscheduled tasks in a sidebar panel
 - Drag tasks to assign/change due dates visually
 
-**Phase 2 — Google Calendar sync:**
+**Phase 2 — Google Calendar sync (shipped):**
 - One-click Google Calendar connection (reuse existing Google OAuth)
-- Read calendar events and display alongside tasks
+- Read calendar events and display alongside tasks (timed events in the hour grid, all-day in the strip)
 - Users see busy/free time at a glance during daily planning
+- Overlap layout: concurrent blocks cluster transitively and render as side-by-side columns
 
-**Phase 3 — Time blocking:**
-- Drag tasks from sidebar onto specific time slots
-- Tasks get `scheduled_time` + `duration` (leverage existing `time_estimate` field)
-- Time blocks optionally pushed to Google Calendar
+**Phase 3 — Time blocking (shipped):**
+- Drag tasks from sidebar onto specific time slots; blocks snap to 15-min and resize via the bottom edge
+- Tasks store `scheduled_time` + `duration`
+- One-way push to a dedicated "GTD Flow" Google Calendar (separate calendar-write OAuth scope; re-consent banner for legacy users)
 
-**Phase 4 (optional) — AI-assisted scheduling:**
-- Extend Daily Focus AI to suggest time slots based on energy levels, time estimates, and calendar availability
-- User confirms/adjusts, not fully automatic
+**Phase 4 — AI-assisted scheduling (shipped, MVP):**
+- Smart Capture detects free-slot intent ("find me 30 min tomorrow afternoon")
+- Reads tasks + Google events for the target day inside hardcoded working hours (9-18 weekdays, 10-16 weekends)
+- Auto-books the first open window; falls back to a toast if no slot fits
+- Future: pull energy levels and time estimates into the ranking instead of first-fit
 
 **Key user insight:** Users do NOT want a calendar replacement — they want their task app to integrate with Google Calendar. The unscheduled task list must coexist with the calendar view. One-click setup is critical.
 
@@ -436,6 +461,12 @@ Lifetime deals generate upfront cash and launch communities love them. Things 3 
 23. AI quality pass: confidence levels in prompts, hide low-confidence badges, inline editor on Import Notes + Process Inbox cards, per-item prune on Daily Focus suggestions
 24. Sort persistence, project fix in Today modal, Today screen refresh on capture, URL link previews, GTD flow summaries
 25. Recurring tasks (daily/weekdays/weekly/monthly/yearly/custom, absolute/relative), start/defer dates, deferred task toggle on list views
+26. Today's Focus auto-surfaces due-today and overdue tasks (matches Things/Todoist behavior)
+27. Demo seed script + DEMO.md walkthrough for trial accounts
+28. JSON + CSV export under Settings (Todoist-compatible CSV with GTD extras for lossless round-trip)
+29. JSON + CSV import with two-step preview/commit, project/habit name merging, missing-LIST → Inbox fallback
+30. Calendar bugfix: timed Google Calendar events now render in the hour grid instead of the all-day strip
+31. Calendar overlap layout: concurrent blocks cluster transitively and render side-by-side
 
 ---
 
@@ -471,13 +502,13 @@ Features to build, ordered by impact and launch-readiness.
 | 3 | **Migrate off sql.js** | In-memory SQLite is fragile. A crash or Railway restart = data loss. Can't take money on this. | High | |
 
 ### P1 — High impact, build before or shortly after launch
-| # | Feature | Why | Effort |
-|---|---------|-----|--------|
-| 4 | **PWA support** | Installable on mobile without native apps. Eliminates "no mobile app" objection. | Low |
-| 5 | **Calendar time blocking (Phase 3)** | Drag tasks onto time slots. Add `scheduled_time` + `duration` fields. Push blocks to Google Calendar. | High |
-| 6 | **AI-assisted scheduling (Phase 4)** | Smart capture reads your Google Calendar, suggests optimal time slots for new tasks based on free time + energy levels. | Medium |
-| 7 | **Saved filters / custom views** | Power user perspectives: "high-energy @office tasks due this week". OmniFocus killer feature. | Medium |
-| 8 | **Productivity analytics dashboard** | Completion rates, streaks, time trends, project velocity. Users want to see progress. | Medium |
+| # | Feature | Why | Effort | Status |
+|---|---------|-----|--------|--------|
+| 4 | **PWA support** | Installable on mobile without native apps. Eliminates "no mobile app" objection. | Low | |
+| 5 | ~~**Calendar time blocking (Phase 3)**~~ | Drag tasks onto time slots, snap, resize, push to dedicated GTD Flow calendar. | High | **Shipped** |
+| 6 | ~~**AI-assisted scheduling (Phase 4)**~~ | Smart Capture detects free-slot intent and books first open window inside working hours. | Medium | **Shipped (MVP)** |
+| 7 | **Saved filters / custom views** | Power user perspectives: "high-energy @office tasks due this week". OmniFocus killer feature. | Medium | |
+| 8 | **Productivity analytics dashboard** | Completion rates, streaks, time trends, project velocity. Users want to see progress. | Medium | |
 
 ### P2 — Differentiators, build when core is solid
 | # | Feature | Why | Effort |
