@@ -37,6 +37,28 @@ async function fetchApi(endpoint, options = {}) {
   return response.json();
 }
 
+async function downloadFile(endpoint, fallbackName) {
+  const token = localStorage.getItem('token');
+  const response = await fetch(`${API_BASE}${endpoint}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (!response.ok) {
+    throw new Error(`Download failed: ${response.statusText}`);
+  }
+  const cd = response.headers.get('Content-Disposition') || '';
+  const match = /filename="([^"]+)"/.exec(cd);
+  const filename = match ? match[1] : fallbackName;
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
 export const api = {
   tasks: {
     getAll: (list) => fetchApi(list ? `/tasks?list=${list}` : '/tasks'),
@@ -96,5 +118,10 @@ export const api = {
     weeklyReview: () => fetchApi('/ai/weekly-review', { method: 'POST' }),
     completeReview: (data) => fetchApi('/ai/complete-review', { method: 'POST', body: JSON.stringify(data) }),
     smartCapture: (text) => fetchApi('/ai/smart-capture', { method: 'POST', body: JSON.stringify({ text }) }),
-  }
+  },
+
+  export: {
+    json: () => downloadFile('/export/json', 'gtdflow-export.json'),
+    csv: () => downloadFile('/export/csv', 'gtdflow-export.csv'),
+  },
 };

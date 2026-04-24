@@ -36,6 +36,12 @@ const navGroups = [
       { to: '/completed', icon: CheckCircle2,  label: 'Completed' },
     ],
   },
+  {
+    label: 'system',
+    items: [
+      { to: '/settings',  icon: Settings,      label: 'Settings' },
+    ],
+  },
 ];
 
 const mobileTabs = [

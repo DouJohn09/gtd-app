@@ -11,6 +11,7 @@ import projectsRouter from './routes/projects.js';
 import aiRouter from './routes/ai.js';
 import contextsRouter from './routes/contexts.js';
 import habitsRouter from './routes/habits.js';
+import exportRouter from './routes/export.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -28,6 +29,7 @@ app.use('/api/projects', requireAuth, projectsRouter);
 app.use('/api/ai', requireAuth, aiRouter);
 app.use('/api/contexts', requireAuth, contextsRouter);
 app.use('/api/habits', requireAuth, habitsRouter);
+app.use('/api/export', requireAuth, exportRouter);
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
