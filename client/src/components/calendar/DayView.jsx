@@ -4,11 +4,28 @@ import TaskCard from '../TaskCard';
 import CalendarEventCard from '../CalendarEventCard';
 import TimeGrid from './TimeGrid';
 
+function googleEventToBlock(event) {
+  if (event.all_day || !event.start_time) return null;
+  const start = new Date(event.start_time);
+  const end = event.end_time ? new Date(event.end_time) : null;
+  const scheduled_time = `${String(start.getHours()).padStart(2, '0')}:${String(start.getMinutes()).padStart(2, '0')}`;
+  const duration = end ? Math.max(15, Math.round((end - start) / 60000)) : 60;
+  return { ...event, scheduled_time, duration };
+}
+
 export default function DayView({ date, items, onEditTask, onCompleteTask, onDropTask, onUpdateTask }) {
   const [isAllDayDragOver, setIsAllDayDragOver] = useState(false);
 
-  const timeBlocks = items.filter(i => i.type !== 'google_event' && i.scheduled_time);
-  const allDayItems = items.filter(i => i.type === 'google_event' || !i.scheduled_time);
+  const timeBlocks = items.flatMap(i => {
+    if (i.type === 'google_event') {
+      const block = googleEventToBlock(i);
+      return block ? [block] : [];
+    }
+    return i.scheduled_time ? [i] : [];
+  });
+  const allDayItems = items.filter(i =>
+    i.type === 'google_event' ? i.all_day : !i.scheduled_time
+  );
 
   const handleAllDayDragOver = (e) => {
     e.preventDefault();

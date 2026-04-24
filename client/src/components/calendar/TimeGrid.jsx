@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { CalendarDays } from 'lucide-react';
 
 const HOUR_START = 0;
 const HOUR_END = 24;
@@ -195,6 +196,10 @@ export default function TimeGrid({
 }
 
 function TimeBlock({ task, top, height, compact, onEdit, onComplete, onResizeStart, isCompleted }) {
+  if (task.type === 'google_event') {
+    return <GoogleEventBlock event={task} top={top} height={height} compact={compact} />;
+  }
+
   const tone = task.list === 'inbox' ? 'amber' :
                task.list === 'waiting_for' ? 'rose' :
                task.list === 'someday_maybe' ? 'violet' : 'mint';
@@ -245,6 +250,46 @@ function TimeBlock({ task, top, height, compact, onEdit, onComplete, onResizeSta
           style={{ background: `rgb(var(--${tone}) / 0.4)` }}
         />
       )}
+    </div>
+  );
+}
+
+function GoogleEventBlock({ event, top, height, compact }) {
+  const handleClick = () => {
+    if (event.html_link) window.open(event.html_link, '_blank', 'noopener');
+  };
+  return (
+    <div
+      onClick={handleClick}
+      className="absolute left-0 right-0 rounded-lg cursor-pointer pointer-events-auto overflow-hidden"
+      style={{
+        top: `${top}px`,
+        height: `${height}px`,
+        background: 'rgb(var(--violet) / 0.12)',
+        boxShadow: 'inset 0 0 0 1px rgb(var(--violet) / 0.30), inset 3px 0 0 rgb(var(--violet-glow))',
+      }}
+      title={event.title}
+    >
+      <div className={`flex items-start gap-1.5 ${compact ? 'p-1' : 'p-1.5'} h-full`}>
+        <CalendarDays
+          className="w-3 h-3 shrink-0 mt-0.5"
+          style={{ color: 'rgb(var(--violet-glow))' }}
+        />
+        <div className="flex-1 min-w-0">
+          <div
+            className={`${compact ? 'text-[10px]' : 'text-[11.5px]'} font-medium leading-tight truncate`}
+            style={{ color: 'rgb(var(--violet-glow))' }}
+          >
+            {event.title}
+          </div>
+          {!compact && height > 32 && (
+            <div className="font-mono text-[9px] text-text-3 mt-0.5">
+              {formatTimeLabel(timeToMinutes(event.scheduled_time))}
+              {event.duration ? ` · ${event.duration}m` : ''}
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
