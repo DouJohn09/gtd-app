@@ -21,6 +21,14 @@ const PORT = process.env.PORT || 3001;
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 
+app.use((req, _res, next) => {
+  const tz = req.get('X-Client-Timezone');
+  if (tz && typeof tz === 'string' && tz.length <= 64) {
+    req.clientTimezone = tz;
+  }
+  next();
+});
+
 // Auth routes (unprotected)
 app.use('/api/auth', authRouter);
 

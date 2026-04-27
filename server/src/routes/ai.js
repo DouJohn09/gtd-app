@@ -90,7 +90,7 @@ router.post('/smart-capture', async (req, res) => {
     };
     const task = TaskModel.create(taskData, req.user.id);
     res.json({ task, ai, bookedSlot, slotSearchFailed });
-    syncTaskToCalendar(req.user.id, task).catch(err => console.error('syncTaskToCalendar (smart-capture):', err));
+    syncTaskToCalendar(req.user.id, task, req.clientTimezone).catch(err => console.error('syncTaskToCalendar (smart-capture):', err));
   } catch (error) {
     console.error('Smart capture error:', error);
     res.status(500).json({ error: error.message });

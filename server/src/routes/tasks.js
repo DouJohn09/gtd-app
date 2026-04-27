@@ -83,7 +83,7 @@ router.post('/', (req, res) => {
   try {
     const task = TaskModel.create(req.body, req.user.id);
     res.status(201).json(task);
-    syncTaskToCalendar(req.user.id, task).catch(err => console.error('syncTaskToCalendar (create):', err));
+    syncTaskToCalendar(req.user.id, task, req.clientTimezone).catch(err => console.error('syncTaskToCalendar (create):', err));
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -96,7 +96,7 @@ router.put('/:id', (req, res) => {
       return res.status(404).json({ error: 'Task not found' });
     }
     res.json(task);
-    syncTaskToCalendar(req.user.id, task).catch(err => console.error('syncTaskToCalendar (update):', err));
+    syncTaskToCalendar(req.user.id, task, req.clientTimezone).catch(err => console.error('syncTaskToCalendar (update):', err));
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -127,7 +127,7 @@ router.post('/:id/complete', (req, res) => {
     // For one-shot completion: leave the event as a time log (no action).
     // For recurring tasks: the original task survives with a new due_date — push the move.
     if (task.list !== 'completed' && task.scheduled_time) {
-      syncTaskToCalendar(req.user.id, task).catch(err => console.error('syncTaskToCalendar (complete recurring):', err));
+      syncTaskToCalendar(req.user.id, task, req.clientTimezone).catch(err => console.error('syncTaskToCalendar (complete recurring):', err));
     }
   } catch (error) {
     res.status(500).json({ error: error.message });

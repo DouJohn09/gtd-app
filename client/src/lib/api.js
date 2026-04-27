@@ -1,12 +1,22 @@
 const API_BASE = '/api';
 
+function getClientTimezone() {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || '';
+  } catch {
+    return '';
+  }
+}
+
 async function fetchApi(endpoint, options = {}) {
   const token = localStorage.getItem('token');
+  const tz = getClientTimezone();
   const response = await fetch(`${API_BASE}${endpoint}`, {
     ...options,
     headers: {
       'Content-Type': 'application/json',
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(tz ? { 'X-Client-Timezone': tz } : {}),
       ...options.headers,
     },
   });

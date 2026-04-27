@@ -278,7 +278,7 @@ async function ensureGtdCalendar(userId, accessToken) {
   return data.id;
 }
 
-function buildEventPayload(task) {
+function buildEventPayload(task, clientTimezone) {
   const startDate = task.due_date;
   const startTime = task.scheduled_time;
   const duration = task.duration || 60;
@@ -294,7 +294,7 @@ function buildEventPayload(task) {
     ? new Date(new Date(startDate + 'T00:00:00').getTime() + 86400000).toISOString().slice(0, 10)
     : startDate;
 
-  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const tz = clientTimezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
   return {
     summary: task.title,
     description: task.notes || undefined,
@@ -309,7 +309,7 @@ function setTaskEventId(taskId, eventId) {
   saveDb();
 }
 
-export async function pushTaskToCalendar(userId, task) {
+export async function pushTaskToCalendar(userId, task, clientTimezone) {
   if (!task || !task.scheduled_time || !task.due_date) return;
   const accessToken = await getValidAccessToken(userId);
   if (!accessToken) return;
@@ -317,7 +317,7 @@ export async function pushTaskToCalendar(userId, task) {
 
   try {
     const calendarId = await ensureGtdCalendar(userId, accessToken);
-    const payload = buildEventPayload(task);
+    const payload = buildEventPayload(task, clientTimezone);
     if (!payload) return;
 
     if (task.google_event_id) {
@@ -378,11 +378,11 @@ function clearTaskEventId(taskId) {
 // Push when task has scheduled_time + due_date and isn't completed.
 // Delete when task lost its scheduled_time but still has an event id.
 // Skip on completed tasks (event remains as a time log).
-export async function syncTaskToCalendar(userId, task) {
+export async function syncTaskToCalendar(userId, task, clientTimezone) {
   if (!task) return;
   if (task.list === 'completed') return;
   if (task.scheduled_time && task.due_date) {
-    await pushTaskToCalendar(userId, task);
+    await pushTaskToCalendar(userId, task, clientTimezone);
   } else if (task.google_event_id) {
     await deleteTaskFromCalendar(userId, task.google_event_id);
     clearTaskEventId(task.id);
