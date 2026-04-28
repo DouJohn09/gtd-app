@@ -50,10 +50,17 @@ export default function TaskModal({ task, projects, onClose, onSave }) {
   const [contexts, setContexts] = useState([]);
   const [addingContext, setAddingContext] = useState(false);
   const [newContextName, setNewContextName] = useState('');
+  const [localProjects, setLocalProjects] = useState([]);
+  const [addingProject, setAddingProject] = useState(false);
+  const [newProjectName, setNewProjectName] = useState('');
 
   useEffect(() => {
     api.contexts.getAll().then(setContexts).catch(console.error);
   }, []);
+
+  useEffect(() => {
+    setLocalProjects(projects || []);
+  }, [projects]);
 
   useEffect(() => {
     if (task) {
@@ -94,6 +101,18 @@ export default function TaskModal({ task, projects, onClose, onSave }) {
       setForm({ ...form, context: created.name });
       setNewContextName('');
       setAddingContext(false);
+    } catch (err) { addToast(err.message, 'error'); }
+  };
+
+  const handleAddProject = async () => {
+    const name = newProjectName.trim();
+    if (!name) return;
+    try {
+      const created = await api.projects.create({ name });
+      setLocalProjects([...localProjects, created]);
+      setForm({ ...form, project_id: String(created.id) });
+      setNewProjectName('');
+      setAddingProject(false);
     } catch (err) { addToast(err.message, 'error'); }
   };
 
@@ -276,16 +295,40 @@ export default function TaskModal({ task, projects, onClose, onSave }) {
 
             <div>
               <label className="gtd-label">Project</label>
-              <select
-                value={form.project_id}
-                onChange={(e) => setForm({ ...form, project_id: e.target.value })}
-                className="gtd-input"
-              >
-                <option value="">No project</option>
-                {projects?.map(p => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
-                ))}
-              </select>
+              {addingProject ? (
+                <div className="flex gap-1.5">
+                  <input
+                    type="text"
+                    value={newProjectName}
+                    onChange={(e) => setNewProjectName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') { e.preventDefault(); handleAddProject(); }
+                      if (e.key === 'Escape') setAddingProject(false);
+                    }}
+                    className="gtd-input flex-1"
+                    placeholder="Project name"
+                    autoFocus
+                  />
+                  <button type="button" onClick={handleAddProject} className="gtd-btn gtd-btn-primary px-2">
+                    <Plus className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ) : (
+                <select
+                  value={form.project_id}
+                  onChange={(e) => {
+                    if (e.target.value === '__add_new__') setAddingProject(true);
+                    else setForm({ ...form, project_id: e.target.value });
+                  }}
+                  className="gtd-input"
+                >
+                  <option value="">No project</option>
+                  {localProjects.map(p => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                  <option value="__add_new__">+ Add new project…</option>
+                </select>
+              )}
             </div>
           </div>
 
