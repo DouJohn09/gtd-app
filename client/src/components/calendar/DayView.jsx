@@ -66,13 +66,22 @@ export default function DayView({ date, items, onEditTask, onCompleteTask, onDro
               item.type === 'google_event' ? (
                 <CalendarEventCard key={item.id} event={item} expanded />
               ) : (
-                <TaskCard
+                <div
                   key={item.id}
-                  task={item}
-                  onComplete={onCompleteTask}
-                  onEdit={onEditTask}
-                  showList
-                />
+                  draggable="true"
+                  onDragStart={(e) => {
+                    e.dataTransfer.setData('text/plain', item.id.toString());
+                    e.dataTransfer.effectAllowed = 'move';
+                  }}
+                  style={{ cursor: 'grab' }}
+                >
+                  <TaskCard
+                    task={item}
+                    onComplete={onCompleteTask}
+                    onEdit={onEditTask}
+                    showList
+                  />
+                </div>
               )
             ))}
           </div>
