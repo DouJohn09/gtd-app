@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Inbox, ListTodo, Clock, CloudSun, CheckCircle2, Target, Sparkles,
@@ -7,6 +7,7 @@ import {
 import { api } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import TaskModal from '../components/TaskModal';
+import SortDropdown, { sortTasks } from '../components/SortDropdown';
 import GlassCard from '../components/ui/GlassCard';
 import Chip from '../components/ui/Chip';
 import FreshCheck from '../components/ui/FreshCheck';
@@ -54,6 +55,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [editingTask, setEditingTask] = useState(null);
   const [showModal, setShowModal] = useState(false);
+  const [sortBy, setSortBy] = useState('priority');
   const { user } = useAuth();
 
   const fetchData = async () => {
@@ -92,6 +94,8 @@ export default function Dashboard() {
       setDailyFocus(prev => prev.map(t => t.id === id ? { ...t, completed: false } : t));
     }
   };
+
+  const sortedFocus = useMemo(() => sortTasks(dailyFocus, sortBy), [dailyFocus, sortBy]);
 
   const focusTotal = dailyFocus.length;
   const focusDone = dailyFocus.filter(t => t.completed).length;
@@ -158,9 +162,12 @@ export default function Dashboard() {
                 <MonoLabel className="mb-1.5">today's focus</MonoLabel>
                 <h2 className="font-display text-[28px] leading-none">What matters now</h2>
               </div>
-              <Link to="/ai" className="gtd-btn gtd-btn-primary inline-flex items-center gap-1.5">
-                <Sparkles className="w-3.5 h-3.5" /> AI suggest
-              </Link>
+              <div className="flex items-center gap-2">
+                {focusTotal > 0 && <SortDropdown value={sortBy} onChange={setSortBy} />}
+                <Link to="/ai" className="gtd-btn gtd-btn-primary inline-flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5" /> AI suggest
+                </Link>
+              </div>
             </div>
 
             {focusTotal === 0 ? (
@@ -186,7 +193,7 @@ export default function Dashboard() {
             ) : (
               <>
                 <div className="flex flex-col">
-                  {dailyFocus.map((t, i) => (
+                  {sortedFocus.map((t, i) => (
                     <FocusRow
                       key={t.id}
                       task={t}
