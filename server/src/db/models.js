@@ -272,7 +272,14 @@ export const TaskModel = {
     const base = task.recurrence_type === 'relative'
       ? new Date().toISOString().split('T')[0]
       : (task.due_date || new Date().toISOString().split('T')[0]);
-    return this._advanceDate(base, task);
+    let next = this._advanceDate(base, task);
+    if (task.recurrence_type !== 'relative') {
+      const today = new Date().toISOString().split('T')[0];
+      while (next <= today) {
+        next = this._advanceDate(next, task);
+      }
+    }
+    return next;
   },
 
   _advanceDate(dateStr, task) {
