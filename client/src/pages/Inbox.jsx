@@ -7,6 +7,7 @@ import QuickCapture from '../components/QuickCapture';
 import TaskCard from '../components/TaskCard';
 import TaskModal from '../components/TaskModal';
 import SortDropdown, { sortTasks } from '../components/SortDropdown';
+import FilterDropdown, { useTaskFilters, applyFilters } from '../components/FilterDropdown';
 import MonoLabel from '../components/ui/MonoLabel';
 import GlassCard from '../components/ui/GlassCard';
 
@@ -34,6 +35,8 @@ export default function Inbox() {
   const [showModal, setShowModal] = useState(false);
   const [sortBy, setSortBy] = useState(() => localStorage.getItem('sort_inbox') || 'date_added_newest');
   const [showDeferred, setShowDeferred] = useState(() => localStorage.getItem('deferred_inbox') === 'true');
+  const [filterContext, setFilterContext] = useState('');
+  const [filterProject, setFilterProject] = useState('');
   const { addToast } = useToast();
 
   useEffect(() => { localStorage.setItem('sort_inbox', sortBy); }, [sortBy]);
@@ -73,7 +76,11 @@ export default function Inbox() {
     catch (err) { addToast(err.message, 'error'); }
   };
 
-  const sortedTasks = useMemo(() => sortTasks(tasks, sortBy), [tasks, sortBy]);
+  const { contexts: inboxContexts, projects: inboxProjects } = useTaskFilters(tasks);
+  const sortedTasks = useMemo(
+    () => sortTasks(applyFilters(tasks, { context: filterContext, project: filterProject }), sortBy),
+    [tasks, sortBy, filterContext, filterProject],
+  );
 
   const capturedToday = useMemo(() => tasks.filter(t => isToday(t.created_at)).length, [tasks]);
   const oldestDays = useMemo(() => {
@@ -131,6 +138,8 @@ export default function Inbox() {
                   <CalendarClock className="w-2.5 h-2.5" />
                   Deferred{deferredTasks.length > 0 && showDeferred ? ` (${deferredTasks.length})` : ''}
                 </button>
+                <FilterDropdown label="Context" options={inboxContexts} value={filterContext} onChange={setFilterContext} />
+                <FilterDropdown label="Project" options={inboxProjects} value={filterProject} onChange={setFilterProject} />
                 <SortDropdown value={sortBy} onChange={setSortBy} />
               </div>
             </div>

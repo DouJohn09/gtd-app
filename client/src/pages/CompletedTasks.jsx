@@ -3,6 +3,7 @@ import { CheckCircle2, RotateCcw, Trash2, Check } from 'lucide-react';
 import { api } from '../lib/api';
 import { useToast } from '../components/Toast';
 import SortDropdown, { sortTasks } from '../components/SortDropdown';
+import FilterDropdown, { useTaskFilters, applyFilters } from '../components/FilterDropdown';
 import MonoLabel from '../components/ui/MonoLabel';
 
 function TaskRow({ task, onRestore, onDelete }) {
@@ -48,6 +49,8 @@ export default function CompletedTasks() {
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [sortBy, setSortBy] = useState(() => localStorage.getItem('sort_completed') || 'completed_newest');
+  const [filterContext, setFilterContext] = useState('');
+  const [filterProject, setFilterProject] = useState('');
 
   useEffect(() => { localStorage.setItem('sort_completed', sortBy); }, [sortBy]);
 
@@ -91,7 +94,11 @@ export default function CompletedTasks() {
     return d.toLocaleDateString();
   };
 
-  const sortedTasks = useMemo(() => sortTasks(tasks, sortBy), [tasks, sortBy]);
+  const { contexts: completedContexts, projects: completedProjects } = useTaskFilters(tasks);
+  const sortedTasks = useMemo(
+    () => sortTasks(applyFilters(tasks, { context: filterContext, project: filterProject }), sortBy),
+    [tasks, sortBy, filterContext, filterProject],
+  );
 
   const grouped = sortedTasks.reduce((acc, task) => {
     const date = task.completed_at ? task.completed_at.split('T')[0] : 'Unknown';
@@ -127,7 +134,11 @@ export default function CompletedTasks() {
           </p>
         </div>
         {tasks.length > 0 && (
-          <SortDropdown value={sortBy} onChange={setSortBy} completed />
+          <div className="flex items-center gap-2 flex-wrap">
+            <FilterDropdown label="Context" options={completedContexts} value={filterContext} onChange={setFilterContext} />
+            <FilterDropdown label="Project" options={completedProjects} value={filterProject} onChange={setFilterProject} />
+            <SortDropdown value={sortBy} onChange={setSortBy} completed />
+          </div>
         )}
       </div>
 

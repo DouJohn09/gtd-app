@@ -8,6 +8,7 @@ import { api } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import TaskModal from '../components/TaskModal';
 import SortDropdown, { sortTasks } from '../components/SortDropdown';
+import FilterDropdown, { useTaskFilters, applyFilters } from '../components/FilterDropdown';
 import GlassCard from '../components/ui/GlassCard';
 import Chip from '../components/ui/Chip';
 import FreshCheck from '../components/ui/FreshCheck';
@@ -56,6 +57,8 @@ export default function Dashboard() {
   const [editingTask, setEditingTask] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [sortBy, setSortBy] = useState('priority');
+  const [filterContext, setFilterContext] = useState('');
+  const [filterProject, setFilterProject] = useState('');
   const { user } = useAuth();
 
   const fetchData = async () => {
@@ -95,7 +98,11 @@ export default function Dashboard() {
     }
   };
 
-  const sortedFocus = useMemo(() => sortTasks(dailyFocus, sortBy), [dailyFocus, sortBy]);
+  const { contexts: focusContexts, projects: focusProjects } = useTaskFilters(dailyFocus);
+  const sortedFocus = useMemo(
+    () => sortTasks(applyFilters(dailyFocus, { context: filterContext, project: filterProject }), sortBy),
+    [dailyFocus, sortBy, filterContext, filterProject],
+  );
 
   const focusTotal = dailyFocus.length;
   const focusDone = dailyFocus.filter(t => t.completed).length;
@@ -162,8 +169,14 @@ export default function Dashboard() {
                 <MonoLabel className="mb-1.5">today's focus</MonoLabel>
                 <h2 className="font-display text-[28px] leading-none">What matters now</h2>
               </div>
-              <div className="flex items-center gap-2">
-                {focusTotal > 0 && <SortDropdown value={sortBy} onChange={setSortBy} />}
+              <div className="flex items-center gap-2 flex-wrap justify-end">
+                {focusTotal > 0 && (
+                  <>
+                    <FilterDropdown label="Context" options={focusContexts} value={filterContext} onChange={setFilterContext} />
+                    <FilterDropdown label="Project" options={focusProjects} value={filterProject} onChange={setFilterProject} />
+                    <SortDropdown value={sortBy} onChange={setSortBy} />
+                  </>
+                )}
                 <Link to="/ai" className="gtd-btn gtd-btn-primary inline-flex items-center gap-1.5">
                   <Sparkles className="w-3.5 h-3.5" /> AI suggest
                 </Link>

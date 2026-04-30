@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { Calendar, X } from 'lucide-react';
 import CalendarTaskCard from '../CalendarTaskCard';
+import FilterDropdown, { useTaskFilters, applyFilters } from '../FilterDropdown';
 
 const LIST_FILTERS = [
   { value: '',              label: 'all'      },
@@ -19,11 +20,16 @@ const TONE_BY_FILTER = {
 
 export default function UnscheduledSidebar({ tasks, onEditTask, onCompleteTask, isOpen, onToggle }) {
   const [filter, setFilter] = useState('');
+  const [filterContext, setFilterContext] = useState('');
+  const [filterProject, setFilterProject] = useState('');
+
+  const { contexts: sidebarContexts, projects: sidebarProjects } = useTaskFilters(tasks);
 
   const filteredTasks = useMemo(() => {
-    if (!filter) return tasks;
-    return tasks.filter(t => t.list === filter);
-  }, [tasks, filter]);
+    let result = tasks;
+    if (filter) result = result.filter(t => t.list === filter);
+    return applyFilters(result, { context: filterContext, project: filterProject });
+  }, [tasks, filter, filterContext, filterProject]);
 
   const sidebar = (
     <div className="flex flex-col h-full">
@@ -66,6 +72,11 @@ export default function UnscheduledSidebar({ tasks, onEditTask, onCompleteTask, 
             </button>
           );
         })}
+      </div>
+
+      <div className="flex flex-wrap gap-1.5 mb-3">
+        <FilterDropdown label="Context" options={sidebarContexts} value={filterContext} onChange={setFilterContext} />
+        <FilterDropdown label="Project" options={sidebarProjects} value={filterProject} onChange={setFilterProject} />
       </div>
 
       <div className="flex-1 overflow-y-auto space-y-1 -mx-1 px-1">

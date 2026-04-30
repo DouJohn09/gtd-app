@@ -6,6 +6,7 @@ import { useToast } from '../components/Toast';
 import TaskCard from '../components/TaskCard';
 import TaskModal from '../components/TaskModal';
 import SortDropdown, { sortTasks } from '../components/SortDropdown';
+import FilterDropdown, { useTaskFilters, applyFilters } from '../components/FilterDropdown';
 import MonoLabel from '../components/ui/MonoLabel';
 
 const LIST_CONFIG = {
@@ -52,9 +53,11 @@ export default function Lists() {
   const [showModal, setShowModal] = useState(false);
   const [sortBy, setSortBy] = useState(() => localStorage.getItem(`sort_list_${list}`) || 'priority');
   const [showDeferred, setShowDeferred] = useState(() => localStorage.getItem(`deferred_list_${list}`) === 'true');
+  const [filterContext, setFilterContext] = useState('');
+  const [filterProject, setFilterProject] = useState('');
   const { addToast } = useToast();
 
-  useEffect(() => { setSortBy(localStorage.getItem(`sort_list_${list}`) || 'priority'); }, [list]);
+  useEffect(() => { setSortBy(localStorage.getItem(`sort_list_${list}`) || 'priority'); setFilterContext(''); setFilterProject(''); }, [list]);
   useEffect(() => { localStorage.setItem(`sort_list_${list}`, sortBy); }, [sortBy, list]);
   useEffect(() => { setShowDeferred(localStorage.getItem(`deferred_list_${list}`) === 'true'); }, [list]);
   useEffect(() => { localStorage.setItem(`deferred_list_${list}`, showDeferred); }, [showDeferred, list]);
@@ -96,7 +99,11 @@ export default function Lists() {
   };
   const handleEdit = (task) => { setEditingTask(task); setShowModal(true); };
 
-  const sortedTasks = useMemo(() => sortTasks(tasks, sortBy), [tasks, sortBy]);
+  const { contexts: listContexts, projects: listProjects } = useTaskFilters(tasks);
+  const sortedTasks = useMemo(
+    () => sortTasks(applyFilters(tasks, { context: filterContext, project: filterProject }), sortBy),
+    [tasks, sortBy, filterContext, filterProject],
+  );
 
   const groupedByContext =
     list === 'next_actions' && sortBy === 'priority'
@@ -111,18 +118,26 @@ export default function Lists() {
   return (
     <div className="px-6 lg:px-12 pt-10 pb-20 max-w-5xl">
       {/* Header */}
-      <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4 mb-8">
-        <div>
-          <MonoLabel tone={tone} className="mb-3">{config.eyebrow}</MonoLabel>
-          <h1 className="font-display text-[52px] md:text-[60px] leading-[1] tracking-tight">
-            {config.title}
-            <span className="font-mono text-[14px] tracking-wider text-text-3 ml-3 align-middle">
-              {tasks.length.toString().padStart(2, '0')}
-            </span>
-          </h1>
-          <p className="font-display italic text-[18px] text-text-2 mt-2">
-            {config.tagline}
-          </p>
+      <div className="mb-8">
+        <div className="flex items-end justify-between gap-4 mb-2">
+          <div>
+            <MonoLabel tone={tone} className="mb-3">{config.eyebrow}</MonoLabel>
+            <h1 className="font-display text-[46px] md:text-[56px] leading-[1] tracking-tight">
+              {config.title}
+              <span className="font-mono text-[14px] tracking-wider text-text-3 ml-3 align-middle">
+                {tasks.length.toString().padStart(2, '0')}
+              </span>
+            </h1>
+            <p className="font-display italic text-[18px] text-text-2 mt-2">
+              {config.tagline}
+            </p>
+          </div>
+          <button
+            onClick={() => { setEditingTask({ list }); setShowModal(true); }}
+            className="gtd-btn gtd-btn-primary inline-flex items-center gap-1.5 text-[12.5px] flex-shrink-0"
+          >
+            <Plus className="w-3.5 h-3.5" /> Add
+          </button>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <button
@@ -137,13 +152,9 @@ export default function Lists() {
             <CalendarClock className="w-3 h-3" />
             Deferred{deferredTasks.length > 0 && showDeferred ? ` (${deferredTasks.length})` : ''}
           </button>
+          <FilterDropdown label="Context" options={listContexts} value={filterContext} onChange={setFilterContext} />
+          <FilterDropdown label="Project" options={listProjects} value={filterProject} onChange={setFilterProject} />
           <SortDropdown value={sortBy} onChange={setSortBy} />
-          <button
-            onClick={() => { setEditingTask({ list }); setShowModal(true); }}
-            className="gtd-btn gtd-btn-primary inline-flex items-center gap-1.5 text-[12.5px]"
-          >
-            <Plus className="w-3.5 h-3.5" /> Add
-          </button>
         </div>
       </div>
 
