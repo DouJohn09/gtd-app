@@ -137,6 +137,7 @@ gtd-app/
 - **Recurring tasks** — Daily, weekdays, weekly, monthly, yearly, custom (specific days + interval). Absolute (advance from due date) or relative (advance from completion date) recurrence. On completion, creates a completed snapshot for history and advances the original task's dates.
 - **Start/defer dates** — Tasks with a future `start_date` are hidden from active lists (Next Actions, Waiting For, etc.) until the start date arrives. Deferred toggle chip on each list view reveals hidden tasks at reduced opacity for quick editing.
 - **Clickable URL previews** — URLs in task notes render as interactive hostname badges in TaskCard and TaskModal
+- **Inline project creation from the task modal** — the project select has an "+ Add new project…" entry that swaps in a small input; mirrors the existing inline context-add and works in every modal callsite (Lists, Calendar, Dashboard, Inbox, Projects)
 
 ### AI Features (OpenAI)
 - **Smart Capture** (GPT-4o-mini) — Real-time AI on every Quick Capture: auto-categorizes list, context, priority, energy, time estimate; extracts due dates and start dates from natural language ("call mom tomorrow", "starting next week"); detects waiting-for patterns; sets daily focus for urgent/today tasks only; auto-matches tasks to existing projects by name/topic; detects personal vs work tasks for context assignment (@work, @home, @phone, etc.); detects recurrence patterns ("every Monday", "daily"). Toggle on/off with sparkle icon.
@@ -149,8 +150,8 @@ gtd-app/
 ### Calendar
 - **Calendar view** — Month/week/day grids with tasks by due date and start date, unscheduled sidebar, drag-and-drop scheduling
 - **Google Calendar sync** — Opt-in OAuth connection, reads events and displays alongside tasks with violet styling, click to open in Google Calendar. Timed events render in the hour grid at their actual start; all-day events live in the all-day strip
-- **Time blocking** — Tasks can hold `scheduled_time` (HH:MM) + `duration` (minutes). Drag tasks onto specific time slots in Day/Week views; blocks snap to 15-min increments and resize via the bottom edge
-- **Push to Google Calendar** — When a task has a scheduled time, it's pushed (one-way) to a dedicated "GTD Flow" calendar so the user's primary calendar stays untouched. Requires the calendar-write OAuth scope; a banner prompts re-consent for users who connected before that scope existed
+- **Time blocking** — Tasks can hold `scheduled_time` (HH:MM) + `duration` (minutes). Drag tasks onto specific time slots in Day/Week views; blocks snap to 15-min increments and resize via the bottom edge. In Day view, tasks already in the all-day strip (due today, no scheduled time yet) are also draggable directly onto the hour grid
+- **Push to Google Calendar** — When a task has a scheduled time, it's pushed (one-way) to a dedicated "GTD Flow" calendar so the user's primary calendar stays untouched. Requires the calendar-write OAuth scope; a banner prompts re-consent for users who connected before that scope existed. The browser's IANA timezone is forwarded on every API call via an `X-Client-Timezone` header and used as the event's `timeZone`, so naive HH:MM scheduled times stay anchored to the user's local time regardless of the server's TZ
 - **AI-assisted scheduling (MVP)** — Smart Capture detects free-slot intent ("find me 30 min tomorrow afternoon"), reads tasks + Google events for the target day inside hardcoded working hours (9-18 weekdays, 10-16 weekends), and auto-books the first open window. Fallback toast if no slot fits
 - **Overlap layout** — Concurrent blocks at the same hour cluster transitively and render as side-by-side columns sized by `1 / cluster max-concurrent`. Non-overlapping blocks keep full width
 
@@ -467,6 +468,9 @@ Lifetime deals generate upfront cash and launch communities love them. Things 3 
 29. JSON + CSV import with two-step preview/commit, project/habit name merging, missing-LIST → Inbox fallback
 30. Calendar bugfix: timed Google Calendar events now render in the hour grid instead of the all-day strip
 31. Calendar overlap layout: concurrent blocks cluster transitively and render side-by-side
+32. Calendar bugfix: Google Calendar push now uses the browser's IANA timezone (forwarded via X-Client-Timezone header) instead of the server's TZ — events created at 2pm Prague no longer land at 4pm on Google
+33. Day view UX: all-day strip tasks are draggable onto the time grid (previously only the right-side Unscheduled sidebar supported this)
+34. Inline project creation from the task modal — "+ Add new project…" option mirrors the existing context-add pattern
 
 ---
 
