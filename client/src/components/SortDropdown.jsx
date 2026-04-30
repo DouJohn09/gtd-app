@@ -1,4 +1,5 @@
-import { ArrowUpDown } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
+import { ArrowUpDown, Check } from 'lucide-react';
 
 const SORT_OPTIONS = [
   { value: 'priority',           label: 'Priority' },
@@ -66,22 +67,77 @@ export function sortTasks(tasks, sortBy) {
 
 export default function SortDropdown({ value, onChange, completed = false }) {
   const options = completed ? COMPLETED_SORT_OPTIONS : SORT_OPTIONS;
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handleClick = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    };
+    const handleKey = (e) => {
+      if (e.key === 'Escape') setOpen(false);
+    };
+    document.addEventListener('mousedown', handleClick);
+    document.addEventListener('keydown', handleKey);
+    return () => {
+      document.removeEventListener('mousedown', handleClick);
+      document.removeEventListener('keydown', handleKey);
+    };
+  }, [open]);
+
+  const current = options.find(o => o.value === value);
 
   return (
-    <div className="inline-flex items-center gap-1.5 rounded-xl glass px-2 py-1">
-      <ArrowUpDown className="w-3.5 h-3.5 text-text-3" />
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="font-mono text-[11px] uppercase tracking-wider bg-transparent text-text-2 outline-none cursor-pointer pr-1"
-        style={{ WebkitAppearance: 'none', MozAppearance: 'none', appearance: 'none' }}
+    <div className="relative" ref={ref}>
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="inline-flex items-center gap-1.5 rounded-xl glass px-2.5 py-1.5 transition-colors hover:bg-white/[0.06]"
       >
-        {options.map(opt => (
-          <option key={opt.value} value={opt.value} className="bg-bg text-text-1 normal-case tracking-normal font-sans">
-            {opt.label}
-          </option>
-        ))}
-      </select>
+        <ArrowUpDown className="w-3.5 h-3.5 text-text-3" />
+        <span className="font-mono text-[11px] uppercase tracking-wider text-text-2">
+          {current?.label || 'Sort'}
+        </span>
+      </button>
+
+      {open && (
+        <div
+          className="absolute right-0 top-full mt-1.5 z-50 min-w-[200px] rounded-xl overflow-hidden"
+          style={{
+            background: 'rgba(18, 18, 28, 0.92)',
+            backdropFilter: 'blur(20px)',
+            boxShadow: '0 16px 48px -8px rgba(0,0,0,0.6), inset 0 0 0 1px rgba(255,255,255,0.08)',
+          }}
+        >
+          <div className="py-1.5">
+            {options.map(opt => {
+              const active = opt.value === value;
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => { onChange(opt.value); setOpen(false); }}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 text-left transition-colors hover:bg-white/[0.06]"
+                >
+                  <span
+                    className="w-3.5 h-3.5 flex-shrink-0 grid place-items-center"
+                    style={{ color: active ? 'rgb(var(--violet-glow))' : 'transparent' }}
+                  >
+                    {active && <Check className="w-3.5 h-3.5" strokeWidth={2.5} />}
+                  </span>
+                  <span
+                    className="font-mono text-[11px] tracking-wide"
+                    style={{ color: active ? 'rgb(var(--violet-glow))' : 'rgb(var(--text-2))' }}
+                  >
+                    {opt.label}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
