@@ -2,6 +2,9 @@ import { useState, useEffect } from 'react';
 import { X, AlertCircle, Plus, Sparkles, ExternalLink, Repeat } from 'lucide-react';
 import { api } from '../lib/api';
 import { useToast } from './Toast';
+import GlassSelect from './ui/GlassSelect';
+import DatePicker from './ui/DatePicker';
+import TimePicker from './ui/TimePicker';
 
 const LISTS = [
   { value: 'inbox',         label: 'Inbox',         tone: 'amber'  },
@@ -86,9 +89,10 @@ export default function TaskModal({ task, projects, onClose, onSave }) {
     }
   }, [task]);
 
-  // Esc to close
   useEffect(() => {
-    const handler = (e) => { if (e.key === 'Escape') onClose(); };
+    const handler = (e) => {
+      if (e.key === 'Escape' && !e.defaultPrevented) onClose();
+    };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [onClose]);
@@ -162,7 +166,7 @@ export default function TaskModal({ task, projects, onClose, onSave }) {
       onClick={onClose}
     >
       <div
-        className="relative w-full max-w-lg my-6 rounded-2xl glass overflow-hidden"
+        className="relative w-full max-w-lg my-6 rounded-2xl glass"
         onClick={e => e.stopPropagation()}
         style={{ boxShadow: '0 24px 64px -16px rgba(0,0,0,0.55), inset 0 1px 0 rgb(255 255 255 / 0.06), inset 0 0 0 1px rgb(var(--violet) / 0.16)' }}
       >
@@ -276,20 +280,17 @@ export default function TaskModal({ task, projects, onClose, onSave }) {
                   </button>
                 </div>
               ) : (
-                <select
+                <GlassSelect
                   value={form.context}
-                  onChange={(e) => {
-                    if (e.target.value === '__add_new__') setAddingContext(true);
-                    else setForm({ ...form, context: e.target.value });
-                  }}
-                  className="gtd-input"
-                >
-                  <option value="">No context</option>
-                  {contexts.map(c => (
-                    <option key={c.id} value={c.name}>{c.name}</option>
-                  ))}
-                  <option value="__add_new__">+ Add new context…</option>
-                </select>
+                  onChange={(v) => setForm({ ...form, context: v })}
+                  options={[
+                    { value: '', label: 'No context' },
+                    ...contexts.map(c => ({ value: c.name, label: c.name })),
+                  ]}
+                  placeholder="No context"
+                  onAdd={() => setAddingContext(true)}
+                  addLabel="Add new context…"
+                />
               )}
             </div>
 
@@ -314,20 +315,17 @@ export default function TaskModal({ task, projects, onClose, onSave }) {
                   </button>
                 </div>
               ) : (
-                <select
+                <GlassSelect
                   value={form.project_id}
-                  onChange={(e) => {
-                    if (e.target.value === '__add_new__') setAddingProject(true);
-                    else setForm({ ...form, project_id: e.target.value });
-                  }}
-                  className="gtd-input"
-                >
-                  <option value="">No project</option>
-                  {localProjects.map(p => (
-                    <option key={p.id} value={p.id}>{p.name}</option>
-                  ))}
-                  <option value="__add_new__">+ Add new project…</option>
-                </select>
+                  onChange={(v) => setForm({ ...form, project_id: v })}
+                  options={[
+                    { value: '', label: 'No project' },
+                    ...localProjects.map(p => ({ value: String(p.id), label: p.name })),
+                  ]}
+                  placeholder="No project"
+                  onAdd={() => setAddingProject(true)}
+                  addLabel="Add new project…"
+                />
               )}
             </div>
           </div>
@@ -403,20 +401,18 @@ export default function TaskModal({ task, projects, onClose, onSave }) {
             </div>
             <div>
               <label className="gtd-label">Start Date</label>
-              <input
-                type="date"
+              <DatePicker
                 value={form.start_date}
-                onChange={(e) => setForm({ ...form, start_date: e.target.value })}
-                className="gtd-input"
+                onChange={(v) => setForm({ ...form, start_date: v })}
+                placeholder="No start"
               />
             </div>
             <div>
               <label className="gtd-label">Due Date</label>
-              <input
-                type="date"
+              <DatePicker
                 value={form.due_date}
-                onChange={(e) => setForm({ ...form, due_date: e.target.value })}
-                className="gtd-input"
+                onChange={(v) => setForm({ ...form, due_date: v })}
+                placeholder="No due date"
               />
             </div>
           </div>
@@ -425,11 +421,10 @@ export default function TaskModal({ task, projects, onClose, onSave }) {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="gtd-label">Scheduled Time</label>
-              <input
-                type="time"
+              <TimePicker
                 value={form.scheduled_time}
-                onChange={(e) => setForm({ ...form, scheduled_time: e.target.value })}
-                className="gtd-input"
+                onChange={(v) => setForm({ ...form, scheduled_time: v })}
+                placeholder="No time"
               />
               <p className="font-mono text-[10px] text-text-3 mt-1">
                 {form.scheduled_time ? 'shown as a time block on the calendar' : 'leave empty for all-day'}
@@ -454,15 +449,13 @@ export default function TaskModal({ task, projects, onClose, onSave }) {
           <div>
             <label className="gtd-label">Repeat</label>
             <div className="flex flex-wrap items-center gap-2">
-              <select
+              <GlassSelect
                 value={form.recurrence_rule}
-                onChange={(e) => setForm({ ...form, recurrence_rule: e.target.value })}
-                className="gtd-input w-auto"
-              >
-                {RECURRENCE_RULES.map(r => (
-                  <option key={r.value} value={r.value}>{r.label}</option>
-                ))}
-              </select>
+                onChange={(v) => setForm({ ...form, recurrence_rule: v })}
+                options={RECURRENCE_RULES.map(r => ({ value: r.value, label: r.label }))}
+                placeholder="No repeat"
+                className="w-auto min-w-[140px]"
+              />
               {form.recurrence_rule === 'custom' && (
                 <>
                   <span className="font-mono text-[11px] text-text-3">every</span>
