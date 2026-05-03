@@ -67,106 +67,106 @@
 #### 1. Calendar Integration & Time Blocking
 The single most requested feature across the ecosystem. Users overwhelmingly want to see tasks and calendar events on the same screen, drag tasks into time slots, and time-block their day without switching apps. Todoist called their calendar view "maybe the most requested piece of the calendar puzzle so far." Apps without this are increasingly seen as incomplete.
 
-**GTD Flow status:** Partial (Phase 1-2 complete: calendar view with month/week/day + Google Calendar sync. Phase 3-4 time blocking not yet implemented)
+**Cleartable status:** Partial (Phase 1-2 complete: calendar view with month/week/day + Google Calendar sync. Phase 3-4 time blocking not yet implemented)
 
 #### 2. Start Dates / Defer Dates
 One of the most persistent feature gaps across major apps. Users want to set a date when a task becomes relevant (not just when it's due), and have it hidden until that start date arrives. OmniFocus has had this for years ("defer dates"). Todoist only partially addressed it with their 2025 "Deadlines" feature. True start dates that hide tasks remain one of the most persistent requests.
 
-**GTD Flow status:** ✅ Implemented (tasks hidden from active lists until start_date, deferred toggle chip on each list view to reveal/edit)
+**Cleartable status:** ✅ Implemented (tasks hidden from active lists until start_date, deferred toggle chip on each list view to reveal/edit)
 
 #### 3. Natural Language Input for Task Capture
 Users expect to type "call John next Monday at 2pm p1" and have the app parse the task, date, time, and priority automatically. This is cited as the #1 thing users miss when switching away from Todoist. Speed of task capture directly correlates with whether people actually use the app consistently.
 
-**GTD Flow status:** Implemented (Smart Capture with GPT-4o-mini — parses dates, contexts, priority, energy, project matching, personal/work detection)
+**Cleartable status:** Implemented (Smart Capture with GPT-4o-mini — parses dates, contexts, priority, energy, project matching, personal/work detection)
 
 #### 4. Cross-Platform Sync & Availability
 Tasks must follow users across iPhone, Android, Mac, Windows, web, and ideally watch/tablet. Sync must be fast and reliable. Apps that are platform-exclusive (Things = Apple only, OmniFocus = Apple only) lose large user segments. This is among the top deal-breakers.
 
-**GTD Flow status:** Partial (web-only currently)
+**Cleartable status:** Partial (web-only currently)
 
 #### 5. Task Dependencies & Sequential Projects
 The ability to mark that Task B cannot begin until Task A is completed. This is standard in project management tools (ClickUp, Asana) but missing from most personal task managers. Users managing multi-step projects consistently request this.
 
-**GTD Flow status:** Partial (sequential projects exist, but no cross-project dependencies)
+**Cleartable status:** Partial (sequential projects exist, but no cross-project dependencies)
 
 #### 6. Quick Capture / Frictionless Task Entry
 The app must make adding a task nearly instantaneous — keyboard shortcuts, natural language processing, voice input, share-sheet integration, global hotkeys. Speed of capture is the single biggest predictor of sustained app usage.
 
-**GTD Flow status:** Partial (Quick Capture exists but web-only)
+**Cleartable status:** Partial (Quick Capture exists but web-only)
 
 ### Tier 2 — High-Demand Differentiators
 
 #### 7. Built-in Habit Tracking
 Users want habit tracking alongside their task lists rather than in a separate app. TickTick is the only major todo app with robust built-in habit tracking. Consistently cited as why users choose TickTick over Todoist.
 
-**GTD Flow status:** Implemented
+**Cleartable status:** Implemented
 
 #### 8. Weekly Review Workflow
 The weekly review is "where GTD lives or dies." OmniFocus is the only major app that bakes this into the interface. Users of other apps consistently request structured review modes that walk them through stale projects, overdue items, and inbox processing.
 
-**GTD Flow status:** Implemented (4-step wizard with AI insights — only OmniFocus also has this)
+**Cleartable status:** Implemented (4-step wizard with AI insights — only OmniFocus also has this)
 
 #### 9. AI-Powered Scheduling & Prioritization
 Auto-scheduling tasks based on priorities, deadlines, capacity, and calendar availability. Motion pioneered this. However, users are skeptical of AI that adds complexity — they want AI that "reduces friction, not reinvents processes." This is divisive: many power users see AI task breakdown as "a way to procrastinate."
 
-**GTD Flow status:** Partial (Daily Focus AI exists, no auto-scheduling into calendar)
+**Cleartable status:** Partial (Daily Focus AI exists, no auto-scheduling into calendar)
 
 #### 10. Built-in Pomodoro / Focus Timer
 TickTick's Pomodoro timer is described as "oddly effective — like tricking your brain into beginning." Users want focus tools integrated into their task manager, not as a separate app.
 
-**GTD Flow status:** Not implemented
+**Cleartable status:** Not implemented
 
 #### 11. Offline Support & Local-First Data
 Growing frustration with cloud-only apps that fail without internet. Privacy concerns drive demand for local storage, self-hosting, and no telemetry. 7% of analyzed Reddit posts specifically requested offline-first tools. 90% of new apps are projected to incorporate on-device AI by 2026.
 
-**GTD Flow status:** Not implemented
+**Cleartable status:** Not implemented
 
 #### 12. Custom Views / Saved Filters / Perspectives
 Power users want saved views combining multiple criteria (labels, priorities, dates, projects, contexts). OmniFocus perspectives are a "killer feature for power users." Todoist filters partially address this but are more limited.
 
-**GTD Flow status:** Not implemented
+**Cleartable status:** Not implemented
 
 #### 13. Collaboration & Shared Lists
 Share projects/lists, assign tasks, communicate within the app. Things 3 and OmniFocus have zero collaboration — a deal-breaker for teams/couples/families. Shared grocery lists and household chores are a massive use case.
 
-**GTD Flow status:** Not implemented (in backlog)
+**Cleartable status:** Not implemented (in backlog)
 
 #### 14. Recurring Task Flexibility
 Advanced recurrence beyond "every Monday" — "every 3rd weekday," "2 days after completion," preset options. Users want both "absolute" recurrence (same date regardless) and "relative" recurrence (based on completion date).
 
-**GTD Flow status:** ✅ Implemented (daily/weekdays/weekly/monthly/yearly/custom with specific days + interval, absolute and relative recurrence types. On completion, creates completed snapshot and advances original task's dates)
+**Cleartable status:** ✅ Implemented (daily/weekdays/weekly/monthly/yearly/custom with specific days + interval, absolute and relative recurrence types. On completion, creates completed snapshot and advances original task's dates)
 
 ### Tier 3 — Growing Demand / Emerging Trends
 
 #### 15. Integrated Notes & Journaling
 Users want rich notes, daily journaling, and reference material alongside tasks. NotePlan, Amplenote, and Notion are praised for this. Todoist and TickTick have limited note-taking.
 
-**GTD Flow status:** Not implemented
+**Cleartable status:** Not implemented
 
 #### 16. Gamification, Streaks & Rewards
 Streaks, XP points, avatar progression, accountability mechanisms. Habitica pioneered full RPG mechanics. Users with ADHD especially value dopamine-driven feedback loops. Poorly designed gamification can backfire.
 
-**GTD Flow status:** Partial (habit streaks exist, no task gamification)
+**Cleartable status:** Partial (habit streaks exist, no task gamification)
 
 #### 17. Energy/Capacity-Aware Scheduling
 Scheduling tasks based on energy levels and cognitive capacity. Integration with wearables for biometric data. Described as "table stakes for serious productivity tools by 2026."
 
-**GTD Flow status:** Partial (energy levels exist on tasks, not used for scheduling)
+**Cleartable status:** Partial (energy levels exist on tasks, not used for scheduling)
 
 #### 18. ADHD-Friendly / Neurodiversity Design
 Features addressing time blindness, task initiation difficulty, executive function challenges. Visual timers, task-as-playlist formats, adjustable task breakdown, low-overwhelm interfaces. Amazing Marvin is consistently called "the best todo app for ADHD." The r/ADHD community is one of the richest sources for product ideas.
 
-**GTD Flow status:** Not specifically addressed
+**Cleartable status:** Not specifically addressed
 
 #### 19. Productivity Analytics & Insights
 Completion rates over time, project velocity, what days/times users are most productive, historical trends. Most todo apps provide minimal analytics. Users feel "every task assigned a duration and completed should be tracked."
 
-**GTD Flow status:** Partial (weekly review stats, no detailed analytics dashboard)
+**Cleartable status:** Partial (weekly review stats, no detailed analytics dashboard)
 
 #### 20. Voice-First Task Capture
 Speech as primary interaction. Todoist's "Ramble" (Jan 2026) turns unstructured speech into organized tasks. Users want this for driving, exercising, and accessibility.
 
-**GTD Flow status:** Not implemented
+**Cleartable status:** Not implemented
 
 ---
 
@@ -210,7 +210,7 @@ Speech as primary interaction. Todoist's "Ramble" (Jan 2026) turns unstructured 
 
 ---
 
-## Part 5: GTD Flow Competitive Position
+## Part 5: Cleartable Competitive Position
 
 ### Already Strong (validated differentiators)
 - **AI-powered features** — Most competitors don't have this. Inbox processing, duplicate detection, daily focus, and weekly review AI are exactly what users ask for.

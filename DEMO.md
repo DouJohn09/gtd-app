@@ -1,4 +1,4 @@
-# GTD Flow — 90-Second Demo Storyboard
+# Cleartable — 90-Second Demo Storyboard
 
 Target length: **75-90s**. One unbroken screen recording, voiceover added in post.
 Resolution: 1920×1080. Browser zoom 110% so text reads on small embeds.
@@ -28,7 +28,7 @@ Open the app, press **Cmd-R**, then start recording at the **Today** screen.
 
 ### Shot 1 — Hook (0:00-0:08)
 **Screen:** Today view, full of tasks. Cursor hovers the capture bar.
-**Voiceover:** *"Most task apps store your tasks. GTD Flow processes them."*
+**Voiceover:** *"Most task apps store your tasks. Cleartable processes them."*
 
 ### Shot 2 — Smart Capture with auto-scheduling (0:08-0:25)
 **Action:** Type into capture: `find me 30 min tomorrow afternoon to review the quarterly report`
@@ -50,14 +50,14 @@ Open the app, press **Cmd-R**, then start recording at the **Today** screen.
 **Voiceover:** *"Sunday review takes five minutes. Stale tasks surface, stuck projects get flagged, and the AI proposes follow-ups."*
 
 ### Shot 6 — Close (1:20-1:30)
-**Screen:** Logo + URL: `gtdflow.app`
-**Voiceover:** *"GTD Flow. Free to start. gtdflow.app."*
+**Screen:** Logo + URL: `cleartable.app`
+**Voiceover:** *"Cleartable. Clear your table. Clear your mind. cleartable.app."*
 
 ---
 
 ## Voiceover script (paste into Loom/ScreenStudio)
 
-> Most task apps store your tasks. GTD Flow processes them.
+> Most task apps store your tasks. Cleartable processes them.
 >
 > Type naturally. AI reads the date, the duration, and finds an open slot in your calendar.
 >
@@ -67,7 +67,7 @@ Open the app, press **Cmd-R**, then start recording at the **Today** screen.
 >
 > Sunday review takes five minutes. Stale tasks surface, stuck projects get flagged, and the AI proposes follow-ups.
 >
-> GTD Flow. Free to start. gtdflow.app.
+> Cleartable. Clear your table. Clear your mind. cleartable.app.
 
 ---
 

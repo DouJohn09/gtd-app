@@ -1,10 +1,12 @@
-# GTD Flow — Project Knowledge
+# Cleartable — Project Knowledge
 
 ## Overview
-GTD Flow is a productivity app implementing the Getting Things Done (GTD) methodology by David Allen. It features AI-powered task management, habit tracking, and a modern responsive UI with dark mode.
+Cleartable is a productivity app inspired by the Getting Things Done (GTD) methodology by David Allen. It features AI-powered task management, habit tracking, and a modern responsive UI with dark mode. Brand positioning: "the calm GTD app" — opinionated, anti-anxiety, AI-assisted task processing.
 
+**Domain:** cleartable.app (registered 2026)
 **Deployed on:** Railway (auto-deploy from GitHub `main` branch)
-**Repository:** https://github.com/DouJohn09/gtd-app
+**Repository:** https://github.com/DouJohn09/gtd-app (folder name retained as `gtd-app`; product name is Cleartable)
+**Trademark note:** Inspired by Getting Things Done® (a registered trademark of the David Allen Company). Cleartable is not affiliated with or endorsed by DAC. The name "GTD" is used only descriptively, never as a brand element.
 
 ---
 
@@ -151,7 +153,7 @@ gtd-app/
 - **Calendar view** — Month/week/day grids with tasks by due date and start date, unscheduled sidebar, drag-and-drop scheduling
 - **Google Calendar sync** — Opt-in OAuth connection, reads events and displays alongside tasks with violet styling, click to open in Google Calendar. Timed events render in the hour grid at their actual start; all-day events live in the all-day strip
 - **Time blocking** — Tasks can hold `scheduled_time` (HH:MM) + `duration` (minutes). Drag tasks onto specific time slots in Day/Week views; blocks snap to 15-min increments and resize via the bottom edge. In Day view, tasks already in the all-day strip (due today, no scheduled time yet) are also draggable directly onto the hour grid
-- **Push to Google Calendar** — When a task has a scheduled time, it's pushed (one-way) to a dedicated "GTD Flow" calendar so the user's primary calendar stays untouched. Requires the calendar-write OAuth scope; a banner prompts re-consent for users who connected before that scope existed. The browser's IANA timezone is forwarded on every API call via an `X-Client-Timezone` header and used as the event's `timeZone`, so naive HH:MM scheduled times stay anchored to the user's local time regardless of the server's TZ
+- **Push to Google Calendar** — When a task has a scheduled time, it's pushed (one-way) to a dedicated "Cleartable" calendar so the user's primary calendar stays untouched. Requires the calendar-write OAuth scope; a banner prompts re-consent for users who connected before that scope existed. The browser's IANA timezone is forwarded on every API call via an `X-Client-Timezone` header and used as the event's `timeZone`, so naive HH:MM scheduled times stay anchored to the user's local time regardless of the server's TZ
 - **AI-assisted scheduling (MVP)** — Smart Capture detects free-slot intent ("find me 30 min tomorrow afternoon"), reads tasks + Google events for the target day inside hardcoded working hours (9-18 weekdays, 10-16 weekends), and auto-books the first open window. Fallback toast if no slot fits
 - **Overlap layout** — Concurrent blocks at the same hour cluster transitively and render as side-by-side columns sized by `1 / cluster max-concurrent`. Non-overlapping blocks keep full width
 
@@ -159,7 +161,7 @@ gtd-app/
 - **Auto-surface due-today and overdue tasks** — The Today list isn't just `is_daily_focus = 1` anymore. It also picks up anything `due_date <= today` (excluding `someday_maybe`, respecting `start_date`). Matches Things/Todoist behavior so a task created with `due_date = tomorrow` shows up automatically when tomorrow arrives
 
 ### Data export & import
-- **Export** — Settings → Data offers JSON (full backup of tasks, projects, contexts, habits, habit_logs) and CSV (Todoist-compatible columns + GTD extras at the end so a round-trip back into GTD Flow keeps `LIST`, `CONTEXT`, `PROJECT`, `ENERGY`, `RECURRENCE`, etc.). Priority is inverted on CSV export to match Todoist's 1=highest convention
+- **Export** — Settings → Data offers JSON (full backup of tasks, projects, contexts, habits, habit_logs) and CSV (Todoist-compatible columns + GTD extras at the end so a round-trip back into Cleartable keeps `LIST`, `CONTEXT`, `PROJECT`, `ENERGY`, `RECURRENCE`, etc.). Priority is inverted on CSV export to match Todoist's 1=highest convention
 - **Import** — Two-step preview/commit flow under the same Settings page. Auto-detects format by extension + content sniff. JSON path merges projects + habits by name (case-insensitive); habit logs preserve dates via `INSERT OR IGNORE`. CSV path re-inverts priority back to our 4=highest scheme, opportunistically reads our extras when present, and falls back to Inbox when no `LIST` column. Append-only (no duplicate detection — users can run AI duplicate finder afterward)
 
 ### Project Execution Modes
@@ -249,7 +251,7 @@ gtd-app/
 | **Todoist** | All platforms | Free / $5/mo Pro | Best cross-platform, integrations | No defer dates, no review mode |
 | **TickTick** | All platforms | Free / $36/yr | Pomodoro, habits, Eisenhower matrix | Weak GTD fit |
 
-### GTD Flow Differentiators
+### Cleartable Differentiators
 - **Web-based & cross-platform** (unlike OmniFocus, Things)
 - **AI-powered features** (smart capture, inbox processing, duplicate detection, daily focus, weekly review analysis — most competitors don't have this)
 - **Weekly Review workflow** (only OmniFocus and FacileThings have this — our version adds AI insights)
@@ -267,7 +269,7 @@ Based on community research across Reddit (r/productivity, r/todoist, r/gtd, r/t
 
 #### High Priority (most requested across all communities)
 1. ~~**Start/defer dates**~~ — ✅ Shipped. Tasks hidden until start_date, deferred toggle chip on lists.
-2. ~~**Calendar integration & time blocking**~~ — ✅ All four phases shipped: calendar view, Google Calendar sync (read + write), time blocking (drag onto slots, snap, resize, push to dedicated "GTD Flow" calendar), and AI-assisted free-slot booking via Smart Capture.
+2. ~~**Calendar integration & time blocking**~~ — ✅ All four phases shipped: calendar view, Google Calendar sync (read + write), time blocking (drag onto slots, snap, resize, push to dedicated "Cleartable" calendar), and AI-assisted free-slot booking via Smart Capture.
 3. ~~**Recurring tasks**~~ — ✅ Shipped. Daily/weekdays/weekly/monthly/yearly/custom, absolute + relative recurrence.
 4. ~~**Natural language input**~~ — ✅ Shipped as Smart Capture (GPT-4o-mini).
 5. **PWA / offline support** — Installable web app with offline capability; addresses mobile + offline without native apps
@@ -304,7 +306,7 @@ The #1 most requested feature ecosystem-wide. Users describe 4 levels of sophist
 **Phase 3 — Time blocking (shipped):**
 - Drag tasks from sidebar onto specific time slots; blocks snap to 15-min and resize via the bottom edge
 - Tasks store `scheduled_time` + `duration`
-- One-way push to a dedicated "GTD Flow" Google Calendar (separate calendar-write OAuth scope; re-consent banner for legacy users)
+- One-way push to a dedicated "Cleartable" Google Calendar (separate calendar-write OAuth scope; re-consent banner for legacy users)
 
 **Phase 4 — AI-assisted scheduling (shipped, MVP):**
 - Smart Capture detects free-slot intent ("find me 30 min tomorrow afternoon")
@@ -362,34 +364,111 @@ cd server && npm start      # Express on :3000
 
 ---
 
+## Naming & Brand
+
+### Why "Cleartable"
+
+The product launched internally as "GTD Flow" but pivoted to **Cleartable** before public launch for two reasons:
+
+1. **Trademark risk.** "GTD" and "Getting Things Done" are registered trademarks of the David Allen Company (DavidCo B.V.; USPTO reg. 77208713 and 3022721 respectively). Using "GTD" as the leading brand element of an app — as opposed to descriptively in marketing copy — creates real risk of a cease-and-desist, App Store/Play Store takedown, and Google Ads keyword restriction. The DAC handles trademark use case-by-case (general@davidco.com, anne@davidco.com) and is known to actively protect the mark. Established competitors (Things 3, OmniFocus, Nirvana, FacileThings, Todoist, TickTick) all avoid putting "GTD" in their product name for this reason.
+2. **Positioning ceiling.** "GTD Flow" leads with an acronym most general productivity users don't recognize, capping addressable audience at the ~5% who already practice GTD. "Cleartable" reads to anyone — GTD practitioners recognize the spiritual fit (clear table = empty inbox = clear mind), non-GTD users just see a calm, opinionated task app.
+
+### Brand voice
+
+- **Calm, opinionated, not gamified.** Anti-anxiety positioning explicitly rejects the Habitica/Finch/streaks-and-XP school. AI is framed as "reduces friction," not "does it all for you" — directly addressing the AI skepticism documented in `FEATURE_RESEARCH_2026.md` Part 4.
+- **GTD-shaped without GTD-branded.** The app's surfaces (Inbox, Next Actions, Waiting For, Someday/Maybe, Weekly Review) are GTD-native, but the marketing language is outcome-language ("clear your table," "process the inbox," "calm your week"). GTD is referenced descriptively in copy ("inspired by Getting Things Done®"), never as the brand.
+- **Channel-specific messaging.** In r/gtd: speak GTD fluently. In r/productivity: translate to general-audience benefits (inbox zero, calm planning, AI-assisted clarification). Same product, different vocabulary per channel — this is discipline, not inconsistency.
+
+### Tagline candidates
+
+- "Clear your table. Clear your mind."
+- "The calm task app that actually processes your inbox."
+- "Capture everything. Let AI clarify. Review weekly. Never feel behind."
+
+---
+
 ## Go-to-Market Strategy
 
-### Positioning — Own the "Modern GTD" Niche
+### Realistic Outcome Target
 
-Don't compete with Todoist/TickTick on general task management. Position as **the GTD app for people who actually do GTD** — with a modern stack and AI:
+The goal is **a few hundred to a few thousand paid users — side-income scale, not unicorn scale.** Concretely:
 
-- **vs OmniFocus**: Cross-platform, AI-powered, lower price
-- **vs FacileThings**: Modern UI, faster, AI features
-- **vs Nirvana**: Active development, habits, weekly review, AI
-- **vs Todoist/TickTick**: Native GTD workflow instead of GTD-as-afterthought
+- **6 months:** 50-200 paid users, $3-10K MRR equivalent. Achievable if P0 infra ships, landing page is live, demo video exists, and Reddit launch happens authentically.
+- **12-18 months:** 500-2,000 paid users, $30-60K ARR. Achievable with sustained founder presence, content cadence, and product iteration.
+- **Honest constraint:** This is **not** "ship and the cash rolls in." It's a part-time job that pays like a side income. Productivity apps see 30-50% annual churn even when users love them, so growth requires continuous distribution effort, not just a launch spike.
 
-Unique combination (AI inbox processing + weekly review + habit tracking + sequential projects + calendar sync) doesn't exist anywhere else.
+### Positioning — Niche acquisition, broad utility
 
-### Must-Ship Before Launch
+Don't compete with Todoist/TickTick on general task management. Don't position as "GTD-only" either — that caps the audience at the 5% who study the methodology.
+
+**The split:**
+- **Acquisition channels target the GTD niche.** r/gtd (80K members) is the beachhead — clear positioning, reachable audience, high intent. The product's GTD-native architecture maps perfectly to their mental model.
+- **Landing page and product copy speak to the broader productivity audience.** Outcome-language, not methodology-language. A non-GTD user reads "calm task app, AI inbox processing, weekly review built in" and sees a productivity tool that just feels good. A GTD practitioner reads the same copy and recognizes their system.
+
+**Competitive frame:**
+- **vs OmniFocus**: Cross-platform, AI-powered, lower price, modern UI
+- **vs FacileThings**: Modern UI, faster, AI features, dark mode
+- **vs Nirvana**: Active development, habits, weekly review with AI insights
+- **vs Todoist/TickTick**: GTD-native by design, not GTD-as-afterthought
+
+The unique combination (AI Smart Capture + Process Inbox + Weekly Review with AI + sequential/parallel projects + calendar time-blocking + habit tracking) doesn't exist anywhere else under one roof.
+
+### Must-Ship Before Launch — Status
 
 Two deal-breakers for GTD practitioners — **both shipped:**
 
 1. ~~**Recurring tasks**~~ — Daily/weekdays/weekly/monthly/yearly/custom with absolute or relative recurrence. **Done.**
-2. ~~**Start/defer dates**~~ — Tasks hidden until start date, toggle chip to reveal deferred tasks on each list. **Done.**
+2. ~~**Start/defer dates**~~ — Tasks hidden until start date, toggle chip to reveal deferred tasks. **Done.**
+
+Three infrastructure items that **block** taking money:
+
+1. **Migrate off sql.js to persistent Postgres** — Single biggest pre-launch risk. In-memory SQLite means a crash or Railway restart can lose data. The first data-loss incident kills reputation permanently in a community as chatty as r/gtd.
+2. **PWA support** — Installable web app eliminates the "no mobile app" objection without building native.
+3. **Landing page at cleartable.app + demo video** — Needed before any traffic-driving post.
+
+### Pre-Launch Checklist (in execution order)
+
+1. **Cleartable.app domain** — ✅ Acquired May 2026 ($12.98/yr first year, $17.98/yr renewal). WhoisGuard enabled.
+2. **Coming-soon landing page** with email capture (Carrd, Framer, or Vercel). Hero, value prop, "join the waitlist" CTA. Live within 1 week of domain purchase. This starts capturing warm leads before the product is publicly available.
+3. **Migrate off sql.js to Postgres on Railway.** P0. No paid signups before this is done.
+4. **PWA support** (manifest, service worker, install prompt). Eliminates the mobile objection.
+5. **Record 75-90s demo video** per `DEMO.md` storyboard. Embed on landing page.
+6. **Stripe + paywall integration** for Pro tier. Free + Pro feature gates wired in.
+7. **Soft launch on r/gtd** — only after items 1-6 are live. See Launch Sequence below.
+
+### Founder Presence — The Hidden Variable
+
+The single biggest determinant of success for an indie productivity app is **the visibility of the founder.** Indie productivity apps that work have a recognizable human behind them — on Twitter/X, on Reddit, on a blog. "Built by one person who does GTD" is the narrative that converts. Without that presence, even the best product struggles to find its audience because productivity apps generate almost no organic word-of-mouth (people don't tell friends about their todo app the way they recommend a game or a design tool).
+
+**Acceptance:** the founder commits to public-facing distribution work for 18-24 months. Without that commitment, scale back the ambition or the timeline.
+
+### Distribution Strategy
+
+Three channels, ranked by return per hour for this product/audience:
+
+**Channel 1 — Reddit (highest ROI; primary).**
+The audience is already there: r/gtd (80K), r/productivity (3.7M), r/ADHD (1.5M), r/todoist (100K+), r/ProductivityApps (30K). These communities have predictable recurring questions ("How do I do a weekly review?", "Todoist alternatives after the price hike?", "Best GTD app for Windows?"). Show up daily, answer questions helpfully without pitching, build comment history. **Two-week lurk-and-help period before any launch post.** Mods reject pitch-first accounts with no history.
+
+**Channel 2 — Twitter/X build-in-public (compounding; secondary).**
+Daily or every-other-day updates: shipped features, broken builds, screenshots, revenue milestones. The build-in-public crowd is self-reinforcing and overlaps heavily with productivity buyers. Goal isn't follower count — it's compounding name recognition over 6-12 months. Specifics-and-screenshots beat philosophy threads.
+
+**Channel 3 — Blog SEO (long-tail; tertiary).**
+One 1,500-word post per week, targeting GTD-intent keywords ("how to do a weekly review," "Todoist alternatives," "best GTD app for Windows") and broad-productivity intent ("inbox zero," "calm task management"). Posts compound for years. Don't aim for viral — aim for ranking.
+
+**Skip for now:** YouTube (high effort, optional), TikTok (audience mismatch), paid ads (no budget, no signal yet).
 
 ### Launch Sequence
 
 | Phase | Channel | Angle |
 |-------|---------|-------|
-| Week 1-2 | r/gtd (80K) | Soft launch. "I built a GTD app because FacileThings felt dated and OmniFocus doesn't work on my PC" — authentic, problem-first |
-| Week 3 | r/productivity (3.7M) + r/ProductivityApps (30K) | Lead with AI features + calendar |
-| Week 4 | Product Hunt | "AI-powered GTD app" — strong PH category |
-| Week 5+ | Hacker News "Show HN" | Technical story: solo dev, open stack |
+| Week -2 to -1 | Reddit (lurk + help) | Build comment history. No app mentions. Answer 5-10 questions/week thoughtfully across r/gtd, r/productivity. |
+| Week 0 | Twitter/X intro | "Building Cleartable, a calm GTD app. Here's day one." Screenshot. Build-in-public account starts. |
+| Week 0 | Blog post #1 | "How to do a weekly review that actually sticks." SEO-targeted. Linked from cleartable.app footer. |
+| Week 1-2 | r/gtd soft launch (80K) | Problem-first post. "I built a GTD app because OmniFocus doesn't work on Windows and FacileThings felt dated." Authentic, no hype. |
+| Week 3 | r/productivity (3.7M) + r/ProductivityApps (30K) | Lead with AI Smart Capture + calendar time-blocking. Calm-positioning, not feature dump. |
+| Week 4 | Product Hunt | "AI-powered calm GTD app." Use the lifetime deal as PH-launch incentive. |
+| Week 5+ | Hacker News "Show HN" | Technical story: solo dev, modern stack, honest about constraints. |
+| Week 6+ | Ongoing | Weekly blog post, daily Twitter, Reddit answer cadence. Iterate on product based on user feedback. |
 
 ### Pricing Strategy
 
@@ -397,42 +476,44 @@ Given subscription fatigue and Todoist's backlash ($48 → $60/yr):
 
 | Tier | Price | What |
 |------|-------|------|
-| Free | $0 | Core GTD (inbox, lists, projects, contexts) |
-| Pro | $3/mo or $30/yr | AI features, calendar sync, habits, analytics |
-| Lifetime | $80 one-time | Everything forever (limited-time launch offer) |
+| Free | $0 | Core GTD (inbox, lists, projects, contexts, manual capture). Heavy AI usage rate-limited. |
+| Pro | $3/mo or $30/yr | Unlimited AI (Smart Capture, Process Inbox, Daily Focus, Find Duplicates, Weekly Review AI), calendar sync, habits, analytics |
+| Lifetime | $80 one-time | Everything forever (limited-time launch offer; first 100 buyers) |
 
-Lifetime deals generate upfront cash and launch communities love them. Things 3 proved this model works.
+**Why these numbers work:** $30/yr undercuts Todoist Pro ($60/yr) and TickTick Pro ($36/yr) while still requiring real commitment. Lifetime at $80 generates upfront cash for OpenAI API costs and gives launch communities a deal they share. Things 3 proved the lifetime model works.
 
-### Pre-Launch Infrastructure
-
-- **Migrate off sql.js** — In-memory SQLite is fragile for production. A crash or Railway restart risks data loss. Move to PostgreSQL or SQLite on persistent storage before taking money.
-- **Add PWA support** — Installable web app, works on mobile. Low effort, eliminates "no mobile app" objection without native apps.
-- **Record a short demo video (60-90s)** — Show capture → AI processing → calendar time blocking → weekly review. Embed on landing page and reuse on Reddit/Product Hunt.
-- **Build a landing page** — Hero, demo video, feature highlights, pricing, signup CTA. Needed before any soft-launch post drives traffic.
+**AI cost discipline:** Smart Capture and Process Inbox call OpenAI on every use. A heavy free user could cost more than they generate. Free tier must enforce daily AI call limits (e.g., 20/day) and push heavy AI usage behind the paywall. Track per-user cost monthly; it's the single biggest margin lever.
 
 ### Growth Channels (No Budget)
 
-- **Reddit organic posts** — Genuine participation in r/gtd, r/productivity, r/ADHD, r/ProductivityApps
-- **"Built with AI" directories** — Several curate AI-powered tools
-- **GTD blog content** — "How to do a weekly review" type posts that rank on Google and funnel to the app
-- **Template/workflow sharing** — Let users export and share their GTD setups
+- **Reddit organic** — Primary. Genuine participation, not promotion. Pattern: 2 weeks of helpful answering before any product mention.
+- **Twitter/X build-in-public** — Daily snapshots of the work. Compounds slowly but reliably.
+- **Blog SEO** — GTD-intent keywords, 1 post/week. Long-tail traffic that doesn't depend on launch buzz.
+- **"Built with AI" / indie directories** — One-time submissions to AI tool directories, IndieHackers product directory, Producthunt-adjacent lists.
+- **Template / workflow sharing** — Let users export GTD setups as JSON templates and share them. Each shared setup is a backlink + word-of-mouth.
 
 ### What NOT to Do
 
-- Don't build collaboration features yet — solo GTD users are the beachhead
-- Don't build native mobile apps — PWA first, native only with revenue
-- Don't compete on AI hype — position AI as "reduces friction" not "does everything for you"
-- Don't launch free-only — need signal on willingness to pay early
+- **Don't position as "the GTD app."** Cap on audience too low; trademark drift; alienates the broader productivity buyer.
+- **Don't build collaboration yet.** Solo GTD users are the beachhead. Family/team is a different market with different feature priorities.
+- **Don't build native mobile apps.** PWA first. Native only after revenue justifies it.
+- **Don't compete on AI hype.** Position AI as friction-reducing, not "AI does everything." Users explicitly distrust the auto-everything pitch (per research).
+- **Don't launch free-only.** Need signal on willingness to pay from day one. Lifetime deal at launch generates that signal.
+- **Don't optimize for follower count.** Optimize for DMs and replies. "Does your app support X?" is worth a hundred likes.
+- **Don't bikeshed the brand.** Cleartable is the name. Move on to product and distribution work.
 
 ### Priority Order
 
-1. ~~Ship recurring tasks + start dates (table stakes)~~ **Done**
-2. Migrate off sql.js to real persistent DB
-3. Add PWA support
-4. Record demo video + ship landing page
-5. Soft launch on r/gtd with free tier + $30/yr Pro
-6. Expand to r/productivity + Product Hunt
-7. Iterate based on feedback
+1. ~~Ship recurring tasks + start dates~~ **Done**
+2. ~~Domain registered (cleartable.app)~~ **Done**
+3. Stand up coming-soon landing page with email capture (Carrd or Framer; this week)
+4. Migrate off sql.js to Postgres (next; blocker for paid)
+5. PWA support
+6. Record 75-90s demo video (per DEMO.md)
+7. Stripe paywall + Free/Pro/Lifetime tiers
+8. Soft launch on r/gtd with $30/yr Pro and $80 lifetime offer
+9. Expand to r/productivity + Product Hunt + HN over weeks 3-5
+10. Sustained Reddit + Twitter + blog cadence; iterate based on feedback
 
 ---
 
@@ -509,7 +590,7 @@ Features to build, ordered by impact and launch-readiness.
 | # | Feature | Why | Effort | Status |
 |---|---------|-----|--------|--------|
 | 4 | **PWA support** | Installable on mobile without native apps. Eliminates "no mobile app" objection. | Low | |
-| 5 | ~~**Calendar time blocking (Phase 3)**~~ | Drag tasks onto time slots, snap, resize, push to dedicated GTD Flow calendar. | High | **Shipped** |
+| 5 | ~~**Calendar time blocking (Phase 3)**~~ | Drag tasks onto time slots, snap, resize, push to dedicated Cleartable calendar. | High | **Shipped** |
 | 6 | ~~**AI-assisted scheduling (Phase 4)**~~ | Smart Capture detects free-slot intent and books first open window inside working hours. | Medium | **Shipped (MVP)** |
 | 7 | **Saved filters / custom views** | Power user perspectives: "high-energy @office tasks due this week". OmniFocus killer feature. | Medium | |
 | 8 | **Productivity analytics dashboard** | Completion rates, streaks, time trends, project velocity. Users want to see progress. | Medium | |

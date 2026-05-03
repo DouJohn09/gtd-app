@@ -1,6 +1,9 @@
-# GTD Flow - Getting Things Done Productivity App
+# Cleartable — The Calm GTD App
 
-A personal productivity application based on David Allen's GTD methodology, with AI-powered task processing.
+A personal productivity application inspired by David Allen's Getting Things Done methodology, with AI-powered task processing.
+
+**Live at:** cleartable.app
+**Methodology reference:** Built on the principles of Getting Things Done® (a registered trademark of the David Allen Company; Cleartable is not affiliated with or endorsed by DAC).
 
 ## Features
 
