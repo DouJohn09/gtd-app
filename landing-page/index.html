@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cleartable — Clear your table. Clear your mind.</title>
+  <meta name="description" content="A calm, AI-powered task manager built on the principles of Getting Things Done. Capture everything, let AI clarify, review weekly. Never feel behind." />
+
+  <!-- Fonts (same family as the app) -->
+  <link rel="preconnect" href="https://api.fontshare.com" crossorigin />
+  <link rel="stylesheet" href="https://api.fontshare.com/v2/css?f[]=instrument-serif@400i,400&f[]=geist-mono@400,500&f[]=satoshi@400,500,700&display=swap" />
+
+  <link rel="stylesheet" href="style.css" />
+
+  <!-- Favicon placeholder -->
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>✦</text></svg>" />
+</head>
+<body>
+
+  <!-- ========== Ambient gradient mesh ========== -->
+  <div class="ambient" aria-hidden="true">
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+    <div class="orb orb-3"></div>
+    <div class="orb orb-4"></div>
+    <div class="orb orb-5"></div>
+  </div>
+
+  <!-- ========== Nav ========== -->
+  <nav id="nav">
+    <div class="container">
+      <a href="#" class="logo">clear<span>table</span></a>
+      <a href="#waitlist" class="nav-cta">Join waitlist</a>
+    </div>
+  </nav>
+
+  <!-- ========== Hero ========== -->
+  <section class="hero">
+    <div class="container">
+      <div class="mono-label violet" style="margin-bottom: 16px;">coming soon</div>
+      <h1>Clear your table.<br />Clear your mind.</h1>
+      <p class="subline">
+        A calm task manager that actually <strong>processes</strong> your inbox — powered by AI,
+        built on the principles of Getting Things Done.
+      </p>
+      <div id="waitlist">
+        <form class="capture-form" id="waitlist-form">
+          <input type="email" name="email" placeholder="you@email.com" required autocomplete="email" />
+          <button type="submit">Join waitlist</button>
+        </form>
+        <div class="form-success" id="form-success">
+          <div class="checkmark">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+          </div>
+          <p>You're on the list.</p>
+          <div class="note">We'll email you when Cleartable opens up.</div>
+        </div>
+        <p class="capture-note" id="capture-note">No spam. Just a launch-day invite.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== Problem ========== -->
+  <section class="problem">
+    <div class="container">
+      <div class="mono-label" style="margin-bottom: 12px;">the problem</div>
+      <h2 style="font-size: clamp(28px, 4.5vw, 44px); font-style: italic; margin-bottom: 8px;">
+        Your task app stores tasks.<br />It doesn't process them.
+      </h2>
+      <div class="problem-grid reveal-stagger">
+        <div class="problem-card reveal">
+          <div class="icon">📥</div>
+          <h3>Inbox grows, clarity shrinks</h3>
+          <p>Tasks pile up faster than you can organize them. The backlog becomes a mountain of shame you avoid opening.</p>
+        </div>
+        <div class="problem-card reveal">
+          <div class="icon">🔀</div>
+          <h3>Three apps, zero flow</h3>
+          <p>Tasks in one app, calendar in another, habits in a third. You spend more time switching than doing.</p>
+        </div>
+        <div class="problem-card reveal">
+          <div class="icon">😰</div>
+          <h3>Overdue badges everywhere</h3>
+          <p>Red badges and deadline anxiety make you avoid the app entirely. Productivity tools shouldn't cause stress.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== Features ========== -->
+  <section class="features">
+    <div class="container">
+      <div class="mono-label violet" style="text-align: center; margin-bottom: 12px;">what cleartable does</div>
+      <h2>One app. Everything processed.</h2>
+      <p class="section-sub">
+        Capture, clarify, organize, review — with AI that reduces friction, not adds complexity.
+      </p>
+      <div class="feature-grid reveal-stagger">
+        <div class="feature-card reveal">
+          <div class="feature-icon violet">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.912 5.813a2 2 0 001.275 1.275L21 12l-5.813 1.912a2 2 0 00-1.275 1.275L12 21l-1.912-5.813a2 2 0 00-1.275-1.275L3 12l5.813-1.912a2 2 0 001.275-1.275L12 3z"/></svg>
+          </div>
+          <h3>AI-powered processing</h3>
+          <p>Type naturally. AI reads dates, assigns contexts, picks the right list, and tells you when it's not sure. One click to process your entire inbox.</p>
+          <span class="feature-tag violet">smart capture + inbox processing</span>
+        </div>
+        <div class="feature-card reveal">
+          <div class="feature-icon mint">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+          </div>
+          <h3>Calendar time blocking</h3>
+          <p>Drag tasks onto your day. Snap to 15-minute slots, resize blocks, push to a dedicated Google Calendar — your primary stays untouched.</p>
+          <span class="feature-tag mint">google calendar sync built in</span>
+        </div>
+        <div class="feature-card reveal">
+          <div class="feature-icon amber">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+          </div>
+          <h3>Weekly review with AI</h3>
+          <p>A guided 4-step ritual: clear your inbox, review stale tasks, check projects, plan ahead. AI flags what needs attention so nothing falls through.</p>
+          <span class="feature-tag amber">only cleartable + omnifocus have this</span>
+        </div>
+        <div class="feature-card reveal">
+          <div class="feature-icon rose">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+          </div>
+          <h3>Habits, recurring tasks, defer dates</h3>
+          <p>Daily and weekly habit tracking. Recurring tasks with flexible scheduling. Start dates that hide tasks until they're actually actionable.</p>
+          <span class="feature-tag rose">all built in — no extra apps</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== GTD ========== -->
+  <section class="gtd-section">
+    <div class="container">
+      <div class="mono-label mint" style="margin-bottom: 12px;">methodology</div>
+      <h2>Built on GTD principles.</h2>
+      <p class="body-text">
+        Cleartable is inspired by the Getting Things Done&reg; methodology — the system trusted by
+        millions to turn overwhelm into calm, clear action. Five steps, one workflow, zero anxiety.
+      </p>
+      <div class="gtd-steps">
+        <div class="gtd-step">
+          <div class="num">01</div>
+          <div class="label">Capture</div>
+        </div>
+        <div class="gtd-step">
+          <div class="num">02</div>
+          <div class="label">Clarify</div>
+        </div>
+        <div class="gtd-step">
+          <div class="num">03</div>
+          <div class="label">Organize</div>
+        </div>
+        <div class="gtd-step">
+          <div class="num">04</div>
+          <div class="label">Reflect</div>
+        </div>
+        <div class="gtd-step">
+          <div class="num">05</div>
+          <div class="label">Engage</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== Preview ========== -->
+  <section class="preview reveal">
+    <div class="container">
+      <div class="mono-label violet" style="text-align: center; margin-bottom: 12px;">the app</div>
+      <h2>Dark, calm, focused.</h2>
+      <div class="preview-frame">
+        <div class="preview-bar">
+          <div class="preview-dot"></div>
+          <div class="preview-dot"></div>
+          <div class="preview-dot"></div>
+        </div>
+        <div class="preview-body" id="preview-body">
+          <!-- Replace this placeholder with an actual screenshot: -->
+          <!-- <img src="screenshot.png" alt="Cleartable app screenshot" /> -->
+          <div class="note">screenshot coming soon</div>
+          <div class="tagline">A clear mind starts here.</div>
+          <div class="note">neo-modern glass ui · dark mode · aurora gradients</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== Pricing ========== -->
+  <section class="pricing">
+    <div class="container">
+      <div class="mono-label violet" style="margin-bottom: 12px;">pricing</div>
+      <h2>Simple, fair, no surprises.</h2>
+      <p class="section-sub">Launch pricing — locked in for early adopters.</p>
+      <div class="pricing-grid reveal-stagger">
+        <div class="pricing-card reveal">
+          <div class="tier-name">Free</div>
+          <div class="price">$0</div>
+          <div class="price-note">forever</div>
+          <ul>
+            <li>Full GTD workflow (inbox, lists, projects)</li>
+            <li>Custom contexts &amp; energy levels</li>
+            <li>Manual task capture</li>
+            <li>20 AI calls per day</li>
+          </ul>
+        </div>
+        <div class="pricing-card featured reveal">
+          <div class="tier-name">Pro</div>
+          <div class="price">$30<span style="font-size: 18px; color: var(--text-3);">/yr</span></div>
+          <div class="price-note">or $3/mo · half of Todoist</div>
+          <ul>
+            <li>Everything in Free</li>
+            <li>Unlimited AI (Smart Capture, Process Inbox, Daily Focus, Duplicates)</li>
+            <li>Google Calendar sync &amp; time blocking</li>
+            <li>Weekly Review with AI insights</li>
+            <li>Habit tracking</li>
+          </ul>
+        </div>
+        <div class="pricing-card reveal">
+          <div class="tier-name">Lifetime</div>
+          <div class="price">$80</div>
+          <div class="price-note">one-time · first 100 buyers</div>
+          <ul>
+            <li>Everything in Pro, forever</li>
+            <li>All future features included</li>
+            <li>Early-adopter badge</li>
+            <li>Priority support</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== Bottom CTA ========== -->
+  <section class="bottom-cta">
+    <div class="container">
+      <h2>Ready to clear the table?</h2>
+      <form class="capture-form" id="waitlist-form-bottom">
+        <input type="email" name="email" placeholder="you@email.com" required autocomplete="email" />
+        <button type="submit">Join waitlist</button>
+      </form>
+      <p class="capture-note">Launch invite. No spam. Unsubscribe anytime.</p>
+    </div>
+  </section>
+
+  <!-- ========== Footer ========== -->
+  <footer>
+    <div class="container">
+      <div class="left">
+        &copy; 2026 Cleartable
+      </div>
+      <div class="right">
+        Getting Things Done&reg; is a registered trademark of the David Allen Company.<br />
+        Cleartable is not affiliated with or endorsed by the David Allen Company.
+      </div>
+    </div>
+  </footer>
+
+  <!-- ========== Scripts ========== -->
+  <script>
+    // Nav scroll effect
+    const nav = document.getElementById('nav');
+    window.addEventListener('scroll', () => {
+      nav.classList.toggle('scrolled', window.scrollY > 40);
+    }, { passive: true });
+
+    // Scroll reveal
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(e => {
+        if (e.isIntersecting) {
+          e.target.classList.add('visible');
+          observer.unobserve(e.target);
+        }
+      });
+    }, { threshold: 0.15 });
+
+    document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+
+    // Waitlist form handling
+    document.querySelectorAll('#waitlist-form, #waitlist-form-bottom').forEach(form => {
+      form.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const email = form.querySelector('input[type="email"]').value;
+
+        // TODO: Replace with your email capture endpoint
+        // Example: fetch('/api/waitlist', { method: 'POST', body: JSON.stringify({ email }) })
+        console.log('Waitlist signup:', email);
+
+        // Show success state (hero form only)
+        if (form.id === 'waitlist-form') {
+          form.style.display = 'none';
+          document.getElementById('capture-note').style.display = 'none';
+          const success = document.getElementById('form-success');
+          success.style.display = 'block';
+        } else {
+          form.querySelector('button').textContent = 'You\'re in!';
+          form.querySelector('button').disabled = true;
+          form.querySelector('input').disabled = true;
+        }
+      });
+    });
+  </script>
+
+</body>
+</html>
