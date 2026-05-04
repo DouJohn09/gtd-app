@@ -565,3 +565,142 @@ export const WeeklyReviewModel = {
     return rowToObject(stmt);
   }
 };
+
+export const CustomListModel = {
+  getAll(userId) {
+    const db = getDb();
+    const stmt = db.prepare('SELECT * FROM custom_lists WHERE user_id = ? ORDER BY position ASC, created_at ASC');
+    stmt.bind([userId]);
+    const lists = rowsToObjects(stmt);
+    return lists.map(l => {
+      const countStmt = db.prepare("SELECT COUNT(*) as cnt FROM list_items WHERE list_id = ? AND user_id = ? AND status != 'done'");
+      countStmt.bind([l.id, userId]);
+      const row = rowToObject(countStmt);
+      return { ...l, item_count: row ? row.cnt : 0 };
+    });
+  },
+
+  getById(id, userId) {
+    const db = getDb();
+    const stmt = db.prepare('SELECT * FROM custom_lists WHERE id = ? AND user_id = ?');
+    stmt.bind([id, userId]);
+    return rowToObject(stmt);
+  },
+
+  create(data, userId) {
+    const db = getDb();
+    const maxResult = db.exec(`SELECT COALESCE(MAX(position), -1) as mp FROM custom_lists WHERE user_id = ${userId}`);
+    const position = (maxResult[0]?.values[0]?.[0] ?? -1) + 1;
+    db.run(
+      'INSERT INTO custom_lists (name, icon, color, position, user_id) VALUES (?, ?, ?, ?, ?)',
+      [data.name, data.icon || 'list', data.color || 'violet', position, userId]
+    );
+    const id = db.exec("SELECT last_insert_rowid() as id")[0].values[0][0];
+    saveDb();
+    return this.getById(id, userId);
+  },
+
+  update(id, updates, userId) {
+    const db = getDb();
+    const allowed = ['name', 'icon', 'color'];
+    const fields = Object.keys(updates).filter(k => allowed.includes(k) && updates[k] !== undefined);
+    if (fields.length === 0) return this.getById(id, userId);
+    const setClause = fields.map(f => `${f} = ?`).join(', ');
+    const values = [...fields.map(f => updates[f]), id, userId];
+    db.run(`UPDATE custom_lists SET ${setClause} WHERE id = ? AND user_id = ?`, values);
+    saveDb();
+    return this.getById(id, userId);
+  },
+
+  delete(id, userId) {
+    const db = getDb();
+    db.run('DELETE FROM custom_lists WHERE id = ? AND user_id = ?', [id, userId]);
+    saveDb();
+    return { changes: 1 };
+  },
+
+  reorder(listIds, userId) {
+    const db = getDb();
+    listIds.forEach((listId, index) => {
+      db.run('UPDATE custom_lists SET position = ? WHERE id = ? AND user_id = ?', [index, listId, userId]);
+    });
+    saveDb();
+    return this.getAll(userId);
+  },
+};
+
+export const ListItemModel = {
+  getByList(listId, userId) {
+    const db = getDb();
+    const stmt = db.prepare('SELECT * FROM list_items WHERE list_id = ? AND user_id = ? ORDER BY position ASC, created_at ASC');
+    stmt.bind([listId, userId]);
+    return rowsToObjects(stmt);
+  },
+
+  getById(id, userId) {
+    const db = getDb();
+    const stmt = db.prepare('SELECT * FROM list_items WHERE id = ? AND user_id = ?');
+    stmt.bind([id, userId]);
+    return rowToObject(stmt);
+  },
+
+  create(data, userId) {
+    const db = getDb();
+    const maxResult = db.exec(`SELECT COALESCE(MAX(position), -1) as mp FROM list_items WHERE list_id = ${data.list_id} AND user_id = ${userId}`);
+    const position = (maxResult[0]?.values[0]?.[0] ?? -1) + 1;
+    db.run(
+      'INSERT INTO list_items (list_id, title, notes, url, status, position, user_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [data.list_id, data.title, data.notes || null, data.url || null, data.status || 'todo', position, userId]
+    );
+    const id = db.exec("SELECT last_insert_rowid() as id")[0].values[0][0];
+    saveDb();
+    return this.getById(id, userId);
+  },
+
+  update(id, updates, userId) {
+    const db = getDb();
+    const allowed = ['title', 'notes', 'url', 'status', 'rating', 'position', 'linked_task_id', 'completed_at'];
+    const fields = Object.keys(updates).filter(k => allowed.includes(k) && updates[k] !== undefined);
+    if (updates.status === 'done' && !updates.completed_at) {
+      updates.completed_at = new Date().toISOString();
+      if (!fields.includes('completed_at')) fields.push('completed_at');
+    }
+    if (updates.status && updates.status !== 'done') {
+      updates.completed_at = null;
+      updates.rating = null;
+      if (!fields.includes('completed_at')) fields.push('completed_at');
+      if (!fields.includes('rating')) fields.push('rating');
+    }
+    if (fields.length === 0) return this.getById(id, userId);
+    const setClause = fields.map(f => `${f} = ?`).join(', ');
+    const values = [...fields.map(f => updates[f]), id, userId];
+    db.run(`UPDATE list_items SET ${setClause} WHERE id = ? AND user_id = ?`, values);
+    saveDb();
+    return this.getById(id, userId);
+  },
+
+  delete(id, userId) {
+    const db = getDb();
+    db.run('DELETE FROM list_items WHERE id = ? AND user_id = ?', [id, userId]);
+    saveDb();
+    return { changes: 1 };
+  },
+
+  reorder(listId, itemIds, userId) {
+    const db = getDb();
+    itemIds.forEach((itemId, index) => {
+      db.run('UPDATE list_items SET position = ? WHERE id = ? AND list_id = ? AND user_id = ?', [index, itemId, listId, userId]);
+    });
+    saveDb();
+    return this.getByList(listId, userId);
+  },
+
+  promoteToTask(id, userId) {
+    const item = this.getById(id, userId);
+    if (!item) return null;
+    if (item.linked_task_id) return { item, task: null, alreadyLinked: true };
+    const task = TaskModel.create({ title: item.title, notes: item.notes || null, list: 'next_actions' }, userId);
+    this.update(id, { linked_task_id: task.id }, userId);
+    return { item: this.getById(id, userId), task };
+  },
+};

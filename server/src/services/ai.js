@@ -563,3 +563,86 @@ Respond with JSON:
     return null;
   }
 }
+
+function extractMeta(html, property, attr = 'property') {
+  const patterns = [
+    new RegExp(`<meta[^>]+${attr}=["']${property}["'][^>]+content=["']([^"']+)["']`, 'i'),
+    new RegExp(`<meta[^>]+content=["']([^"']+)["'][^>]+${attr}=["']${property}["']`, 'i'),
+  ];
+  for (const p of patterns) {
+    const m = html.match(p);
+    if (m?.[1]) return m[1].trim();
+  }
+  return '';
+}
+
+export async function extractUrlMetadata(url) {
+  if (!openai) return null;
+
+  let pageTitle = '';
+  let ogTitle = '';
+  let ogDescription = '';
+  let metaDescription = '';
+  let author = '';
+  let extraMeta = '';
+
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
+    const res = await fetch(url, {
+      signal: controller.signal,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
+      },
+    });
+    clearTimeout(timeout);
+    const html = await res.text();
+
+    pageTitle = html.match(/<title[^>]*>([^<]+)<\/title>/i)?.[1]?.trim() || '';
+    ogTitle = extractMeta(html, 'og:title');
+    ogDescription = extractMeta(html, 'og:description');
+    metaDescription = extractMeta(html, 'description', 'name');
+    author = extractMeta(html, 'author', 'name')
+      || extractMeta(html, 'book:author')
+      || extractMeta(html, 'article:author');
+
+    const byline = html.match(/class=["'][^"']*(?:author|byline|contributor)[^"']*["'][^>]*>([^<]{2,80})</i)?.[1]?.trim() || '';
+    if (byline) extraMeta += `Author element: ${byline}\n`;
+  } catch (e) {
+    // page fetch failed — AI will work with just the URL
+  }
+
+  try {
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [
+        {
+          role: 'system',
+          content: `You extract clean, human-readable titles from URLs and their page metadata.
+Return a JSON object with:
+- "title": a clean, concise title. For books: "Title by Author". For movies/shows: "Title (Year)". For products: brand + product name. For articles: article headline. Strip store names, SEO junk, and formatting artifacts. ALWAYS include the author/creator when available — check all provided metadata fields.
+- "notes": a one-line description if available, otherwise null.`
+        },
+        {
+          role: 'user',
+          content: `URL: ${url}
+Page title: ${pageTitle}
+OG title: ${ogTitle}
+OG description: ${ogDescription}
+Meta description: ${metaDescription}
+Author meta: ${author}
+${extraMeta}`.trim()
+        }
+      ],
+      response_format: { type: 'json_object' },
+      max_tokens: 200,
+    });
+
+    return JSON.parse(response.choices[0].message.content);
+  } catch (error) {
+    console.error('AI URL extraction error:', error);
+    return null;
+  }
+}

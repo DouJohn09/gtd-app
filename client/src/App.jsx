@@ -11,6 +11,7 @@ import CompletedTasks from './pages/CompletedTasks';
 import WeeklyReview from './pages/WeeklyReview';
 import Calendar from './pages/Calendar';
 import Settings from './pages/Settings';
+import CustomList from './pages/CustomList';
 import Login from './pages/Login';
 
 function ProtectedRoute({ children }) {
@@ -37,6 +38,7 @@ export default function App() {
         <Route path="review" element={<WeeklyReview />} />
         <Route path="calendar" element={<Calendar />} />
         <Route path="ai" element={<AIAssistant />} />
+        <Route path="custom-lists/:listId" element={<CustomList />} />
         <Route path="settings" element={<Settings />} />
       </Route>
     </Routes>

@@ -202,6 +202,39 @@ export async function initDb() {
   `);
   db.run(`CREATE INDEX IF NOT EXISTS idx_reviews_user ON weekly_reviews(user_id, completed_at)`);
 
+  // Custom lists tables
+  db.run(`
+    CREATE TABLE IF NOT EXISTS custom_lists (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      icon TEXT DEFAULT 'list',
+      color TEXT DEFAULT 'violet',
+      user_id INTEGER REFERENCES users(id),
+      position INTEGER DEFAULT 0,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+  db.run(`CREATE INDEX IF NOT EXISTS idx_custom_lists_user ON custom_lists(user_id, position)`);
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS list_items (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      list_id INTEGER NOT NULL REFERENCES custom_lists(id) ON DELETE CASCADE,
+      title TEXT NOT NULL,
+      notes TEXT,
+      url TEXT,
+      status TEXT DEFAULT 'todo' CHECK(status IN ('todo', 'in_progress', 'done')),
+      rating INTEGER CHECK(rating IS NULL OR (rating >= 1 AND rating <= 5)),
+      position INTEGER DEFAULT 0,
+      linked_task_id INTEGER REFERENCES tasks(id) ON DELETE SET NULL,
+      user_id INTEGER REFERENCES users(id),
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      completed_at DATETIME
+    )
+  `);
+  db.run(`CREATE INDEX IF NOT EXISTS idx_list_items_list ON list_items(list_id, position)`);
+  db.run(`CREATE INDEX IF NOT EXISTS idx_list_items_user ON list_items(user_id)`);
+
   saveDb();
   return db;
 }

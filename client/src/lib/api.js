@@ -130,6 +130,22 @@ export const api = {
     smartCapture: (text) => fetchApi('/ai/smart-capture', { method: 'POST', body: JSON.stringify({ text }) }),
   },
 
+  customLists: {
+    getAll: () => fetchApi('/custom-lists'),
+    getById: (id) => fetchApi(`/custom-lists/${id}`),
+    create: (data) => fetchApi('/custom-lists', { method: 'POST', body: JSON.stringify(data) }),
+    update: (id, updates) => fetchApi(`/custom-lists/${id}`, { method: 'PUT', body: JSON.stringify(updates) }),
+    delete: (id) => fetchApi(`/custom-lists/${id}`, { method: 'DELETE' }),
+    reorder: (listIds) => fetchApi('/custom-lists/reorder', { method: 'POST', body: JSON.stringify({ listIds }) }),
+    getItems: (listId) => fetchApi(`/custom-lists/${listId}/items`),
+    createItem: (listId, data) => fetchApi(`/custom-lists/${listId}/items`, { method: 'POST', body: JSON.stringify(data) }),
+    updateItem: (listId, itemId, updates) => fetchApi(`/custom-lists/${listId}/items/${itemId}`, { method: 'PUT', body: JSON.stringify(updates) }),
+    deleteItem: (listId, itemId) => fetchApi(`/custom-lists/${listId}/items/${itemId}`, { method: 'DELETE' }),
+    reorderItems: (listId, itemIds) => fetchApi(`/custom-lists/${listId}/items/reorder`, { method: 'POST', body: JSON.stringify({ itemIds }) }),
+    promoteItem: (listId, itemId) => fetchApi(`/custom-lists/${listId}/items/${itemId}/promote`, { method: 'POST' }),
+    extractUrl: (url) => fetchApi('/custom-lists/extract-url', { method: 'POST', body: JSON.stringify({ url }) }),
+  },
+
   export: {
     json: () => downloadFile('/export/json', 'gtdflow-export.json'),
     csv: () => downloadFile('/export/csv', 'gtdflow-export.csv'),

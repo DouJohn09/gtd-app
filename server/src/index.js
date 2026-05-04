@@ -13,6 +13,7 @@ import contextsRouter from './routes/contexts.js';
 import habitsRouter from './routes/habits.js';
 import exportRouter from './routes/export.js';
 import importRouter from './routes/import.js';
+import customListsRouter from './routes/customLists.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -40,6 +41,7 @@ app.use('/api/contexts', requireAuth, contextsRouter);
 app.use('/api/habits', requireAuth, habitsRouter);
 app.use('/api/export', requireAuth, exportRouter);
 app.use('/api/import', requireAuth, importRouter);
+app.use('/api/custom-lists', requireAuth, customListsRouter);
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });

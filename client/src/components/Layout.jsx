@@ -1,11 +1,14 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Outlet, NavLink } from 'react-router-dom';
 import {
   LayoutDashboard, Inbox, FolderKanban, ListTodo, Clock, CloudSun,
   Sparkles, Target, LogOut, CheckCircle2, RotateCcw, CalendarDays,
-  Command, Settings, MoreHorizontal, X,
+  Command, Settings, MoreHorizontal, X, Plus, List,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { api } from '../lib/api';
+import { ICON_MAP } from './NewListModal';
+import NewListModal from './NewListModal';
 import AuroraBackground from './AuroraBackground';
 import CommandCapture from './CommandCapture';
 
@@ -20,7 +23,7 @@ const navGroups = [
     ],
   },
   {
-    label: 'lists',
+    label: 'gtd_lists',
     items: [
       { to: '/lists/next_actions',  icon: ListTodo, label: 'Next Actions' },
       { to: '/lists/waiting_for',   icon: Clock,    label: 'Waiting For' },
@@ -91,6 +94,14 @@ export default function Layout() {
   const { user, logout } = useAuth();
   const [captureOpen, setCaptureOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
+  const [customLists, setCustomLists] = useState([]);
+  const [showNewList, setShowNewList] = useState(false);
+
+  const refreshCustomLists = useCallback(() => {
+    api.customLists.getAll().then(setCustomLists).catch(console.error);
+  }, []);
+
+  useEffect(() => { refreshCustomLists(); }, [refreshCustomLists]);
 
   // Cmd/Ctrl + K opens capture
   useEffect(() => {
@@ -162,6 +173,42 @@ export default function Layout() {
               </div>
             </div>
           ))}
+
+          {/* Custom lists */}
+          <div className="mt-6">
+            <div className="flex items-center justify-between px-3 mb-2">
+              <div className="mono-label">lists</div>
+              <button
+                onClick={() => setShowNewList(true)}
+                className="grid place-items-center w-5 h-5 rounded-md text-text-3 hover:text-text-1 hover:bg-white/[0.06] transition-colors"
+                title="New list"
+              >
+                <Plus className="w-3 h-3" />
+              </button>
+            </div>
+            <div className="flex flex-col gap-0.5">
+              {customLists.map((cl) => {
+                const CLIcon = ICON_MAP[cl.icon] || List;
+                return (
+                  <NavItem
+                    key={cl.id}
+                    to={`/custom-lists/${cl.id}`}
+                    icon={CLIcon}
+                    label={cl.name}
+                  />
+                );
+              })}
+              {customLists.length === 0 && (
+                <button
+                  onClick={() => setShowNewList(true)}
+                  className="flex items-center gap-3 px-3 py-2 rounded-xl text-[13px] text-text-3 hover:text-text-1 hover:bg-white/[0.04] transition-colors"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Create a list</span>
+                </button>
+              )}
+            </div>
+          </div>
         </nav>
 
         {/* User card */}
@@ -195,7 +242,7 @@ export default function Layout() {
 
       {/* Main */}
       <main className="flex-1 overflow-auto relative z-10 pb-[76px] md:pb-0">
-        <Outlet />
+        <Outlet context={{ refreshCustomLists }} />
       </main>
 
       {/* Mobile bottom tab bar */}
@@ -257,6 +304,13 @@ export default function Layout() {
       )}
 
       <CommandCapture open={captureOpen} onClose={() => setCaptureOpen(false)} />
+
+      {showNewList && (
+        <NewListModal
+          onClose={() => setShowNewList(false)}
+          onSave={refreshCustomLists}
+        />
+      )}
     </div>
   );
 }
