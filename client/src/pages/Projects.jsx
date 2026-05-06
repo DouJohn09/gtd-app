@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import {
   FolderKanban, Plus, Sparkles, ChevronRight, ChevronUp, ChevronDown,
-  Trash2, ArrowRightLeft, Clock, X, Check,
+  Trash2, ArrowRightLeft, Clock, X, Check, Pencil,
 } from 'lucide-react';
 import { api } from '../lib/api';
 import TaskModal from '../components/TaskModal';
@@ -10,6 +10,7 @@ import GlassCard from '../components/ui/GlassCard';
 import Chip from '../components/ui/Chip';
 import MonoLabel from '../components/ui/MonoLabel';
 import FreshCheck from '../components/ui/FreshCheck';
+import ConfirmModal from '../components/ui/ConfirmModal';
 
 const TONE_CYCLE = ['violet', 'mint', 'amber', 'rose'];
 const toneFor = (id) => TONE_CYCLE[(Number(id) || 0) % TONE_CYCLE.length];
@@ -26,6 +27,9 @@ export default function Projects() {
   const [loadingAi, setLoadingAi] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
   const [showModal, setShowModal] = useState(false);
+  const [editingProject, setEditingProject] = useState(null);
+  const [editForm, setEditForm] = useState({ name: '', description: '', outcome: '', execution_mode: 'parallel' });
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
 
   const fetchProjects = async () => {
     try {
@@ -70,12 +74,12 @@ export default function Projects() {
   };
 
   const handleDeleteProject = async (id) => {
-    if (confirm('Delete this project?')) {
-      await api.projects.delete(id);
-      setExpandedProject(null);
-      setExpandedData(null);
-      fetchProjects();
-    }
+    await api.projects.delete(id);
+    setExpandedProject(null);
+    setExpandedData(null);
+    setConfirmDeleteId(null);
+    fetchProjects();
+    addToast('Project deleted', 'success');
   };
 
   const handleToggleMode = async (project) => {
@@ -84,6 +88,26 @@ export default function Projects() {
     fetchProjects();
     fetchExpandedProject(project.id);
     addToast(`Switched to ${newMode} mode`, 'success');
+  };
+
+  const startEditProject = (project) => {
+    setEditingProject(project.id);
+    setEditForm({
+      name: project.name || '',
+      description: project.description || '',
+      outcome: project.outcome || '',
+      execution_mode: project.execution_mode || 'parallel',
+    });
+  };
+
+  const handleSaveProject = async (e) => {
+    e.preventDefault();
+    if (!editForm.name.trim()) return;
+    await api.projects.update(editingProject, editForm);
+    setEditingProject(null);
+    fetchProjects();
+    fetchExpandedProject(editingProject);
+    addToast('Project updated', 'success');
   };
 
   const handleAiBreakdown = async (project) => {
@@ -280,8 +304,87 @@ export default function Projects() {
                 {/* Expanded content */}
                 {isOpen && (
                   <div className="px-5 pb-5 -mt-1">
+                    {/* Description */}
+                    {project.description && editingProject !== project.id && (
+                      <p className="text-[13px] text-text-2 mb-4 leading-relaxed">{project.description}</p>
+                    )}
+
+                    {/* Edit form */}
+                    {editingProject === project.id && (
+                      <GlassCard className="mb-4" padded={false}>
+                        <form onSubmit={handleSaveProject} className="p-5 space-y-4">
+                          <div className="flex items-center justify-between">
+                            <MonoLabel tone={tone}>edit project</MonoLabel>
+                            <button type="button" onClick={() => setEditingProject(null)}
+                                    className="grid place-items-center w-7 h-7 rounded-lg border border-white/10 hover:bg-white/5">
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                          <input
+                            type="text"
+                            value={editForm.name}
+                            onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                            className="gtd-input font-display text-[22px] tracking-tight"
+                            placeholder="Project name"
+                            required
+                            autoFocus
+                          />
+                          <textarea
+                            value={editForm.description}
+                            onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+                            className="gtd-input min-h-[60px]"
+                            placeholder="Why does this matter? (optional)"
+                          />
+                          <input
+                            type="text"
+                            value={editForm.outcome}
+                            onChange={(e) => setEditForm({ ...editForm, outcome: e.target.value })}
+                            className="gtd-input"
+                            placeholder='Desired outcome (e.g. "Brief shipped to stakeholders")'
+                          />
+                          <div>
+                            <MonoLabel className="mb-2">execution mode</MonoLabel>
+                            <div className="grid grid-cols-2 gap-3">
+                              {[
+                                { v: 'parallel',   label: 'Parallel',   sub: 'all tasks active at once' },
+                                { v: 'sequential', label: 'Sequential', sub: 'one task at a time' },
+                              ].map(opt => (
+                                <button
+                                  type="button"
+                                  key={opt.v}
+                                  onClick={() => setEditForm({ ...editForm, execution_mode: opt.v })}
+                                  className="text-left rounded-xl p-3 transition-all"
+                                  style={{
+                                    background: editForm.execution_mode === opt.v ? 'rgba(167,139,250,0.10)' : 'rgba(255,255,255,0.02)',
+                                    border: `1px solid ${editForm.execution_mode === opt.v ? 'rgba(167,139,250,0.35)' : 'rgba(255,255,255,0.08)'}`,
+                                  }}
+                                >
+                                  <div className="text-[13.5px] font-medium">{opt.label}</div>
+                                  <div className="font-mono text-[10.5px] text-text-3 mt-0.5">{opt.sub}</div>
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                          <div className="flex gap-2 pt-1">
+                            <button type="button" onClick={() => setEditingProject(null)} className="gtd-btn gtd-btn-secondary">
+                              Cancel
+                            </button>
+                            <button type="submit" className="gtd-btn gtd-btn-primary inline-flex items-center gap-1.5">
+                              <Check className="w-3.5 h-3.5" /> Save
+                            </button>
+                          </div>
+                        </form>
+                      </GlassCard>
+                    )}
+
                     {/* Action toolbar */}
                     <div className="flex flex-wrap gap-2 pb-4 mb-4 border-b border-white/[0.05]">
+                      <button
+                        onClick={() => startEditProject(project)}
+                        className="gtd-btn gtd-btn-secondary inline-flex items-center gap-1.5 text-[12.5px]"
+                      >
+                        <Pencil className="w-3.5 h-3.5" /> Edit
+                      </button>
                       <button
                         onClick={() => handleAiBreakdown(project)}
                         disabled={loadingAi}
@@ -298,7 +401,7 @@ export default function Projects() {
                         {project.execution_mode === 'sequential' ? 'Switch to parallel' : 'Switch to sequential'}
                       </button>
                       <button
-                        onClick={() => handleDeleteProject(project.id)}
+                        onClick={() => setConfirmDeleteId(project.id)}
                         className="gtd-btn inline-flex items-center gap-1.5 text-[12.5px] text-rose hover:text-rose-glow ml-auto"
                         style={{ background: 'rgba(251,113,133,0.06)', border: '1px solid rgba(251,113,133,0.18)' }}
                       >
@@ -364,6 +467,16 @@ export default function Projects() {
           projects={projects}
           onClose={() => { setShowModal(false); setEditingTask(null); }}
           onSave={() => { fetchProjects(); if (expandedProject) fetchExpandedProject(expandedProject); }}
+        />
+      )}
+
+      {confirmDeleteId && (
+        <ConfirmModal
+          title="Delete project?"
+          message="The project will be removed. Its tasks will remain but become unlinked."
+          confirmLabel="Delete"
+          onConfirm={() => handleDeleteProject(confirmDeleteId)}
+          onCancel={() => setConfirmDeleteId(null)}
         />
       )}
     </div>
