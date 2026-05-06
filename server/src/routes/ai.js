@@ -39,11 +39,14 @@ router.post('/smart-capture', async (req, res) => {
       return res.json({ task, ai: null, fallback: true });
     }
 
-    // Resolve project_id from AI's project_name suggestion
+    // Resolve project_id from AI's project_name suggestion (exact → includes → fuzzy)
     let projectId = null;
     if (ai.project_name) {
-      const match = projects.find(p => p.name.toLowerCase() === ai.project_name.toLowerCase());
+      const aiName = ai.project_name.toLowerCase();
+      const match = projects.find(p => p.name.toLowerCase() === aiName)
+        || projects.find(p => p.name.toLowerCase().includes(aiName) || aiName.includes(p.name.toLowerCase()));
       if (match) projectId = match.id;
+      else console.warn(`Smart capture: AI suggested project "${ai.project_name}" but no match found. Available: ${projects.map(p => p.name).join(', ')}`);
     }
 
     let notes = null;
