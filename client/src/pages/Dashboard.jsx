@@ -2,10 +2,11 @@ import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Inbox, ListTodo, Clock, CloudSun, CheckCircle2, Target, Sparkles,
-  ArrowUpRight, ChevronRight, Flame, Plus,
+  ArrowUpRight, ChevronRight, Flame, Plus, EyeOff,
 } from 'lucide-react';
 import { api } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
+import { isOverdue } from '../lib/dateUtils';
 import TaskModal from '../components/TaskModal';
 import SortDropdown, { sortTasks } from '../components/SortDropdown';
 import FilterDropdown, { useTaskFilters, applyFilters } from '../components/FilterDropdown';
@@ -59,7 +60,10 @@ export default function Dashboard() {
   const [sortBy, setSortBy] = useState('priority');
   const [filterContext, setFilterContext] = useState('');
   const [filterProject, setFilterProject] = useState('');
+  const [hideOverdue, setHideOverdue] = useState(() => localStorage.getItem('hide_overdue_focus') === 'true');
   const { user } = useAuth();
+
+  useEffect(() => { localStorage.setItem('hide_overdue_focus', hideOverdue); }, [hideOverdue]);
 
   const fetchData = async () => {
     try {
@@ -99,10 +103,15 @@ export default function Dashboard() {
   };
 
   const { contexts: focusContexts, projects: focusProjects } = useTaskFilters(dailyFocus);
-  const sortedFocus = useMemo(
-    () => sortTasks(applyFilters(dailyFocus, { context: filterContext, project: filterProject }), sortBy),
-    [dailyFocus, sortBy, filterContext, filterProject],
+  const overdueCount = useMemo(
+    () => dailyFocus.filter(t => !t.completed && isOverdue(t.due_date)).length,
+    [dailyFocus],
   );
+  const sortedFocus = useMemo(() => {
+    const filtered = applyFilters(dailyFocus, { context: filterContext, project: filterProject });
+    const withoutOverdue = hideOverdue ? filtered.filter(t => !isOverdue(t.due_date)) : filtered;
+    return sortTasks(withoutOverdue, sortBy);
+  }, [dailyFocus, sortBy, filterContext, filterProject, hideOverdue]);
 
   const focusTotal = dailyFocus.length;
   const focusDone = dailyFocus.filter(t => t.completed).length;
@@ -172,6 +181,21 @@ export default function Dashboard() {
               <div className="flex items-center gap-2 flex-wrap justify-end">
                 {focusTotal > 0 && (
                   <>
+                    {(overdueCount > 0 || hideOverdue) && (
+                      <button
+                        onClick={() => setHideOverdue(v => !v)}
+                        title={hideOverdue ? 'Show overdue tasks' : 'Hide overdue tasks'}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-mono uppercase tracking-wider transition-all"
+                        style={
+                          hideOverdue
+                            ? { background: 'rgb(var(--violet) / 0.14)', color: 'rgb(var(--violet-glow))', boxShadow: 'inset 0 0 0 1px rgb(var(--violet) / 0.28)' }
+                            : { background: 'rgba(255,255,255,0.04)', color: 'rgb(var(--text-3))', boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.06)' }
+                        }
+                      >
+                        <EyeOff className="w-3 h-3" />
+                        {hideOverdue ? `Overdue hidden (${overdueCount})` : 'Hide overdue'}
+                      </button>
+                    )}
                     <FilterDropdown label="Context" options={focusContexts} value={filterContext} onChange={setFilterContext} />
                     <FilterDropdown label="Project" options={focusProjects} value={filterProject} onChange={setFilterProject} />
                     <SortDropdown value={sortBy} onChange={setSortBy} />
