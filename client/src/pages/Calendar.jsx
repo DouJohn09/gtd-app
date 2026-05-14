@@ -291,7 +291,7 @@ export default function Calendar() {
               Reconnect Google to push time blocks to your calendar
             </div>
             <p className="font-mono text-[11px] text-text-3 mt-1 leading-relaxed">
-              You're connected with read-only access. Reconnect with write access and we'll push your time blocks to a dedicated <span style={{ color: 'rgb(var(--violet-glow))' }}>GTD Flow</span> calendar — your primary calendar stays untouched.
+              You're connected with read-only access. Reconnect with write access and we'll push your time blocks to a dedicated <span style={{ color: 'rgb(var(--violet-glow))' }}>Cleartable</span> calendar — your primary calendar stays untouched.
             </p>
           </div>
           <button

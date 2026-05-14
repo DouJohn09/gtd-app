@@ -16,7 +16,7 @@ export default function Login() {
           {/* Wordmark */}
           <div className="text-center mb-8">
             <div
-              className="inline-flex items-baseline gap-1.5 font-display text-[44px] leading-none mb-2"
+              className="font-display text-[44px] leading-none mb-2"
               style={{
                 background: 'linear-gradient(180deg, #fff, rgb(var(--violet-glow)))',
                 WebkitBackgroundClip: 'text',
@@ -24,15 +24,9 @@ export default function Login() {
                 backgroundClip: 'text',
               }}
             >
-              flow
-              <span
-                className="font-mono text-[14px] tracking-widest"
-                style={{ color: 'rgb(var(--violet-glow))', WebkitTextFillColor: 'rgb(var(--violet-glow))' }}
-              >
-                ::01
-              </span>
+              Cleartable
             </div>
-            <div className="mono-label" style={{ color: 'rgb(var(--violet-glow))' }}>gtd_system</div>
+            <div className="mono-label" style={{ color: 'rgb(var(--violet-glow))' }}>clear_table_clear_mind</div>
           </div>
 
           {/* Card */}

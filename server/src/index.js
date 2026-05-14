@@ -64,7 +64,7 @@ if (process.env.NODE_ENV === 'production') {
 async function start() {
   await initDb();
   app.listen(PORT, () => {
-    console.log(`GTD Server running on http://localhost:${PORT}`);
+    console.log(`Cleartable server running on http://localhost:${PORT}`);
   });
 }
 

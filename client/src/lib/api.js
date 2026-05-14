@@ -147,8 +147,8 @@ export const api = {
   },
 
   export: {
-    json: () => downloadFile('/export/json', 'gtdflow-export.json'),
-    csv: () => downloadFile('/export/csv', 'gtdflow-export.csv'),
+    json: () => downloadFile('/export/json', 'cleartable-export.json'),
+    csv: () => downloadFile('/export/csv', 'cleartable-export.csv'),
   },
 
   import: {

@@ -254,9 +254,43 @@ function setGtdCalendarId(userId, id) {
   saveDb();
 }
 
+// One-time rename of legacy "GTD Flow" calendars to "Cleartable" after the rebrand.
+// Memoized per server process so we don't re-check on every push.
+const migratedCalendarCache = new Set();
+async function migrateLegacyCalendarName(userId, calendarId, accessToken) {
+  if (migratedCalendarCache.has(userId)) return;
+  migratedCalendarCache.add(userId);
+  try {
+    const r = await fetch(
+      `${CALENDAR_API_BASE}/calendars/${encodeURIComponent(calendarId)}`,
+      { headers: { Authorization: `Bearer ${accessToken}` } }
+    );
+    if (!r.ok) return;
+    const data = await r.json();
+    if (data.summary === 'GTD Flow') {
+      await fetch(
+        `${CALENDAR_API_BASE}/calendars/${encodeURIComponent(calendarId)}`,
+        {
+          method: 'PATCH',
+          headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            summary: 'Cleartable',
+            description: 'Time blocks pushed from Cleartable',
+          }),
+        }
+      );
+    }
+  } catch (err) {
+    console.error('Calendar rename migration failed:', err.message);
+  }
+}
+
 async function ensureGtdCalendar(userId, accessToken) {
   const existing = getGtdCalendarId(userId);
-  if (existing) return existing;
+  if (existing) {
+    migrateLegacyCalendarName(userId, existing, accessToken);
+    return existing;
+  }
   const response = await fetch(`${CALENDAR_API_BASE}/calendars`, {
     method: 'POST',
     headers: {
@@ -264,14 +298,14 @@ async function ensureGtdCalendar(userId, accessToken) {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      summary: 'GTD Flow',
-      description: 'Time blocks pushed from GTD Flow',
+      summary: 'Cleartable',
+      description: 'Time blocks pushed from Cleartable',
       timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
     }),
   });
   if (!response.ok) {
     const err = await response.text();
-    throw new Error(`Failed to create GTD Flow calendar: ${response.status} ${err}`);
+    throw new Error(`Failed to create Cleartable calendar: ${response.status} ${err}`);
   }
   const data = await response.json();
   setGtdCalendarId(userId, data.id);
@@ -345,7 +379,7 @@ export async function pushTaskToCalendar(userId, task, clientTimezone) {
           setTaskEventId(task.id, data.id);
         }
       } else if (!r.ok) {
-        console.error('Failed to update GTD Flow event:', r.status, await r.text());
+        console.error('Failed to update Cleartable event:', r.status, await r.text());
       }
     } else {
       const r = await fetch(
@@ -360,7 +394,7 @@ export async function pushTaskToCalendar(userId, task, clientTimezone) {
         const data = await r.json();
         setTaskEventId(task.id, data.id);
       } else {
-        console.error('Failed to create GTD Flow event:', r.status, await r.text());
+        console.error('Failed to create Cleartable event:', r.status, await r.text());
       }
     }
   } catch (err) {
@@ -406,7 +440,7 @@ export async function deleteTaskFromCalendar(userId, eventId) {
       }
     );
     if (!r.ok && r.status !== 404 && r.status !== 410) {
-      console.error('Failed to delete GTD Flow event:', r.status, await r.text());
+      console.error('Failed to delete Cleartable event:', r.status, await r.text());
     }
   } catch (err) {
     console.error('deleteTaskFromCalendar error:', err.message);

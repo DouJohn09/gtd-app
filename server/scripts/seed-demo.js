@@ -76,7 +76,7 @@ async function main() {
   }, userId);
 
   const launchPrep = ProjectModel.create({
-    name: 'GTD Flow launch',
+    name: 'Cleartable launch',
     description: 'Get the app to public launch',
     outcome: 'Soft launch on r/gtd',
     execution_mode: 'parallel',

@@ -76,7 +76,7 @@ export default function Settings() {
         <p className="text-text-3 text-sm mb-5 leading-relaxed">
           <span className="text-text-2">JSON</span> is a complete backup —
           tasks, projects, contexts, and habits — and is re-importable into
-          GTD Flow. <span className="text-text-2">CSV</span> exports tasks
+          Cleartable. <span className="text-text-2">CSV</span> exports tasks
           only, using Todoist-compatible columns so you can open it in a
           spreadsheet or migrate to another GTD app.
         </p>
@@ -105,7 +105,7 @@ export default function Settings() {
         <MonoLabel className="mb-2">data</MonoLabel>
         <h2 className="font-display text-xl mb-1">Import data</h2>
         <p className="text-text-3 text-sm mb-5 leading-relaxed">
-          Upload a <span className="text-text-2">GTD Flow JSON backup</span> or
+          Upload a <span className="text-text-2">Cleartable JSON backup</span> or
           a <span className="text-text-2">Todoist-compatible CSV</span>. Tasks
           go to their original list (or Inbox if missing). Projects with the
           same name merge into existing ones. Duplicates aren't filtered — use
@@ -142,7 +142,7 @@ export default function Settings() {
                 <MonoLabel tone="violet" className="mb-1">preview</MonoLabel>
                 <div className="text-text-1 font-medium">
                   Ready to import {preview.summary.tasks} task{preview.summary.tasks === 1 ? '' : 's'}
-                  {preview.format === 'gtdflow-json' ? ' from GTD Flow backup' : ' from CSV'}
+                  {preview.format === 'gtdflow-json' ? ' from Cleartable backup' : ' from CSV'}
                 </div>
               </div>
               <button

@@ -45,7 +45,7 @@ router.get('/json', (req, res) => {
     const habit_logs = getRows('habit_logs', userId).map(l => pick(l, HABIT_LOG_FIELDS));
 
     const payload = {
-      app: 'GTD Flow',
+      app: 'Cleartable',
       version: 1,
       exported_at: new Date().toISOString(),
       counts: {
@@ -59,7 +59,7 @@ router.get('/json', (req, res) => {
     };
 
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
-    res.setHeader('Content-Disposition', `attachment; filename="gtdflow-export-${todayStamp()}.json"`);
+    res.setHeader('Content-Disposition', `attachment; filename="cleartable-export-${todayStamp()}.json"`);
     res.send(JSON.stringify(payload, null, 2));
   } catch (err) {
     console.error('Export JSON failed:', err);
@@ -135,7 +135,7 @@ router.get('/csv', (req, res) => {
     }
 
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-    res.setHeader('Content-Disposition', `attachment; filename="gtdflow-export-${todayStamp()}.csv"`);
+    res.setHeader('Content-Disposition', `attachment; filename="cleartable-export-${todayStamp()}.csv"`);
     res.send(lines.join('\n'));
   } catch (err) {
     console.error('Export CSV failed:', err);

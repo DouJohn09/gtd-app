@@ -23,7 +23,7 @@ const navGroups = [
     ],
   },
   {
-    label: 'gtd_lists',
+    label: 'lists',
     items: [
       { to: '/lists/next_actions',  icon: ListTodo, label: 'Next Actions' },
       { to: '/lists/waiting_for',   icon: Clock,    label: 'Waiting For' },
@@ -128,7 +128,7 @@ export default function Layout() {
           >
             <Sparkles className="w-3.5 h-3.5 text-white" />
           </div>
-          <div className="font-display text-[18px] leading-none">flow</div>
+          <div className="font-display text-[18px] leading-none">Cleartable</div>
         </div>
         <button
           onClick={() => setCaptureOpen(true)}
@@ -148,8 +148,8 @@ export default function Layout() {
             <Sparkles className="w-4 h-4 text-white" />
           </div>
           <div>
-            <div className="font-display text-[19px] leading-none">flow</div>
-            <div className="mono-label mt-1">gtd</div>
+            <div className="font-display text-[19px] leading-none">Cleartable</div>
+            <div className="mono-label mt-1">clear table clear mind</div>
           </div>
         </div>
 

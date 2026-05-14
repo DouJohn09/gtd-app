@@ -128,8 +128,8 @@ router.post('/preview', (req, res) => {
       let payload;
       try { payload = JSON.parse(content); }
       catch { return res.status(400).json({ error: 'Invalid JSON' }); }
-      if (payload.app !== 'GTD Flow') {
-        return res.status(400).json({ error: 'Not a GTD Flow JSON export' });
+      if (payload.app !== 'Cleartable' && payload.app !== 'GTD Flow') {
+        return res.status(400).json({ error: 'Not a Cleartable JSON export' });
       }
       const incomingProjects = payload.projects || [];
       const projects_new = incomingProjects.filter(p => !existingNames.has((p.name || '').toLowerCase())).length;
@@ -171,7 +171,7 @@ router.post('/preview', (req, res) => {
     }
 
     return res.status(400).json({
-      error: 'Unsupported file. Use a GTD Flow JSON export or a Todoist-compatible CSV.',
+      error: 'Unsupported file. Use a Cleartable JSON export or a Todoist-compatible CSV.',
     });
   } catch (err) {
     console.error('Import preview failed:', err);

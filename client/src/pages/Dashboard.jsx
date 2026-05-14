@@ -270,7 +270,7 @@ export default function Dashboard() {
             onToggle={async (id) => { await api.habits.toggle(id); fetchData(); }}
           />
           <SmartActionCard inboxCount={stats?.inbox || 0} />
-          <GtdFlowCard />
+          <WorkflowCard />
         </aside>
 
         {/* Stats row */}
@@ -476,7 +476,7 @@ function SmartActionCard({ inboxCount }) {
   );
 }
 
-function GtdFlowCard() {
+function WorkflowCard() {
   const steps = [
     { num: '01', text: 'Capture everything into Inbox.' },
     { num: '02', text: 'Clarify — is it actionable?' },
@@ -486,7 +486,7 @@ function GtdFlowCard() {
   ];
   return (
     <GlassCard>
-      <MonoLabel className="mb-3">gtd flow</MonoLabel>
+      <MonoLabel className="mb-3">gtd workflow</MonoLabel>
       <ul className="space-y-1.5">
         {steps.map(s => (
           <li key={s.num} className="flex gap-2 text-[12px] leading-relaxed">
