@@ -15,6 +15,27 @@ function getUserContexts(userId) {
   return results;
 }
 
+// Few-shot examples: the user's recent classified tasks. Drives the AI toward
+// the user's actual naming pattern (e.g. "call mom" → Personal, not Phone).
+function getRecentClassifiedTasks(userId, limit = 10) {
+  const db = getDb();
+  const stmt = db.prepare(`
+    SELECT title, context, list, project_id
+    FROM tasks
+    WHERE user_id = ?
+      AND context IS NOT NULL
+      AND context != ''
+      AND list != 'inbox'
+    ORDER BY created_at DESC
+    LIMIT ?
+  `);
+  stmt.bind([userId, limit]);
+  const results = [];
+  while (stmt.step()) results.push(stmt.getAsObject());
+  stmt.free();
+  return results;
+}
+
 const router = Router();
 
 router.post('/smart-capture', async (req, res) => {
@@ -27,10 +48,11 @@ router.post('/smart-capture', async (req, res) => {
     const urls = rawText.match(/https?:\/\/[^\s]+/gi) || [];
     const contexts = getUserContexts(req.user.id);
     const projects = ProjectModel.getAll(req.user.id).filter(p => p.status === 'active');
+    const history = getRecentClassifiedTasks(req.user.id, 10);
     const now = new Date();
     const today = now.toISOString().split('T')[0];
     const dayName = now.toLocaleDateString('en-US', { weekday: 'long' });
-    const ai = await smartCapture(rawText, contexts, projects, today, dayName);
+    const ai = await smartCapture(rawText, contexts, projects, today, dayName, history);
 
     if (!ai) {
       const taskData = { title: rawText };

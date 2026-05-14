@@ -34,13 +34,23 @@ When analyzing tasks:
 Always respond in JSON format as specified in each request.`;
 }
 
-export async function smartCapture(rawText, userContexts, projects, today, dayName) {
+export async function smartCapture(rawText, userContexts, projects, today, dayName, history = []) {
   if (!openai) return null;
   const contextOptions = userContexts?.length
     ? userContexts.map(c => c.name || c).join('|')
     : '@home|@work|@errands|@computer|@phone|@anywhere';
   const projectList = projects?.length
     ? projects.map(p => p.name).join(', ')
+    : '';
+  // Build a few-shot block from the user's own past classifications so the AI
+  // learns their personal pattern (e.g. "call mom" → Personal, not Phone).
+  const historyBlock = history?.length
+    ? `
+USER'S RECENT CLASSIFICATIONS (mirror this pattern when ambiguous):
+${history.map(h => `- "${h.title}" → context: ${h.context}${h.list ? `, list: ${h.list}` : ''}`).join('\n')}
+
+Treat these as the strongest hints about how THIS user actually organizes tasks. If a new input is similar to one of these, copy the classification choice.
+`
     : '';
   try {
     const response = await openai.chat.completions.create({
@@ -75,13 +85,29 @@ DAILY FOCUS RULES:
 - is_daily_focus = false for tasks due tomorrow or later, or with no urgency signals
 - "tomorrow" does NOT mean daily focus — it's scheduled for tomorrow, not today
 
-CONTEXT RULES (personal vs work detection):
-- Context should match one of: ${contextOptions} — or null if unclear.
-- Detect whether the task is personal or work-related based on keywords and intent:
-  - WORK signals: report, meeting, client, project, deadline, presentation, review, budget, stakeholder, sprint, deploy, colleague names, professional activities
-  - PERSONAL signals: family members (mom, dad, kids), groceries, doctor, gym, home repairs, hobbies, friends, personal errands
-- Assign @work for work tasks, @home for home/personal tasks, @phone for calls, @errands for shopping/errands, @computer for digital tasks
-- If the task is clearly work-related, prefer @work or @computer. If personal, prefer @home, @phone, or @errands as appropriate.
+${historyBlock}
+CONTEXT RULES (critical — this is where most mistakes happen):
+- Context must be one of the user's existing contexts (or null): ${contextOptions}.
+- Do NOT invent context names. Only use names from the list above. If none fit, return null.
+
+Two kinds of contexts exist:
+  - LIFE-DOMAIN contexts describe whose life the task belongs to: Personal, Work, Family, Home, Side-Project, Health, etc.
+  - ACTIVITY-TYPE contexts describe the tool, place, or activity: Phone, Computer, Office, Errands, Anywhere, etc.
+
+Rule of preference: when a task could fit BOTH a life-domain context and an activity-type context, ALWAYS prefer the life-domain context.
+  - "Call mom" → Personal (NOT Phone). The phone is incidental; this is about the personal relationship.
+  - "Email Sarah about Q3 plan" → Work (NOT Computer). The computer is incidental; this is work.
+  - "Buy birthday gift for sister" → Personal or Family (NOT Errands), if those exist.
+
+Use activity-type contexts only when:
+  (a) no life-domain context fits, OR
+  (b) the user has NO life-domain contexts at all, OR
+  (c) the activity/location is the dominant useful filter (e.g. "pick up dry cleaning" → Errands when no Personal/Family context exists).
+
+Detect work vs personal from signals:
+  - WORK: report, meeting, client, deadline, presentation, sprint, deploy, stakeholder, colleague names, professional verbs
+  - PERSONAL/FAMILY: family members (mom, dad, kids, sister), groceries, doctor, gym, home repairs, hobbies, friends, school
+But these signals choose WHICH life-domain context — they don't override the preference rule above.
 ${projectList ? `
 PROJECT MATCHING:
 - Active projects: ${projectList}

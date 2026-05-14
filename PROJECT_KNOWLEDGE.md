@@ -159,6 +159,7 @@ gtd-app/
 
 ### Today's Focus
 - **Auto-surface due-today and overdue tasks** — The Today list isn't just `is_daily_focus = 1` anymore. It also picks up anything `due_date <= today` (excluding `someday_maybe`, respecting `start_date`). Matches Things/Todoist behavior so a task created with `due_date = tomorrow` shows up automatically when tomorrow arrives
+- **Hide overdue toggle** — Optional per-user toggle on the Today's Focus header (chip alongside Filter/Sort) suppresses anything where `due_date < today`. Addresses the "mountain of shame" backlog-anxiety pattern users report on r/productivity and r/ADHD. Preference persists in localStorage (`hide_overdue_focus`). Chip only appears when overdue tasks exist or the toggle is already on
 
 ### Data export & import
 - **Export** — Settings → Data offers JSON (full backup of tasks, projects, contexts, habits, habit_logs) and CSV (Todoist-compatible columns + GTD extras at the end so a round-trip back into Cleartable keeps `LIST`, `CONTEXT`, `PROJECT`, `ENERGY`, `RECURRENCE`, etc.). Priority is inverted on CSV export to match Todoist's 1=highest convention
@@ -552,6 +553,9 @@ Given subscription fatigue and Todoist's backlash ($48 → $60/yr):
 32. Calendar bugfix: Google Calendar push now uses the browser's IANA timezone (forwarded via X-Client-Timezone header) instead of the server's TZ — events created at 2pm Prague no longer land at 4pm on Google
 33. Day view UX: all-day strip tasks are draggable onto the time grid (previously only the right-side Unscheduled sidebar supported this)
 34. Inline project creation from the task modal — "+ Add new project…" option mirrors the existing context-add pattern
+35. Hide-overdue toggle on Today's Focus — calms the dashboard for users overwhelmed by backlog (community-feedback driven)
+36. Rebrand "GTD Flow" → "Cleartable" across UI, server strings, exports, and Google Calendar (legacy GCal calendars auto-renamed on next push; import accepts both old + new payloads)
+37. Smart Capture context overhaul — prefer life-domain (Personal/Work/Family) over activity-type (@phone/@computer); inject user's 10 most recent classified tasks as few-shot history; add context delete UI in Settings (chips with X + ConfirmModal)
 
 ---
 
@@ -565,13 +569,17 @@ Cross-cutting effort to make AI suggestions more trustworthy. Insight from FEATU
 - **Inline-edit-everywhere on AI surfaces** — Import Notes and Process Inbox cards have a pencil → full editor (title, list, context, project, due date, energy, time, waiting-on, daily focus). User can fix wrong suggestions in place instead of hunting them down later.
 - **Per-item prune on Daily Focus** — Each suggestion has a remove (X) toggle; "Set N as Today's Focus" only applies the kept ones.
 - **Backend wired** — `/apply-inbox-processing` accepts the full editable field set (project_id, due_date, energy, time, daily_focus, waiting_for_person), mirroring `/apply-import`.
+- **Few-shot from user history (Smart Capture)** — The user's 10 most recent classified tasks (title + final context + list) are injected into every Smart Capture prompt as a "USER'S RECENT CLASSIFICATIONS" block. AI mirrors the user's actual organization pattern instead of generic GTD defaults. Self-correcting: after the user manually fixes "call mom → Personal" twice, the AI sees it in history and stops suggesting @phone.
+- **Life-domain context preference** — Smart Capture's prompt now distinguishes life-domain contexts (Personal/Work/Family/Home) from activity-type contexts (Phone/Computer/Errands) and ALWAYS prefers life-domain when both could apply. Fixes the "call mom → @phone" misclassification when the user has @Personal available.
+- **Context management UI** — Settings → Contexts surface with add + delete (chips with X). Deletes are confirmed via ConfirmModal; existing tasks keep their tag, only the autocomplete suggestion is removed.
 
 ### Next (in priority order)
-1. **Few-shot prompting from user history** — Inject 5–10 of the user's recent processed tasks into prompts so AI learns their personal patterns (work vs home keywords, project naming, etc.). Should reduce wrong context/project guesses dramatically.
-2. **Capture corrections** — When the user edits an AI suggestion before applying, log the original→corrected diff. Use as future few-shot examples and as a quality metric.
-3. **Single-item processing for Process Inbox** — Send each inbox item in its own API call rather than a batch. Eliminates the cross-item bleed problem at the API level (batching was the root cause of the "Courier Hub assigned to unrelated tasks" bug).
-4. **Show "AI uncertain" affordance** — When AI returns mostly low confidence for an item, surface a hint ("AI wasn't sure about project + context") instead of silently hiding badges, so the user knows to check the editor.
-5. **Confidence calibration check** — Track how often "high" suggestions get edited vs "low" ones. If high gets edited often, the prompt is overconfident — tune.
+1. **Capture corrections** — When the user edits an AI suggestion before applying, log the original→corrected diff. Use as future few-shot examples and as a quality metric.
+2. **Single-item processing for Process Inbox** — Send each inbox item in its own API call rather than a batch. Eliminates the cross-item bleed problem at the API level (batching was the root cause of the "Courier Hub assigned to unrelated tasks" bug).
+3. **Show "AI uncertain" affordance** — When AI returns mostly low confidence for an item, surface a hint ("AI wasn't sure about project + context") instead of silently hiding badges, so the user knows to check the editor.
+4. **Confidence calibration check** — Track how often "high" suggestions get edited vs "low" ones. If high gets edited often, the prompt is overconfident — tune.
+5. **Onboarding: seed default life-domain contexts** — New users start with an empty contexts table, so Smart Capture has no life-domain contexts to prefer and falls back to activity-type. Seed Personal / Work / Family / Home (or let the user pick from a recommended set) during first-run onboarding so the life-domain preference rule actually fires from day one. Cold-start fix for few-shot history.
+6. **Spread few-shot to Process Inbox + Import Notes** — Currently history is injected only into Smart Capture. The same pattern should help the bulk-processing flows once they move to single-item calls (#2 above).
 
 ---
 

@@ -1,8 +1,9 @@
-import { useState, useRef } from 'react';
-import { Settings as SettingsIcon, FileJson, FileSpreadsheet, Upload, X } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
+import { Settings as SettingsIcon, FileJson, FileSpreadsheet, Upload, X, Tag, Plus } from 'lucide-react';
 import { api } from '../lib/api';
 import { useToast } from '../components/Toast';
 import MonoLabel from '../components/ui/MonoLabel';
+import ConfirmModal from '../components/ui/ConfirmModal';
 
 export default function Settings() {
   const { addToast } = useToast();
@@ -10,6 +11,45 @@ export default function Settings() {
   const [preview, setPreview] = useState(null);
   const [importing, setImporting] = useState(false);
   const fileInputRef = useRef(null);
+  const [contexts, setContexts] = useState([]);
+  const [newContextName, setNewContextName] = useState('');
+  const [addingContext, setAddingContext] = useState(false);
+  const [contextToDelete, setContextToDelete] = useState(null);
+
+  useEffect(() => {
+    api.contexts.getAll().then(setContexts).catch(err => {
+      console.error('Load contexts failed:', err);
+    });
+  }, []);
+
+  async function addContext(e) {
+    e.preventDefault();
+    const name = newContextName.trim();
+    if (!name) return;
+    setAddingContext(true);
+    try {
+      const created = await api.contexts.create(name);
+      setContexts(prev => [...prev, created].sort((a, b) => a.name.localeCompare(b.name)));
+      setNewContextName('');
+    } catch (err) {
+      addToast(err.message || 'Could not add context', 'error');
+    } finally {
+      setAddingContext(false);
+    }
+  }
+
+  async function deleteContext() {
+    if (!contextToDelete) return;
+    try {
+      await api.contexts.delete(contextToDelete.id);
+      setContexts(prev => prev.filter(c => c.id !== contextToDelete.id));
+      addToast(`Deleted ${contextToDelete.name}`, 'success');
+    } catch (err) {
+      addToast(err.message || 'Could not delete context', 'error');
+    } finally {
+      setContextToDelete(null);
+    }
+  }
 
   async function downloadExport(format) {
     setBusy(format);
@@ -197,6 +237,78 @@ export default function Settings() {
           </div>
         )}
       </section>
+
+      <section className="glass rounded-2xl p-6 mt-6">
+        <MonoLabel className="mb-2">ai</MonoLabel>
+        <h2 className="font-display text-xl mb-1">Contexts</h2>
+        <p className="text-text-3 text-sm mb-5 leading-relaxed">
+          Tags that group your tasks (e.g. <span className="text-text-2">Personal</span>,{' '}
+          <span className="text-text-2">Work</span>, <span className="text-text-2">Errands</span>).
+          Smart Capture uses these to classify new tasks — and learns from how you
+          actually label things over time. Deleting a context removes it from the
+          autocomplete list; tasks already tagged with it keep their tag.
+        </p>
+
+        <form onSubmit={addContext} className="flex gap-2 mb-5">
+          <input
+            type="text"
+            value={newContextName}
+            onChange={e => setNewContextName(e.target.value)}
+            placeholder="New context name…"
+            disabled={addingContext}
+            className="gtd-input flex-1 disabled:opacity-50"
+            maxLength={50}
+          />
+          <button
+            type="submit"
+            disabled={addingContext || !newContextName.trim()}
+            className="gtd-btn gtd-btn-primary inline-flex items-center gap-2 disabled:opacity-50"
+          >
+            <Plus className="w-4 h-4" />
+            {addingContext ? 'Adding…' : 'Add'}
+          </button>
+        </form>
+
+        {contexts.length === 0 ? (
+          <p className="text-text-3 text-xs italic">No contexts yet. Add one above, or let Smart Capture create them inline from a task.</p>
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            {contexts.map(c => (
+              <span
+                key={c.id}
+                className="inline-flex items-center gap-1.5 pl-3 pr-1.5 py-1.5 rounded-full text-[12px]"
+                style={{
+                  background: 'rgb(var(--mint) / 0.08)',
+                  boxShadow: 'inset 0 0 0 1px rgb(var(--mint) / 0.22)',
+                  color: 'rgb(var(--mint-glow))',
+                }}
+              >
+                <Tag className="w-3 h-3 opacity-70" />
+                <span>{c.name}</span>
+                <button
+                  type="button"
+                  onClick={() => setContextToDelete(c)}
+                  className="grid place-items-center w-5 h-5 rounded-full hover:bg-white/10 transition-colors"
+                  title={`Delete ${c.name}`}
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
+      </section>
+
+      {contextToDelete && (
+        <ConfirmModal
+          title={`Delete "${contextToDelete.name}"?`}
+          message="The tag stays on tasks that already use it, but Smart Capture won't suggest it anymore. You can re-add it any time."
+          confirmLabel="Delete"
+          tone="rose"
+          onConfirm={deleteContext}
+          onCancel={() => setContextToDelete(null)}
+        />
+      )}
     </div>
   );
 }
