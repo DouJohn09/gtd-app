@@ -1,7 +1,6 @@
 import './env.js';
 import express from 'express';
 import cors from 'cors';
-import { createReadStream, existsSync, statSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { pingDb } from './db/pool.js';
@@ -46,20 +45,6 @@ app.use('/api/custom-lists', requireAuth, customListsRouter);
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
-});
-
-// TEMPORARY: one-time data recovery endpoint. REMOVE after use.
-app.get('/__recovery/gtd-db', (req, res) => {
-  const token = req.query.token;
-  const expected = process.env.RECOVERY_TOKEN;
-  if (!expected || token !== expected) return res.status(404).send('Not found');
-  const path = process.env.DATABASE_PATH || '/data/gtd.db';
-  if (!existsSync(path)) return res.status(404).send('Legacy gtd.db not present');
-  const size = statSync(path).size;
-  res.setHeader('Content-Type', 'application/octet-stream');
-  res.setHeader('Content-Disposition', 'attachment; filename="gtd.db"');
-  res.setHeader('Content-Length', String(size));
-  createReadStream(path).pipe(res);
 });
 
 // Expose Google Client ID to frontend (safe — this is a public value)
