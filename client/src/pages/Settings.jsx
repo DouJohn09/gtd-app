@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Settings as SettingsIcon, FileJson, FileSpreadsheet, Upload, X, Tag, Plus } from 'lucide-react';
+import { Settings as SettingsIcon, FileJson, FileSpreadsheet, Upload, X, Tag, Plus, Sparkles } from 'lucide-react';
 import { api } from '../lib/api';
 import { useToast } from '../components/Toast';
 import MonoLabel from '../components/ui/MonoLabel';
@@ -15,12 +15,24 @@ export default function Settings() {
   const [newContextName, setNewContextName] = useState('');
   const [addingContext, setAddingContext] = useState(false);
   const [contextToDelete, setContextToDelete] = useState(null);
+  const [routing, setRouting] = useState(() => localStorage.getItem('smart_capture_routing') || 'auto_route');
 
   useEffect(() => {
     api.contexts.getAll().then(setContexts).catch(err => {
       console.error('Load contexts failed:', err);
     });
   }, []);
+
+  function updateRouting(next) {
+    setRouting(next);
+    localStorage.setItem('smart_capture_routing', next);
+    addToast(
+      next === 'auto_route'
+        ? 'Smart Capture: auto-route confident tasks'
+        : 'Smart Capture: every task lands in Inbox',
+      'success'
+    );
+  }
 
   async function addContext(e) {
     e.preventDefault();
@@ -236,6 +248,79 @@ export default function Settings() {
             </div>
           </div>
         )}
+      </section>
+
+      <section className="glass rounded-2xl p-6 mt-6">
+        <MonoLabel className="mb-2">ai</MonoLabel>
+        <h2 className="font-display text-xl mb-1 flex items-center gap-2">
+          <Sparkles className="w-4 h-4" style={{ color: 'rgb(var(--violet-glow))' }} />
+          Smart Capture
+        </h2>
+        <p className="text-text-3 text-sm mb-5 leading-relaxed">
+          When you capture a task with Smart Capture on, the AI parses its
+          metadata (context, due date, project, energy, recurrence) and decides
+          which list it belongs in. Choose how aggressive that routing should be.
+          Either way, Smart Capture learns from how you organize tasks — your
+          recent classifications and corrections shape every future capture.
+        </p>
+
+        <div className="space-y-2">
+          <label
+            className="flex items-start gap-3 p-3 rounded-xl cursor-pointer transition-all"
+            style={
+              routing === 'auto_route'
+                ? { background: 'rgb(var(--violet) / 0.08)', boxShadow: 'inset 0 0 0 1px rgb(var(--violet) / 0.30)' }
+                : { boxShadow: 'inset 0 0 0 1px rgb(255 255 255 / 0.06)' }
+            }
+          >
+            <input
+              type="radio"
+              name="routing"
+              value="auto_route"
+              checked={routing === 'auto_route'}
+              onChange={() => updateRouting('auto_route')}
+              className="mt-1 accent-violet-400"
+            />
+            <div className="flex-1">
+              <div className="text-[13px] font-medium text-text-1">
+                Auto-route confident tasks <span className="text-text-3 font-normal">(recommended)</span>
+              </div>
+              <p className="text-[12px] text-text-3 mt-0.5 leading-relaxed">
+                Tasks the AI is confident about land directly in their final list
+                (Next Actions, Waiting For, etc.). Ambiguous tasks fall back to
+                Inbox so you can review them.
+              </p>
+            </div>
+          </label>
+
+          <label
+            className="flex items-start gap-3 p-3 rounded-xl cursor-pointer transition-all"
+            style={
+              routing === 'always_inbox'
+                ? { background: 'rgb(var(--violet) / 0.08)', boxShadow: 'inset 0 0 0 1px rgb(var(--violet) / 0.30)' }
+                : { boxShadow: 'inset 0 0 0 1px rgb(255 255 255 / 0.06)' }
+            }
+          >
+            <input
+              type="radio"
+              name="routing"
+              value="always_inbox"
+              checked={routing === 'always_inbox'}
+              onChange={() => updateRouting('always_inbox')}
+              className="mt-1 accent-violet-400"
+            />
+            <div className="flex-1">
+              <div className="text-[13px] font-medium text-text-1">
+                Always send to Inbox
+              </div>
+              <p className="text-[12px] text-text-3 mt-0.5 leading-relaxed">
+                Strict GTD mode: AI fills in metadata but every task lands in
+                Inbox first so you can review and triage before it joins your
+                active lists.
+              </p>
+            </div>
+          </label>
+        </div>
       </section>
 
       <section className="glass rounded-2xl p-6 mt-6">

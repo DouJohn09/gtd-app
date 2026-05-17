@@ -17,6 +17,9 @@ function getUserContexts(userId) {
 
 // Few-shot examples: the user's recent classified tasks. Drives the AI toward
 // the user's actual naming pattern (e.g. "call mom" → Personal, not Phone).
+// Ordered by updated_at so user CORRECTIONS (moving a task between lists,
+// fixing its context) surface in the next capture's prompt — the AI learns
+// from edits, not just initial classifications.
 function getRecentClassifiedTasks(userId, limit = 10) {
   const db = getDb();
   const stmt = db.prepare(`
@@ -26,7 +29,7 @@ function getRecentClassifiedTasks(userId, limit = 10) {
       AND context IS NOT NULL
       AND context != ''
       AND list != 'inbox'
-    ORDER BY created_at DESC
+    ORDER BY updated_at DESC
     LIMIT ?
   `);
   stmt.bind([userId, limit]);
@@ -40,7 +43,7 @@ const router = Router();
 
 router.post('/smart-capture', async (req, res) => {
   try {
-    const { text } = req.body;
+    const { text, routing } = req.body;
     if (!text?.trim()) {
       return res.status(400).json({ error: 'Text is required' });
     }
@@ -59,6 +62,20 @@ router.post('/smart-capture', async (req, res) => {
       if (urls.length) taskData.notes = urls.join('\n');
       const task = TaskModel.create(taskData, req.user.id);
       return res.json({ task, ai: null, fallback: true });
+    }
+
+    // Confidence-gated routing: trust AI's list when confident, fall back to
+    // inbox when ambiguous (or when user opted into always-inbox mode).
+    // All other AI parsing (context, due date, project, etc.) is preserved
+    // regardless — the inbox becomes a triage holding bay with metadata
+    // pre-filled, not a re-do from scratch.
+    let routedToInbox = false;
+    if (routing === 'always_inbox' && ai.list !== 'inbox') {
+      ai.list = 'inbox';
+      routedToInbox = true;
+    } else if (routing !== 'always_inbox' && ai.list_confidence === 'low' && ai.list !== 'inbox') {
+      ai.list = 'inbox';
+      routedToInbox = true;
     }
 
     // Resolve project_id from AI's project_name suggestion (exact → includes → fuzzy)
@@ -114,7 +131,7 @@ router.post('/smart-capture', async (req, res) => {
       recurrence_days: ai.recurrence_days || null,
     };
     const task = TaskModel.create(taskData, req.user.id);
-    res.json({ task, ai, bookedSlot, slotSearchFailed });
+    res.json({ task, ai, bookedSlot, slotSearchFailed, routedToInbox });
     syncTaskToCalendar(req.user.id, task, req.clientTimezone).catch(err => console.error('syncTaskToCalendar (smart-capture):', err));
   } catch (error) {
     console.error('Smart capture error:', error);

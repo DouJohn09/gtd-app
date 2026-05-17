@@ -145,16 +145,36 @@ FREE-SLOT INTENT RULES (auto-scheduling):
 - Do NOT set find_free_slot when an explicit time is given — that case is already handled by scheduled_time.
 
 OTHER RULES:
-- Clean the title: remove parsed date/time references and recurrence patterns but keep the core action. Make it action-oriented (start with a verb).
+- Clean the title: remove parsed date/time references and recurrence patterns but keep the core action.
+- DO NOT invent action verbs. If the user typed a noun phrase ("birthday gift", "tax stuff", "groceries"), leave the title as a noun phrase. Inventing "Buy …" or "Handle …" disguises ambiguity that the user should resolve.
 - Detect "waiting for [person]" patterns → list: waiting_for, extract person name.
 - Detect vague/aspirational items ("someday", "maybe", "one day", "would be nice") → list: someday_maybe.
 - Default to next_actions if the task is clearly actionable.
 - Only use inbox if the input is genuinely ambiguous or needs clarification.
 
+LIST CONFIDENCE (critical — controls whether the task bypasses the inbox):
+- list_confidence: "high" | "medium" | "low"
+- IMPORTANT: judge confidence against the USER'S ORIGINAL INPUT, not your cleaned title. If you had to invent a verb, fix grammar, or guess at intent to make sense of the input, that is a strong LOW signal — even if the cleaned title now looks tidy.
+
+- HIGH: input is unambiguous on its own. Clear actionable verb + clear category in the raw text, OR explicit "waiting for X", OR explicit aspirational language ("someday", "maybe").
+- MEDIUM: list seems right but there's some doubt — vague action verb, edge-case wording, or matches the user's pattern only loosely.
+- LOW (default when in doubt): the raw input is just a noun or noun phrase with no verb ("birthday gift", "tax stuff"), OR the input is so terse you had to guess, OR it could plausibly fit multiple lists. Even if you can guess a plausible action, the original wording forces a LOW classification — let the user clarify in their inbox.
+
+EXAMPLES (these decide list_confidence):
+- "buy milk friday"   → high (verb + clear noun + date)
+- "call mom tomorrow" → high (verb + person + date)
+- "email Sarah Q3"    → high (verb + person + topic)
+- "birthday gift"     → LOW (noun phrase, no verb in the raw input)
+- "tax stuff"         → LOW (vague noun, no verb)
+- "follow up"         → LOW (verb but no object — what are we following up on?)
+- "groceries"         → LOW (single noun)
+- "remember to back up the laptop someday" → high (clear someday_maybe signal)
+
 Respond with JSON:
 {
   "title": "cleaned action-oriented title without date references",
   "list": "inbox|next_actions|waiting_for|someday_maybe",
+  "list_confidence": "high|medium|low",
   "context": "${contextOptions}|null",
   "priority": 1-5,
   "energy_level": "low|medium|high",

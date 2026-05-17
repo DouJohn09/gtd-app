@@ -44,11 +44,14 @@ export default function QuickCapture({ onCapture, placeholder = "Quick capture �
     setLoading(true);
     try {
       if (smartMode) {
-        const { ai, fallback, bookedSlot, slotSearchFailed } = await api.ai.smartCapture(title.trim());
+        const routing = localStorage.getItem('smart_capture_routing') || 'auto_route';
+        const { ai, fallback, bookedSlot, slotSearchFailed, routedToInbox } = await api.ai.smartCapture(title.trim(), routing);
         setTitle('');
         if (fallback || !ai) addToast('Captured to inbox (AI unavailable)', 'info');
         else if (bookedSlot) addToast(formatBookedToast(bookedSlot), 'success');
         else if (slotSearchFailed) addToast('No free slot found — captured without booking', 'info');
+        else if (routedToInbox && routing === 'always_inbox') addToast(formatAiToast(ai), 'success');
+        else if (routedToInbox) addToast(`Added to Inbox · AI wasn't sure where`, 'info');
         else addToast(formatAiToast(ai), 'success');
       } else {
         await api.tasks.create({ title: title.trim() });
