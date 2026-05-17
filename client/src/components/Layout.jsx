@@ -292,9 +292,46 @@ export default function Layout() {
               {navGroups.flatMap(g => g.items)
                 .filter(i => !mobileTabs.some(m => m.to === i.to))
                 .map(i => <NavItem key={i.to} {...i} onClick={() => setMoreOpen(false)} />)}
+
+              {/* Custom lists */}
+              <div className="mt-4">
+                <div className="flex items-center justify-between px-3 mb-1">
+                  <div className="mono-label">lists</div>
+                  <button
+                    onClick={() => { setMoreOpen(false); setShowNewList(true); }}
+                    className="grid place-items-center w-5 h-5 rounded-md text-text-3 hover:text-text-1 hover:bg-white/[0.06] transition-colors"
+                    title="New list"
+                  >
+                    <Plus className="w-3 h-3" />
+                  </button>
+                </div>
+                {customLists.length === 0 ? (
+                  <button
+                    onClick={() => { setMoreOpen(false); setShowNewList(true); }}
+                    className="flex items-center gap-3 px-3 py-2 rounded-xl text-[13px] text-text-3 hover:text-text-1 hover:bg-white/[0.04] transition-colors w-full"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>Create a list</span>
+                  </button>
+                ) : (
+                  customLists.map((cl) => {
+                    const CLIcon = ICON_MAP[cl.icon] || List;
+                    return (
+                      <NavItem
+                        key={cl.id}
+                        to={`/custom-lists/${cl.id}`}
+                        icon={CLIcon}
+                        label={cl.name}
+                        onClick={() => setMoreOpen(false)}
+                      />
+                    );
+                  })
+                )}
+              </div>
+
               <button
                 onClick={() => { setMoreOpen(false); logout(); }}
-                className="flex items-center gap-3 px-3 py-2 rounded-xl text-[13.5px] text-text-2 hover:text-text-1 hover:bg-white/[0.04]"
+                className="flex items-center gap-3 px-3 py-2 rounded-xl text-[13.5px] text-text-2 hover:text-text-1 hover:bg-white/[0.04] mt-2"
               >
                 <LogOut className="w-4 h-4" /> Sign out
               </button>
