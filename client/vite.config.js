@@ -1,15 +1,81 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react(),
+    VitePWA({
+      // New SW versions install silently when the user reopens the app.
+      // Manual update prompts would be more correct but add UI churn for an
+      // app that may ship multiple times per day.
+      registerType: 'autoUpdate',
+      // Vite copies anything under client/public/ to dist/, but vite-plugin-pwa
+      // needs to know which of those are referenced from the manifest/HTML so
+      // it can include them in the SW precache.
+      includeAssets: [
+        'favicon.png',
+        'icons/apple-touch-icon.png',
+      ],
+      manifest: {
+        name: 'Cleartable',
+        short_name: 'Cleartable',
+        description: 'The calm GTD app — capture, clarify, review.',
+        // Theme + bg colors match the in-app dark aesthetic so the iOS/Android
+        // splash screen doesn't flash white before the app loads.
+        theme_color: '#0b0b13',
+        background_color: '#0b0b13',
+        display: 'standalone',
+        orientation: 'any',
+        scope: '/',
+        start_url: '/',
+        icons: [
+          {
+            src: '/icons/icon-192.png',
+            sizes: '192x192',
+            type: 'image/png',
+            purpose: 'any',
+          },
+          {
+            src: '/icons/icon-512.png',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'any',
+          },
+          {
+            src: '/icons/icon-512-maskable.png',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'maskable',
+          },
+        ],
+      },
+      workbox: {
+        // Precache hashed Vite assets. NEVER precache /api/* — task data must
+        // be fresh on every request, not served from a stale cache.
+        navigateFallbackDenylist: [/^\/api\//],
+        // Tell Workbox to skip API requests entirely so they go to the network.
+        runtimeCaching: [
+          {
+            urlPattern: ({ url }) => url.pathname.startsWith('/api/'),
+            handler: 'NetworkOnly',
+          },
+        ],
+      },
+      // Dev mode: don't generate a SW (it can stick around and serve stale
+      // assets even after the dev server restarts).
+      devOptions: {
+        enabled: false,
+      },
+    }),
+  ],
   server: {
     port: 5173,
     proxy: {
       '/api': {
         target: 'http://localhost:3001',
-        changeOrigin: true
-      }
-    }
-  }
+        changeOrigin: true,
+      },
+    },
+  },
 });
