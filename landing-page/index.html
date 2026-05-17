@@ -6,14 +6,32 @@
   <title>Cleartable — Clear your table. Clear your mind.</title>
   <meta name="description" content="A calm, AI-powered task manager built on the principles of Getting Things Done. Capture everything, let AI clarify, review weekly. Never feel behind." />
 
+  <!-- Open Graph -->
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="Cleartable" />
+  <meta property="og:url" content="https://cleartable.app" />
+  <meta property="og:title" content="Cleartable — Clear your table. Clear your mind." />
+  <meta property="og:description" content="A calm, AI-powered task manager built on the principles of Getting Things Done. Capture everything, let AI clarify, review weekly." />
+  <meta property="og:image" content="https://cleartable.app/og-image.png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+
+  <!-- Twitter -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Cleartable — Clear your table. Clear your mind." />
+  <meta name="twitter:description" content="A calm, AI-powered task manager built on the principles of Getting Things Done." />
+  <meta name="twitter:image" content="https://cleartable.app/og-image.png" />
+
+  <meta name="theme-color" content="#F9F8F6" />
+
   <!-- Fonts (same family as the app) -->
   <link rel="preconnect" href="https://api.fontshare.com" crossorigin />
   <link rel="stylesheet" href="https://api.fontshare.com/v2/css?f[]=instrument-serif@400i,400&f[]=geist-mono@400,500&f[]=satoshi@400,500,700&display=swap" />
 
   <link rel="stylesheet" href="style.css" />
 
-  <!-- Favicon placeholder -->
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>✦</text></svg>" />
+  <!-- Favicon: stylized "ct" sparkle mark -->
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='14' fill='%237C3AED'/><path d='M32 14l3.2 9.8a3.4 3.4 0 002.2 2.2L47 29l-9.8 3.2a3.4 3.4 0 00-2.2 2.2L32 44l-3.2-9.8a3.4 3.4 0 00-2.2-2.2L17 29l9.8-3.2a3.4 3.4 0 002.2-2.2L32 14z' fill='%23fff'/></svg>" />
 </head>
 <body>
 
@@ -108,9 +126,9 @@
           <div class="feature-icon mint">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
           </div>
-          <h3>Calendar time blocking</h3>
-          <p>Drag tasks onto your day. Snap to 15-minute slots, resize blocks, push to a dedicated Google Calendar — your primary stays untouched.</p>
-          <span class="feature-tag mint">google calendar sync built in</span>
+          <h3>AI auto-scheduling</h3>
+          <p>Type <em>"find me 30 min tomorrow afternoon"</em> — Cleartable reads your calendar, finds the first open slot, and books it. Drag-and-drop time blocking syncs to a dedicated Google Calendar so your primary stays untouched.</p>
+          <span class="feature-tag mint">smart capture + google calendar</span>
         </div>
         <div class="feature-card reveal">
           <div class="feature-icon amber">
@@ -178,11 +196,13 @@
           <div class="preview-dot"></div>
         </div>
         <div class="preview-body" id="preview-body">
-          <!-- Replace this placeholder with an actual screenshot: -->
-          <!-- <img src="screenshot.png" alt="Cleartable app screenshot" /> -->
-          <div class="note">screenshot coming soon</div>
+          <!-- Replace this placeholder with the demo video before launch: -->
+          <!-- <video src="demo.mp4" poster="demo-poster.jpg" controls autoplay muted loop></video> -->
+          <div class="play-icon" aria-hidden="true">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+          </div>
           <div class="tagline">A clear mind starts here.</div>
-          <div class="note">neo-modern glass ui · dark mode · aurora gradients</div>
+          <div class="note">90-second walkthrough coming soon</div>
         </div>
       </div>
     </div>
@@ -233,6 +253,91 @@
     </div>
   </section>
 
+  <!-- ========== Founder ========== -->
+  <section class="founder">
+    <div class="container">
+      <div class="founder-card reveal">
+        <div class="founder-avatar" aria-hidden="true">JB</div>
+        <div class="founder-body">
+          <div class="mono-label violet" style="margin-bottom: 8px;">built by one person</div>
+          <p class="founder-quote">
+            "I built Cleartable because I do GTD every day and every existing app either felt dated, locked me to Apple, or treated GTD as an afterthought. I'm building this in public — slowly, calmly, with users in the loop."
+          </p>
+          <div class="founder-meta">
+            <span class="founder-name">Jan Bambas</span>
+            <span class="founder-sep">·</span>
+            <!-- TODO: replace with your real X/Twitter handle -->
+            <a href="https://x.com/" target="_blank" rel="noopener" class="founder-link">Follow the build on X →</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== FAQ ========== -->
+  <section class="faq">
+    <div class="container">
+      <div class="mono-label" style="text-align: center; margin-bottom: 12px;">questions</div>
+      <h2>What people ask first.</h2>
+      <div class="faq-list">
+        <details class="faq-item">
+          <summary>
+            <span>When is Cleartable launching?</span>
+            <span class="faq-icon" aria-hidden="true">+</span>
+          </summary>
+          <div class="faq-answer">
+            Soft launch on r/gtd within weeks, broader release shortly after. Join the waitlist to be notified first — early adopters lock in the launch pricing (including the $80 lifetime deal, first 100 buyers only).
+          </div>
+        </details>
+        <details class="faq-item">
+          <summary>
+            <span>Does it work on mobile?</span>
+            <span class="faq-icon" aria-hidden="true">+</span>
+          </summary>
+          <div class="faq-answer">
+            Yes — Cleartable is a web app that works on any device with a browser. A PWA (installable home-screen app, offline support) is shipping before public launch, so no app store wait.
+          </div>
+        </details>
+        <details class="faq-item">
+          <summary>
+            <span>Do I need to know GTD to use it?</span>
+            <span class="faq-icon" aria-hidden="true">+</span>
+          </summary>
+          <div class="faq-answer">
+            Not at all. The structure (Inbox, Next Actions, Projects, Someday/Maybe) is intuitive even without studying David Allen's book. GTD practitioners get a system built around their methodology; everyone else gets a calm task manager that just works.
+          </div>
+        </details>
+        <details class="faq-item">
+          <summary>
+            <span>Is my data private?</span>
+            <span class="faq-icon" aria-hidden="true">+</span>
+          </summary>
+          <div class="faq-answer">
+            Yes. Sign-in is Google OAuth — we never see your password. Your tasks are stored privately, never sold, and never used to train external AI models. AI features call OpenAI on demand only; nothing is retained for training.
+          </div>
+        </details>
+        <details class="faq-item">
+          <summary>
+            <span>Can I export my data?</span>
+            <span class="faq-icon" aria-hidden="true">+</span>
+          </summary>
+          <div class="faq-answer">
+            Always. Full JSON backup and Todoist-compatible CSV export are built in. Your data is yours — leave anytime, no lock-in.
+          </div>
+        </details>
+        <details class="faq-item">
+          <summary>
+            <span>Why not just use Todoist or Things?</span>
+            <span class="faq-icon" aria-hidden="true">+</span>
+          </summary>
+          <div class="faq-answer">
+            Todoist treats GTD as an afterthought (no defer dates, no review mode). Things is Apple-only and has no AI. OmniFocus is Apple-only and costs $10/month. Cleartable is cross-platform, GTD-native, and AI-powered at half the price of Todoist Pro.
+          </div>
+        </details>
+      </div>
+    </div>
+  </section>
+
   <!-- ========== Bottom CTA ========== -->
   <section class="bottom-cta">
     <div class="container">
@@ -278,27 +383,72 @@
 
     document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
 
-    // Waitlist form handling
+    // ========== Waitlist form ==========
+    //
+    // Set WAITLIST_ENDPOINT to one of:
+    //   • Formspree:   "https://formspree.io/f/YOUR_FORM_ID"
+    //   • Buttondown:  "https://buttondown.email/api/emails/embed-subscribe/YOUR_USERNAME"
+    //   • ConvertKit:  "https://app.convertkit.com/forms/YOUR_FORM_ID/subscriptions"
+    //   • Your own:    "https://cleartable.app/api/waitlist"
+    //
+    // Until configured, submissions are logged to the console (dev mode).
+    const WAITLIST_ENDPOINT = '';
+
+    async function submitWaitlist(form) {
+      const button = form.querySelector('button');
+      const input = form.querySelector('input[type="email"]');
+      const originalLabel = button.textContent;
+      const email = input.value.trim();
+
+      if (!email) return;
+
+      button.disabled = true;
+      input.disabled = true;
+      button.textContent = 'Joining…';
+      form.classList.remove('has-error');
+
+      try {
+        if (WAITLIST_ENDPOINT) {
+          const res = await fetch(WAITLIST_ENDPOINT, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+            body: JSON.stringify({ email })
+          });
+          if (!res.ok) throw new Error('submission_failed');
+        } else {
+          console.log('[Cleartable] Waitlist signup (no endpoint configured):', email);
+          await new Promise(r => setTimeout(r, 500));
+        }
+
+        if (form.id === 'waitlist-form') {
+          form.style.display = 'none';
+          const note = document.getElementById('capture-note');
+          if (note) note.style.display = 'none';
+          const success = document.getElementById('form-success');
+          if (success) success.style.display = 'block';
+        } else {
+          button.textContent = "You're in!";
+        }
+      } catch (err) {
+        button.disabled = false;
+        input.disabled = false;
+        button.textContent = originalLabel;
+        form.classList.add('has-error');
+        const errorEl = form.querySelector('.form-error') || (() => {
+          const el = document.createElement('div');
+          el.className = 'form-error';
+          el.textContent = "Something went wrong. Please try again.";
+          form.insertAdjacentElement('afterend', el);
+          return el;
+        })();
+        errorEl.style.display = 'block';
+      }
+    }
+
     document.querySelectorAll('#waitlist-form, #waitlist-form-bottom').forEach(form => {
       form.addEventListener('submit', (e) => {
         e.preventDefault();
-        const email = form.querySelector('input[type="email"]').value;
-
-        // TODO: Replace with your email capture endpoint
-        // Example: fetch('/api/waitlist', { method: 'POST', body: JSON.stringify({ email }) })
-        console.log('Waitlist signup:', email);
-
-        // Show success state (hero form only)
-        if (form.id === 'waitlist-form') {
-          form.style.display = 'none';
-          document.getElementById('capture-note').style.display = 'none';
-          const success = document.getElementById('form-success');
-          success.style.display = 'block';
-        } else {
-          form.querySelector('button').textContent = 'You\'re in!';
-          form.querySelector('button').disabled = true;
-          form.querySelector('input').disabled = true;
-        }
+        submitWaitlist(form);
       });
     });
   </script>
