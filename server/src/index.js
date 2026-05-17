@@ -14,6 +14,7 @@ import habitsRouter from './routes/habits.js';
 import exportRouter from './routes/export.js';
 import importRouter from './routes/import.js';
 import customListsRouter from './routes/customLists.js';
+import waitlistRouter from './routes/waitlist.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -30,8 +31,9 @@ app.use((req, _res, next) => {
   next();
 });
 
-// Auth routes (unprotected)
+// Public routes (no auth)
 app.use('/api/auth', authRouter);
+app.use('/api/waitlist', waitlistRouter);
 
 // Protected routes
 app.use('/api/tasks', requireAuth, tasksRouter);

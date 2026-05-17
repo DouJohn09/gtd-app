@@ -176,6 +176,7 @@ gtd-app/
 - **Neo-modern glass UI** — Aurora gradient background, frosted glass cards, semantic color tones per GTD list (inbox→amber, next→mint, waiting→rose, someday→violet); Instrument Serif display headings, Geist Mono labels; ⌘K global capture
 - **Dark mode (locked)** — Aesthetic is dark-only at present; CSS-variable design tokens are architected so a future light theme is a single `:root:not(.dark)` override
 - **Responsive Design** — Sidebar on desktop, bottom-tab nav on mobile
+- **PWA installable** — Web app manifest + Workbox service worker so Cleartable can be pinned to a phone home screen (iOS Add-to-Home-Screen, Android Install prompt) or installed as a desktop app via Chrome's install button. Shell loads offline; `/api/*` is NetworkOnly so task data is always fresh
 - **Google OAuth** — Secure login, multi-user support
 
 ---
@@ -562,6 +563,7 @@ Given subscription fatigue and Todoist's backlash ($48 → $60/yr):
 41. Postgres cutover on Railway (Phase 6) — `gtd-app` service wired to `DATABASE_URL` reference of the Postgres addon. Schema migration ran against Railway PG via `DATABASE_PUBLIC_URL` (the internal `postgres.railway.internal` hostname is only resolvable inside Railway's network). Prod cleartable.app verified healthy.
 42. Data recovery from Railway volume — legacy `/data/gtd.db` (164K) survived on the `gtd-app-volume` mount across the deploy. Recovered via a temporary token-protected `GET /__recovery/gtd-db` endpoint streamed to local Mac, since `railway ssh` host-key verification doesn't auto-accept in non-TTY. `server/scripts/recover-user-data.js` then migrated jan.bambas@rohlik.cz's 80 tasks + 7 projects + 4 habits + 15 habit logs + 1 custom list + 7 list items + 8 contexts (local user_id=2 → prod user_id=1) with full FK remapping.
 43. Pre-created theliau.bevilacqua@rohlik.cz prod user row directly from sqlite (preserving google_id so Google OAuth matches on next login), then migrated their 5 tasks + 6 contexts. Recovery endpoint reverted, RECOVERY_TOKEN unset, local copy of prod DB deleted.
+44. PWA support via `vite-plugin-pwa` — manifest.webmanifest, Workbox service worker (autoUpdate, precaches ~461 KiB app shell, NetworkOnly for `/api/*` so task data is never stale), iOS Add-to-Home-Screen meta tags, theme-color matching the dark UI. App icons (192/512/512-maskable/180/favicon) generated from the brand identity (violet→mint gradient + Lucide Sparkles glyph) by a one-source-SVG script (`npm run pwa:icons`).
 
 ---
 
@@ -607,7 +609,7 @@ Features to build, ordered by impact and launch-readiness.
 ### P1 — High impact, build before or shortly after launch
 | # | Feature | Why | Effort | Status |
 |---|---------|-----|--------|--------|
-| 4 | **PWA support** | Installable on mobile without native apps. Eliminates "no mobile app" objection. | Low | |
+| 4 | ~~**PWA support**~~ | `vite-plugin-pwa` (Workbox SW + manifest + autoUpdate). App icons generated from brand identity. iOS Add-to-Home-Screen meta tags. Installable on Chrome, Edge, Safari iOS, Safari macOS. | Low | **Shipped** |
 | 5 | ~~**Calendar time blocking (Phase 3)**~~ | Drag tasks onto time slots, snap, resize, push to dedicated Cleartable calendar. | High | **Shipped** |
 | 6 | ~~**AI-assisted scheduling (Phase 4)**~~ | Smart Capture detects free-slot intent and books first open window inside working hours. | Medium | **Shipped (MVP)** |
 | 7 | **Saved filters / custom views** | Power user perspectives: "high-energy @office tasks due this week". OmniFocus killer feature. | Medium | |

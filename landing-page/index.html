@@ -385,14 +385,11 @@
 
     // ========== Waitlist form ==========
     //
-    // Set WAITLIST_ENDPOINT to one of:
-    //   • Formspree:   "https://formspree.io/f/YOUR_FORM_ID"
-    //   • Buttondown:  "https://buttondown.email/api/emails/embed-subscribe/YOUR_USERNAME"
-    //   • ConvertKit:  "https://app.convertkit.com/forms/YOUR_FORM_ID/subscriptions"
-    //   • Your own:    "https://cleartable.app/api/waitlist"
-    //
-    // Until configured, submissions are logged to the console (dev mode).
-    const WAITLIST_ENDPOINT = '';
+    // Posts to our own Express API. Emails land in the `waitlist` table in
+    // Postgres so we own the data and can email the list ourselves at launch.
+    // Absolute URL so the form works even if the landing page is ever served
+    // from a different origin than the API.
+    const WAITLIST_ENDPOINT = 'https://cleartable.app/api/waitlist';
 
     async function submitWaitlist(form) {
       const button = form.querySelector('button');
@@ -407,12 +404,16 @@
       button.textContent = 'Joining…';
       form.classList.remove('has-error');
 
+      // Track which form converted ('hero' = top of page, 'bottom-cta' = end).
+      // Tagged on the row so we can compare placement performance later.
+      const source = form.id === 'waitlist-form' ? 'hero' : 'bottom-cta';
+
       try {
         if (WAITLIST_ENDPOINT) {
           const res = await fetch(WAITLIST_ENDPOINT, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-            body: JSON.stringify({ email })
+            body: JSON.stringify({ email, source })
           });
           if (!res.ok) throw new Error('submission_failed');
         } else {
