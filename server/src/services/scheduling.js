@@ -69,7 +69,7 @@ function collectBusyRanges(userId, dateStr, gcalEvents, ownTasks) {
 export async function findFreeSlot(userId, dateStr, durationMins) {
   const { start: workStart, end: workEnd } = workingHoursFor(dateStr);
 
-  const ownTasks = TaskModel.getByDateRange(dateStr, dateStr, userId);
+  const ownTasks = await TaskModel.getByDateRange(dateStr, dateStr, userId);
   let gcalEvents = [];
   try {
     gcalEvents = await getCalendarEvents(userId, dateStr, dateStr);

@@ -1,25 +1,21 @@
 import { Router } from 'express';
-import { getDb, saveDb } from '../db/schema.js';
+import { pool } from '../db/pool.js';
 
 const router = Router();
 
-router.get('/', (req, res) => {
+router.get('/', async (req, res) => {
   try {
-    const db = getDb();
-    const stmt = db.prepare('SELECT * FROM contexts WHERE user_id = ? ORDER BY name');
-    stmt.bind([req.user.id]);
-    const results = [];
-    while (stmt.step()) {
-      results.push(stmt.getAsObject());
-    }
-    stmt.free();
-    res.json(results);
+    const { rows } = await pool.query(
+      'SELECT * FROM contexts WHERE user_id = $1 ORDER BY name',
+      [req.user.id]
+    );
+    res.json(rows);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
-router.post('/', (req, res) => {
+router.post('/', async (req, res) => {
   try {
     let { name } = req.body;
     if (!name || !name.trim()) {
@@ -30,25 +26,26 @@ router.post('/', (req, res) => {
       name = '@' + name;
     }
 
-    const db = getDb();
-    db.run('INSERT INTO contexts (name, user_id) VALUES (?, ?)', [name, req.user.id]);
-    const id = db.exec("SELECT last_insert_rowid() as id")[0].values[0][0];
-    saveDb();
-
-    res.status(201).json({ id, name, user_id: req.user.id });
+    const { rows } = await pool.query(
+      'INSERT INTO contexts (name, user_id) VALUES ($1, $2) RETURNING id',
+      [name, req.user.id]
+    );
+    res.status(201).json({ id: rows[0].id, name, user_id: req.user.id });
   } catch (error) {
-    if (error.message.includes('UNIQUE constraint')) {
+    // PG unique violation: code '23505'
+    if (error.code === '23505') {
       return res.status(409).json({ error: 'Context already exists' });
     }
     res.status(500).json({ error: error.message });
   }
 });
 
-router.delete('/:id', (req, res) => {
+router.delete('/:id', async (req, res) => {
   try {
-    const db = getDb();
-    db.run('DELETE FROM contexts WHERE id = ? AND user_id = ?', [req.params.id, req.user.id]);
-    saveDb();
+    await pool.query(
+      'DELETE FROM contexts WHERE id = $1 AND user_id = $2',
+      [req.params.id, req.user.id]
+    );
     res.status(204).send();
   } catch (error) {
     res.status(500).json({ error: error.message });

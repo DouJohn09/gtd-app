@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { OAuth2Client } from 'google-auth-library';
 import jwt from 'jsonwebtoken';
-import { getDb, saveDb } from '../db/schema.js';
+import { pool } from '../db/pool.js';
 import { requireAuth } from '../middleware/auth.js';
 import { exchangeCodeForTokens, revokeCalendarAccess, isCalendarConnected } from '../services/googleCalendar.js';
 
@@ -19,39 +19,44 @@ router.post('/google', async (req, res) => {
     const payload = ticket.getPayload();
     const { sub: googleId, email, name, picture } = payload;
 
-    const db = getDb();
-    const stmt = db.prepare('SELECT * FROM users WHERE google_id = ?');
-    stmt.bind([googleId]);
+    const { rows: existingRows } = await pool.query(
+      'SELECT * FROM users WHERE google_id = $1',
+      [googleId]
+    );
     let user;
 
-    if (stmt.step()) {
-      user = stmt.getAsObject();
-      stmt.free();
-      db.run('UPDATE users SET last_login = CURRENT_TIMESTAMP, name = ?, picture = ? WHERE id = ?',
-        [name, picture, user.id]);
+    if (existingRows[0]) {
+      user = existingRows[0];
+      await pool.query(
+        'UPDATE users SET last_login = NOW(), name = $1, picture = $2 WHERE id = $3',
+        [name, picture, user.id]
+      );
 
       // Seed default contexts for existing users who don't have any
-      const ctxCount = db.exec(`SELECT COUNT(*) FROM contexts WHERE user_id = ${user.id}`);
-      if (ctxCount[0]?.values[0][0] === 0) {
+      const { rows: ctxCountRows } = await pool.query(
+        'SELECT COUNT(*)::int AS cnt FROM contexts WHERE user_id = $1',
+        [user.id]
+      );
+      if ((ctxCountRows[0]?.cnt ?? 0) === 0) {
         const defaultContexts = ['@home', '@work', '@errands', '@computer', '@phone', '@anywhere'];
-        for (const ctx of defaultContexts) {
-          db.run('INSERT INTO contexts (name, user_id) VALUES (?, ?)', [ctx, user.id]);
-        }
+        await Promise.all(defaultContexts.map(ctx =>
+          pool.query('INSERT INTO contexts (name, user_id) VALUES ($1, $2)', [ctx, user.id])
+        ));
       }
     } else {
-      stmt.free();
-      db.run('INSERT INTO users (google_id, email, name, picture) VALUES (?, ?, ?, ?)',
-        [googleId, email, name, picture]);
-      const id = db.exec("SELECT last_insert_rowid() as id")[0].values[0][0];
+      const { rows: insertRows } = await pool.query(
+        'INSERT INTO users (google_id, email, name, picture) VALUES ($1, $2, $3, $4) RETURNING id',
+        [googleId, email, name, picture]
+      );
+      const id = insertRows[0].id;
       user = { id, google_id: googleId, email, name, picture };
 
       // Seed default contexts for new user
       const defaultContexts = ['@home', '@work', '@errands', '@computer', '@phone', '@anywhere'];
-      for (const ctx of defaultContexts) {
-        db.run('INSERT INTO contexts (name, user_id) VALUES (?, ?)', [ctx, id]);
-      }
+      await Promise.all(defaultContexts.map(ctx =>
+        pool.query('INSERT INTO contexts (name, user_id) VALUES ($1, $2)', [ctx, id])
+      ));
     }
-    saveDb();
 
     const token = jwt.sign(
       { userId: user.id, email: user.email },
@@ -69,35 +74,36 @@ router.post('/google', async (req, res) => {
   }
 });
 
-router.get('/me', (req, res) => {
+router.get('/me', async (req, res) => {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return res.status(401).json({ error: 'Not authenticated' });
   }
   try {
     const payload = jwt.verify(authHeader.split(' ')[1], process.env.JWT_SECRET);
-    const db = getDb();
-    const stmt = db.prepare('SELECT id, email, name, picture, (google_calendar_refresh_token IS NOT NULL OR google_calendar_access_token IS NOT NULL) as google_calendar_connected, google_calendar_scopes FROM users WHERE id = ?');
-    stmt.bind([payload.userId]);
-    if (stmt.step()) {
-      const user = stmt.getAsObject();
-      stmt.free();
-      user.google_calendar_connected = !!user.google_calendar_connected;
-      user.google_calendar_write = (user.google_calendar_scopes || '').includes('https://www.googleapis.com/auth/calendar');
-      delete user.google_calendar_scopes;
-      return res.json({ user });
-    }
-    stmt.free();
-    return res.status(401).json({ error: 'User not found' });
+    const { rows } = await pool.query(
+      `SELECT id, email, name, picture,
+              (google_calendar_refresh_token IS NOT NULL OR google_calendar_access_token IS NOT NULL) AS google_calendar_connected,
+              google_calendar_scopes
+       FROM users WHERE id = $1`,
+      [payload.userId]
+    );
+    const user = rows[0];
+    if (!user) return res.status(401).json({ error: 'User not found' });
+
+    user.google_calendar_connected = !!user.google_calendar_connected;
+    user.google_calendar_write = (user.google_calendar_scopes || '').includes('https://www.googleapis.com/auth/calendar');
+    delete user.google_calendar_scopes;
+    return res.json({ user });
   } catch {
     return res.status(401).json({ error: 'Invalid token' });
   }
 });
 
 // Google Calendar connection routes (require auth)
-router.get('/google-calendar/status', requireAuth, (req, res) => {
+router.get('/google-calendar/status', requireAuth, async (req, res) => {
   try {
-    const connected = isCalendarConnected(req.user.id);
+    const connected = await isCalendarConnected(req.user.id);
     res.json({ connected });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -111,20 +117,18 @@ router.post('/google-calendar', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'Authorization code is required' });
     }
     const tokens = await exchangeCodeForTokens(code);
-    const db = getDb();
     // If Google didn't return a refresh_token (re-authorization), keep the existing one
     if (tokens.refresh_token) {
-      db.run(
-        'UPDATE users SET google_calendar_access_token = ?, google_calendar_refresh_token = ?, google_calendar_token_expiry = ?, google_calendar_scopes = ? WHERE id = ?',
-        [tokens.access_token, tokens.refresh_token, tokens.expiry_date, tokens.scope, req.user.id]
+      await pool.query(
+        'UPDATE users SET google_calendar_access_token = $1, google_calendar_refresh_token = $2, google_calendar_token_expiry = $3, google_calendar_scopes = $4 WHERE id = $5',
+        [tokens.access_token, tokens.refresh_token, String(tokens.expiry_date), tokens.scope, req.user.id]
       );
     } else {
-      db.run(
-        'UPDATE users SET google_calendar_access_token = ?, google_calendar_token_expiry = ?, google_calendar_scopes = ? WHERE id = ?',
-        [tokens.access_token, tokens.expiry_date, tokens.scope, req.user.id]
+      await pool.query(
+        'UPDATE users SET google_calendar_access_token = $1, google_calendar_token_expiry = $2, google_calendar_scopes = $3 WHERE id = $4',
+        [tokens.access_token, String(tokens.expiry_date), tokens.scope, req.user.id]
       );
     }
-    saveDb();
     res.json({ connected: true, hasWriteScope: (tokens.scope || '').includes('https://www.googleapis.com/auth/calendar') });
   } catch (error) {
     console.error('Google Calendar connect error:', error);

@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { getDb, saveDb } from '../db/schema.js';
+import { pool } from '../db/pool.js';
 
 const router = Router();
 
@@ -10,39 +10,20 @@ const normalizeCategory = (cat) => {
   return trimmed.charAt(0).toUpperCase() + trimmed.slice(1).toLowerCase();
 };
 
-// Helper to get rows as objects
-function queryAll(db, sql, params = []) {
-  const stmt = db.prepare(sql);
-  if (params.length) stmt.bind(params);
-  const results = [];
-  while (stmt.step()) results.push(stmt.getAsObject());
-  stmt.free();
-  return results;
-}
-
-function queryOne(db, sql, params = []) {
-  const stmt = db.prepare(sql);
-  if (params.length) stmt.bind(params);
-  const row = stmt.step() ? stmt.getAsObject() : null;
-  stmt.free();
-  return row;
-}
-
 // GET /api/habits - list active habits with today's completion status
-router.get('/', (req, res) => {
+router.get('/', async (req, res) => {
   try {
-    const db = getDb();
     const today = new Date().toISOString().split('T')[0];
-    const habits = queryAll(db,
-      'SELECT * FROM habits WHERE user_id = ? AND active = 1 ORDER BY category, name',
-      [req.user.id]
-    );
-
-    // Get today's completions
-    const todayLogs = queryAll(db,
-      'SELECT habit_id FROM habit_logs WHERE user_id = ? AND completed_date = ?',
-      [req.user.id, today]
-    );
+    const [{ rows: habits }, { rows: todayLogs }] = await Promise.all([
+      pool.query(
+        'SELECT * FROM habits WHERE user_id = $1 AND active = true ORDER BY category, name',
+        [req.user.id]
+      ),
+      pool.query(
+        'SELECT habit_id FROM habit_logs WHERE user_id = $1 AND completed_date = $2',
+        [req.user.id, today]
+      ),
+    ]);
     const completedToday = new Set(todayLogs.map(l => l.habit_id));
 
     const result = habits.map(h => ({
@@ -58,25 +39,24 @@ router.get('/', (req, res) => {
 });
 
 // GET /api/habits/stats - streaks, completion rates, heatmap data
-router.get('/stats', (req, res) => {
+router.get('/stats', async (req, res) => {
   try {
-    const db = getDb();
-    const habits = queryAll(db,
-      'SELECT * FROM habits WHERE user_id = ? AND active = 1 ORDER BY name',
-      [req.user.id]
-    );
-
     // Get all logs for the past 90 days
     const ninetyDaysAgo = new Date();
     ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
     const startDate = ninetyDaysAgo.toISOString().split('T')[0];
 
-    const allLogs = queryAll(db,
-      'SELECT habit_id, completed_date FROM habit_logs WHERE user_id = ? AND completed_date >= ? ORDER BY completed_date',
-      [req.user.id, startDate]
-    );
+    const [{ rows: habits }, { rows: allLogs }] = await Promise.all([
+      pool.query(
+        'SELECT * FROM habits WHERE user_id = $1 AND active = true ORDER BY name',
+        [req.user.id]
+      ),
+      pool.query(
+        'SELECT habit_id, completed_date FROM habit_logs WHERE user_id = $1 AND completed_date >= $2 ORDER BY completed_date',
+        [req.user.id, startDate]
+      ),
+    ]);
 
-    // Build per-habit stats
     const today = new Date().toISOString().split('T')[0];
     const habitStats = habits.map(habit => {
       const logs = allLogs.filter(l => l.habit_id === habit.id);
@@ -91,7 +71,6 @@ router.get('/stats', (req, res) => {
           streak++;
           d.setDate(d.getDate() - 1);
         } else if (dateStr === today) {
-          // Today not yet completed, check yesterday
           d.setDate(d.getDate() - 1);
         } else {
           break;
@@ -99,8 +78,6 @@ router.get('/stats', (req, res) => {
       }
 
       // Completion rate (last 30 days)
-      const thirtyDaysAgo = new Date();
-      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
       let expectedDays = 0;
       let completedDays = 0;
       for (let i = 0; i < 30; i++) {
@@ -138,22 +115,27 @@ router.get('/stats', (req, res) => {
 });
 
 // POST /api/habits - create a habit
-router.post('/', (req, res) => {
+router.post('/', async (req, res) => {
   try {
     const { name, description, frequency, target_days, category, color } = req.body;
     if (!name?.trim()) {
       return res.status(400).json({ error: 'Habit name is required' });
     }
 
-    const db = getDb();
-    db.run(
-      'INSERT INTO habits (name, description, frequency, target_days, category, color, user_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [name.trim(), description || null, frequency || 'daily', target_days ? JSON.stringify(target_days) : null, normalizeCategory(category), color || '#3b82f6', req.user.id]
+    const { rows } = await pool.query(
+      `INSERT INTO habits (name, description, frequency, target_days, category, color, user_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+      [
+        name.trim(),
+        description || null,
+        frequency || 'daily',
+        target_days ? JSON.stringify(target_days) : null,
+        normalizeCategory(category),
+        color || '#3b82f6',
+        req.user.id,
+      ]
     );
-    const id = db.exec("SELECT last_insert_rowid() as id")[0].values[0][0];
-    saveDb();
-
-    const habit = queryOne(db, 'SELECT * FROM habits WHERE id = ?', [id]);
+    const habit = rows[0];
     habit.target_days = habit.target_days ? JSON.parse(habit.target_days) : null;
     habit.completed_today = false;
     res.status(201).json(habit);
@@ -163,28 +145,35 @@ router.post('/', (req, res) => {
 });
 
 // PUT /api/habits/:id - update a habit
-router.put('/:id', (req, res) => {
+router.put('/:id', async (req, res) => {
   try {
     const { name, description, frequency, target_days, category, color, active } = req.body;
-    const db = getDb();
 
     const fields = [];
     const values = [];
-    if (name !== undefined) { fields.push('name = ?'); values.push(name.trim()); }
-    if (description !== undefined) { fields.push('description = ?'); values.push(description || null); }
-    if (frequency !== undefined) { fields.push('frequency = ?'); values.push(frequency); }
-    if (target_days !== undefined) { fields.push('target_days = ?'); values.push(target_days ? JSON.stringify(target_days) : null); }
-    if (category !== undefined) { fields.push('category = ?'); values.push(normalizeCategory(category)); }
-    if (color !== undefined) { fields.push('color = ?'); values.push(color); }
-    if (active !== undefined) { fields.push('active = ?'); values.push(active); }
+    if (name !== undefined)        { fields.push(`name = $${fields.length + 1}`); values.push(name.trim()); }
+    if (description !== undefined) { fields.push(`description = $${fields.length + 1}`); values.push(description || null); }
+    if (frequency !== undefined)   { fields.push(`frequency = $${fields.length + 1}`); values.push(frequency); }
+    if (target_days !== undefined) { fields.push(`target_days = $${fields.length + 1}`); values.push(target_days ? JSON.stringify(target_days) : null); }
+    if (category !== undefined)    { fields.push(`category = $${fields.length + 1}`); values.push(normalizeCategory(category)); }
+    if (color !== undefined)       { fields.push(`color = $${fields.length + 1}`); values.push(color); }
+    if (active !== undefined)      { fields.push(`active = $${fields.length + 1}`); values.push(!!active); }
 
     if (fields.length === 0) return res.status(400).json({ error: 'No fields to update' });
 
     values.push(req.params.id, req.user.id);
-    db.run(`UPDATE habits SET ${fields.join(', ')} WHERE id = ? AND user_id = ?`, values);
-    saveDb();
+    const idIdx = values.length - 1;
+    const userIdx = values.length;
+    await pool.query(
+      `UPDATE habits SET ${fields.join(', ')} WHERE id = $${idIdx} AND user_id = $${userIdx}`,
+      values
+    );
 
-    const habit = queryOne(db, 'SELECT * FROM habits WHERE id = ? AND user_id = ?', [req.params.id, req.user.id]);
+    const { rows } = await pool.query(
+      'SELECT * FROM habits WHERE id = $1 AND user_id = $2',
+      [req.params.id, req.user.id]
+    );
+    const habit = rows[0];
     if (!habit) return res.status(404).json({ error: 'Habit not found' });
     habit.target_days = habit.target_days ? JSON.parse(habit.target_days) : null;
     res.json(habit);
@@ -194,12 +183,13 @@ router.put('/:id', (req, res) => {
 });
 
 // DELETE /api/habits/:id
-router.delete('/:id', (req, res) => {
+router.delete('/:id', async (req, res) => {
   try {
-    const db = getDb();
-    db.run('DELETE FROM habit_logs WHERE habit_id = ? AND user_id = ?', [req.params.id, req.user.id]);
-    db.run('DELETE FROM habits WHERE id = ? AND user_id = ?', [req.params.id, req.user.id]);
-    saveDb();
+    // habit_logs has ON DELETE CASCADE, so deleting the habit also drops its logs.
+    await pool.query(
+      'DELETE FROM habits WHERE id = $1 AND user_id = $2',
+      [req.params.id, req.user.id]
+    );
     res.status(204).send();
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -207,28 +197,25 @@ router.delete('/:id', (req, res) => {
 });
 
 // POST /api/habits/:id/toggle - toggle completion for a date
-router.post('/:id/toggle', (req, res) => {
+router.post('/:id/toggle', async (req, res) => {
   try {
-    const db = getDb();
     const date = req.body.date || new Date().toISOString().split('T')[0];
 
-    // Check if already logged
-    const existing = queryOne(db,
-      'SELECT id FROM habit_logs WHERE habit_id = ? AND completed_date = ? AND user_id = ?',
+    const { rows: existingRows } = await pool.query(
+      'SELECT id FROM habit_logs WHERE habit_id = $1 AND completed_date = $2 AND user_id = $3',
       [req.params.id, date, req.user.id]
     );
 
-    if (existing) {
-      db.run('DELETE FROM habit_logs WHERE id = ?', [existing.id]);
+    if (existingRows[0]) {
+      await pool.query('DELETE FROM habit_logs WHERE id = $1', [existingRows[0].id]);
+      res.json({ completed: false, date });
     } else {
-      db.run(
-        'INSERT INTO habit_logs (habit_id, completed_date, user_id) VALUES (?, ?, ?)',
+      await pool.query(
+        'INSERT INTO habit_logs (habit_id, completed_date, user_id) VALUES ($1, $2, $3)',
         [req.params.id, date, req.user.id]
       );
+      res.json({ completed: true, date });
     }
-    saveDb();
-
-    res.json({ completed: !existing, date });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

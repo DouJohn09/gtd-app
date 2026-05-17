@@ -16,7 +16,7 @@ const ENERGY_DOT = {
 export default function CalendarTaskCard({ task, onEdit, onComplete, onDragStart }) {
   const overdue = isOverdue(task.due_date);
   const tone = LIST_TONE[task.list] || LIST_TONE.next_actions;
-  const isFocus = task.is_daily_focus === 1;
+  const isFocus = !!task.is_daily_focus;
 
   return (
     <div

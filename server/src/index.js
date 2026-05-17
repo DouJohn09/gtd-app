@@ -3,7 +3,7 @@ import express from 'express';
 import cors from 'cors';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
-import { initDb } from './db/schema.js';
+import { pingDb } from './db/pool.js';
 import { requireAuth } from './middleware/auth.js';
 import authRouter from './routes/auth.js';
 import tasksRouter from './routes/tasks.js';
@@ -62,7 +62,7 @@ if (process.env.NODE_ENV === 'production') {
 }
 
 async function start() {
-  await initDb();
+  await pingDb();
   app.listen(PORT, () => {
     console.log(`Cleartable server running on http://localhost:${PORT}`);
   });

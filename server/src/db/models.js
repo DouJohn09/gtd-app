@@ -1,267 +1,257 @@
-import { getDb, saveDb } from './schema.js';
+import { pool } from './pool.js';
 
-function rowsToObjects(stmt) {
-  const results = [];
-  while (stmt.step()) {
-    const row = stmt.getAsObject();
-    results.push(row);
+// Boolean coercion for fields that some callers still pass as 0/1
+// (legacy from the sql.js INT-as-boolean convention). The DB columns are
+// real BOOLEAN now, so pg rejects 0/1 — normalize at the model boundary.
+function coerceBooleans(updates) {
+  const out = { ...updates };
+  if ('is_daily_focus' in out && out.is_daily_focus !== undefined) {
+    out.is_daily_focus = !!out.is_daily_focus;
   }
-  stmt.free();
-  return results;
-}
-
-function rowToObject(stmt) {
-  if (stmt.step()) {
-    const row = stmt.getAsObject();
-    stmt.free();
-    return row;
+  if ('active' in out && out.active !== undefined) {
+    out.active = !!out.active;
   }
-  stmt.free();
-  return null;
+  return out;
 }
 
 export const TaskModel = {
-  getAll(list = null, userId) {
-    const db = getDb();
+  async getAll(list = null, userId) {
+    if (list === 'next_actions') {
+      const sql = `
+        SELECT t.*, p.name as project_name FROM tasks t
+        LEFT JOIN projects p ON t.project_id = p.id
+        WHERE t.list = 'next_actions' AND t.user_id = $1
+          AND (t.start_date IS NULL OR t.start_date <= CURRENT_DATE)
+          AND (
+            p.execution_mode IS NULL
+            OR p.execution_mode = 'parallel'
+            OR t.position = (
+              SELECT MIN(t2.position) FROM tasks t2
+              WHERE t2.project_id = t.project_id
+                AND t2.list = 'next_actions' AND t2.user_id = $1
+            )
+          )
+        ORDER BY t.priority DESC, t.created_at DESC
+      `;
+      const { rows } = await pool.query(sql, [userId]);
+      return rows;
+    }
     if (list) {
       const orderBy = list === 'completed' ? 't.completed_at DESC' : 't.priority DESC, t.created_at DESC';
-      // For next_actions, filter out queued tasks from sequential projects
-      if (list === 'next_actions') {
-        const stmt = db.prepare(`
-          SELECT t.*, p.name as project_name FROM tasks t
-          LEFT JOIN projects p ON t.project_id = p.id
-          WHERE t.list = 'next_actions' AND t.user_id = ?
-            AND (t.start_date IS NULL OR t.start_date <= date('now'))
-            AND (
-              p.execution_mode IS NULL
-              OR p.execution_mode = 'parallel'
-              OR t.position = (
-                SELECT MIN(t2.position) FROM tasks t2
-                WHERE t2.project_id = t.project_id
-                  AND t2.list = 'next_actions' AND t2.user_id = ?
-              )
-            )
-          ORDER BY t.priority DESC, t.created_at DESC
-        `);
-        stmt.bind([userId, userId]);
-        return rowsToObjects(stmt);
-      }
-      const deferFilter = list === 'completed' ? '' : " AND (t.start_date IS NULL OR t.start_date <= date('now'))";
-      const stmt = db.prepare(`SELECT t.*, p.name as project_name FROM tasks t LEFT JOIN projects p ON t.project_id = p.id WHERE t.list = ? AND t.user_id = ?${deferFilter} ORDER BY ${orderBy}`);
-      stmt.bind([list, userId]);
-      return rowsToObjects(stmt);
-    } else {
-      const stmt = db.prepare(`SELECT t.*, p.name as project_name FROM tasks t LEFT JOIN projects p ON t.project_id = p.id WHERE t.user_id = ? ORDER BY t.priority DESC, t.created_at DESC`);
-      stmt.bind([userId]);
-      return rowsToObjects(stmt);
+      const deferFilter = list === 'completed' ? '' : " AND (t.start_date IS NULL OR t.start_date <= CURRENT_DATE)";
+      const sql = `SELECT t.*, p.name as project_name FROM tasks t LEFT JOIN projects p ON t.project_id = p.id WHERE t.list = $1 AND t.user_id = $2${deferFilter} ORDER BY ${orderBy}`;
+      const { rows } = await pool.query(sql, [list, userId]);
+      return rows;
     }
+    const { rows } = await pool.query(
+      `SELECT t.*, p.name as project_name FROM tasks t LEFT JOIN projects p ON t.project_id = p.id WHERE t.user_id = $1 ORDER BY t.priority DESC, t.created_at DESC`,
+      [userId]
+    );
+    return rows;
   },
 
-  getById(id, userId) {
-    const db = getDb();
-    const stmt = db.prepare(`SELECT t.*, p.name as project_name FROM tasks t LEFT JOIN projects p ON t.project_id = p.id WHERE t.id = ? AND t.user_id = ?`);
-    stmt.bind([id, userId]);
-    return rowToObject(stmt);
+  async getById(id, userId) {
+    const { rows } = await pool.query(
+      `SELECT t.*, p.name as project_name FROM tasks t LEFT JOIN projects p ON t.project_id = p.id WHERE t.id = $1 AND t.user_id = $2`,
+      [id, userId]
+    );
+    return rows[0] || null;
   },
 
-  getDailyFocus(userId) {
-    const db = getDb();
-    const stmt = db.prepare(`SELECT t.*, p.name as project_name FROM tasks t LEFT JOIN projects p ON t.project_id = p.id WHERE (t.is_daily_focus = 1 OR t.due_date <= date('now')) AND t.list != 'completed' AND t.list != 'someday_maybe' AND t.user_id = ? AND (t.start_date IS NULL OR t.start_date <= date('now')) ORDER BY t.priority DESC, t.due_date ASC`);
-    stmt.bind([userId]);
-    return rowsToObjects(stmt);
+  async getDailyFocus(userId) {
+    const { rows } = await pool.query(
+      `SELECT t.*, p.name as project_name FROM tasks t LEFT JOIN projects p ON t.project_id = p.id WHERE (t.is_daily_focus = true OR t.due_date <= CURRENT_DATE) AND t.list != 'completed' AND t.list != 'someday_maybe' AND t.user_id = $1 AND (t.start_date IS NULL OR t.start_date <= CURRENT_DATE) ORDER BY t.priority DESC, t.due_date ASC`,
+      [userId]
+    );
+    return rows;
   },
 
-  getByProject(projectId, userId) {
-    const db = getDb();
-    const stmt = db.prepare(`SELECT * FROM tasks WHERE project_id = ? AND user_id = ? ORDER BY position ASC, created_at ASC`);
-    stmt.bind([projectId, userId]);
-    return rowsToObjects(stmt);
+  async getByProject(projectId, userId) {
+    const { rows } = await pool.query(
+      `SELECT * FROM tasks WHERE project_id = $1 AND user_id = $2 ORDER BY position ASC, created_at ASC`,
+      [projectId, userId]
+    );
+    return rows;
   },
 
-  getDeferred(list, userId) {
-    const db = getDb();
-    const stmt = db.prepare(`
-      SELECT t.*, p.name as project_name FROM tasks t
-      LEFT JOIN projects p ON t.project_id = p.id
-      WHERE t.list = ? AND t.user_id = ? AND t.start_date > date('now')
-      ORDER BY t.start_date ASC, t.priority DESC
-    `);
-    stmt.bind([list, userId]);
-    return rowsToObjects(stmt);
+  async getDeferred(list, userId) {
+    const { rows } = await pool.query(
+      `SELECT t.*, p.name as project_name FROM tasks t
+       LEFT JOIN projects p ON t.project_id = p.id
+       WHERE t.list = $1 AND t.user_id = $2 AND t.start_date > CURRENT_DATE
+       ORDER BY t.start_date ASC, t.priority DESC`,
+      [list, userId]
+    );
+    return rows;
   },
 
-  getByDateRange(startDate, endDate, userId) {
-    const db = getDb();
-    const stmt = db.prepare(`
-      SELECT t.*, p.name as project_name FROM tasks t
-      LEFT JOIN projects p ON t.project_id = p.id
-      WHERE t.user_id = ? AND t.list != 'completed'
-        AND (
-          (t.due_date >= ? AND t.due_date <= ?)
-          OR (t.start_date >= ? AND t.start_date <= ?)
-        )
-      ORDER BY COALESCE(t.start_date, t.due_date) ASC, t.priority DESC
-    `);
-    stmt.bind([userId, startDate, endDate, startDate, endDate]);
-    return rowsToObjects(stmt);
+  async getByDateRange(startDate, endDate, userId) {
+    const { rows } = await pool.query(
+      `SELECT t.*, p.name as project_name FROM tasks t
+       LEFT JOIN projects p ON t.project_id = p.id
+       WHERE t.user_id = $1 AND t.list != 'completed'
+         AND (
+           (t.due_date >= $2 AND t.due_date <= $3)
+           OR (t.start_date >= $2 AND t.start_date <= $3)
+         )
+       ORDER BY COALESCE(t.start_date, t.due_date) ASC, t.priority DESC`,
+      [userId, startDate, endDate]
+    );
+    return rows;
   },
 
-  getUnscheduled(userId) {
-    const db = getDb();
-    const stmt = db.prepare(`
-      SELECT t.*, p.name as project_name FROM tasks t
-      LEFT JOIN projects p ON t.project_id = p.id
-      WHERE t.user_id = ? AND (t.due_date IS NULL OR t.due_date = '') AND t.list != 'completed'
-      ORDER BY t.priority DESC, t.created_at DESC
-    `);
-    stmt.bind([userId]);
-    return rowsToObjects(stmt);
+  async getUnscheduled(userId) {
+    const { rows } = await pool.query(
+      `SELECT t.*, p.name as project_name FROM tasks t
+       LEFT JOIN projects p ON t.project_id = p.id
+       WHERE t.user_id = $1 AND t.due_date IS NULL AND t.list != 'completed'
+       ORDER BY t.priority DESC, t.created_at DESC`,
+      [userId]
+    );
+    return rows;
   },
 
-  create(task, userId) {
-    const db = getDb();
-
+  async create(task, userId) {
     // Auto-assign position for tasks in a project
     let position = task.position ?? 0;
     if (task.project_id && position === 0) {
-      const maxResult = db.exec(`SELECT COALESCE(MAX(position), -1) as max_pos FROM tasks WHERE project_id = ${task.project_id} AND user_id = ${userId}`);
-      position = (maxResult[0]?.values[0]?.[0] ?? -1) + 1;
+      const { rows: maxRows } = await pool.query(
+        'SELECT COALESCE(MAX(position), -1) AS max_pos FROM tasks WHERE project_id = $1 AND user_id = $2',
+        [task.project_id, userId]
+      );
+      position = (maxRows[0]?.max_pos ?? -1) + 1;
     }
 
-    db.run(`
-      INSERT INTO tasks (title, notes, list, context, project_id, waiting_for_person, due_date, start_date, scheduled_time, duration, energy_level, time_estimate, priority, is_daily_focus, position, recurrence_rule, recurrence_interval, recurrence_days, recurrence_type, user_id)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `, [
-      task.title,
-      task.notes || null,
-      task.list || 'inbox',
-      task.context || null,
-      task.project_id || null,
-      task.waiting_for_person || null,
-      task.due_date || null,
-      task.start_date || null,
-      task.scheduled_time || null,
-      task.duration || null,
-      task.energy_level || null,
-      task.time_estimate || null,
-      task.priority || 0,
-      task.is_daily_focus || 0,
-      position,
-      task.recurrence_rule || null,
-      task.recurrence_interval || 1,
-      task.recurrence_days || null,
-      task.recurrence_type || 'absolute',
-      userId
-    ]);
-
-    const result = db.exec("SELECT last_insert_rowid() as id");
-    const id = result[0].values[0][0];
-
-    saveDb();
-    return this.getById(id, userId);
+    const { rows } = await pool.query(
+      `INSERT INTO tasks (
+        title, notes, list, context, project_id, waiting_for_person,
+        due_date, start_date, scheduled_time, duration, energy_level,
+        time_estimate, priority, is_daily_focus, position,
+        recurrence_rule, recurrence_interval, recurrence_days, recurrence_type, user_id
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
+      RETURNING id`,
+      [
+        task.title,
+        task.notes || null,
+        task.list || 'inbox',
+        task.context || null,
+        task.project_id || null,
+        task.waiting_for_person || null,
+        task.due_date || null,
+        task.start_date || null,
+        task.scheduled_time || null,
+        task.duration || null,
+        task.energy_level || null,
+        task.time_estimate || null,
+        task.priority || 0,
+        !!task.is_daily_focus,
+        position,
+        task.recurrence_rule || null,
+        task.recurrence_interval || 1,
+        task.recurrence_days || null,
+        task.recurrence_type || 'absolute',
+        userId,
+      ]
+    );
+    return this.getById(rows[0].id, userId);
   },
 
-  update(id, updates, userId) {
-    const db = getDb();
+  async update(id, updates, userId) {
     const allowedFields = ['title', 'notes', 'list', 'context', 'project_id', 'waiting_for_person', 'due_date', 'start_date', 'scheduled_time', 'duration', 'energy_level', 'time_estimate', 'priority', 'is_daily_focus', 'completed_at', 'position', 'recurrence_rule', 'recurrence_interval', 'recurrence_days', 'recurrence_type'];
-    const fields = Object.keys(updates).filter(k => allowedFields.includes(k) && updates[k] !== undefined);
-
+    const coerced = coerceBooleans(updates);
+    const fields = Object.keys(coerced).filter(k => allowedFields.includes(k) && coerced[k] !== undefined);
     if (fields.length === 0) return this.getById(id, userId);
 
-    const setClause = fields.map(f => `${f} = ?`).join(', ');
-    const values = fields.map(f => updates[f]);
+    const setClause = fields.map((f, i) => `${f} = $${i + 1}`).join(', ');
+    const values = fields.map(f => coerced[f]);
     values.push(id, userId);
+    const idIdx = values.length - 1;
+    const userIdx = values.length;
 
-    try {
-      db.run(`UPDATE tasks SET ${setClause}, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?`, values);
-      saveDb();
-    } catch (err) {
-      console.error('Update error:', err);
-      throw err;
-    }
+    await pool.query(
+      `UPDATE tasks SET ${setClause}, updated_at = NOW() WHERE id = $${idIdx} AND user_id = $${userIdx}`,
+      values
+    );
     return this.getById(id, userId);
   },
 
-  delete(id, userId) {
-    const db = getDb();
-    const task = this.getById(id, userId);
-    db.run('DELETE FROM tasks WHERE id = ? AND user_id = ?', [id, userId]);
-    saveDb();
+  async delete(id, userId) {
+    const task = await this.getById(id, userId);
+    await pool.query('DELETE FROM tasks WHERE id = $1 AND user_id = $2', [id, userId]);
 
     // Auto-promote next task if deleted from sequential project
     if (task && task.project_id) {
-      const projStmt = db.prepare('SELECT execution_mode FROM projects WHERE id = ? AND user_id = ?');
-      projStmt.bind([task.project_id, userId]);
-      const project = rowToObject(projStmt);
-
+      const { rows: projRows } = await pool.query(
+        'SELECT execution_mode FROM projects WHERE id = $1 AND user_id = $2',
+        [task.project_id, userId]
+      );
+      const project = projRows[0];
       if (project?.execution_mode === 'sequential') {
-        const nextStmt = db.prepare(
-          "SELECT id, list FROM tasks WHERE project_id = ? AND user_id = ? AND list != 'completed' ORDER BY position ASC LIMIT 1"
+        const { rows: nextRows } = await pool.query(
+          "SELECT id, list FROM tasks WHERE project_id = $1 AND user_id = $2 AND list != 'completed' ORDER BY position ASC LIMIT 1",
+          [task.project_id, userId]
         );
-        nextStmt.bind([task.project_id, userId]);
-        const nextTask = rowToObject(nextStmt);
+        const nextTask = nextRows[0];
         if (nextTask && nextTask.list !== 'next_actions') {
-          this.update(nextTask.id, { list: 'next_actions' }, userId);
+          await this.update(nextTask.id, { list: 'next_actions' }, userId);
         }
       }
     }
-
     return { changes: 1 };
   },
 
-  complete(id, userId) {
-    const task = this.getById(id, userId);
+  async complete(id, userId) {
+    const task = await this.getById(id, userId);
 
     if (task && task.recurrence_rule) {
       return this._completeRecurring(task, userId);
     }
 
-    const result = this.update(id, { list: 'completed', completed_at: new Date().toISOString(), is_daily_focus: 0 }, userId);
+    const result = await this.update(id, { list: 'completed', completed_at: new Date().toISOString(), is_daily_focus: false }, userId);
 
-    // Auto-promote next task in sequential projects
     if (task && task.project_id) {
-      const db = getDb();
-      const projStmt = db.prepare('SELECT execution_mode FROM projects WHERE id = ? AND user_id = ?');
-      projStmt.bind([task.project_id, userId]);
-      const project = rowToObject(projStmt);
-
+      const { rows: projRows } = await pool.query(
+        'SELECT execution_mode FROM projects WHERE id = $1 AND user_id = $2',
+        [task.project_id, userId]
+      );
+      const project = projRows[0];
       if (project?.execution_mode === 'sequential') {
-        const nextStmt = db.prepare(
-          "SELECT id FROM tasks WHERE project_id = ? AND user_id = ? AND list != 'completed' ORDER BY position ASC LIMIT 1"
+        const { rows: nextRows } = await pool.query(
+          "SELECT id FROM tasks WHERE project_id = $1 AND user_id = $2 AND list != 'completed' ORDER BY position ASC LIMIT 1",
+          [task.project_id, userId]
         );
-        nextStmt.bind([task.project_id, userId]);
-        const nextTask = rowToObject(nextStmt);
+        const nextTask = nextRows[0];
         if (nextTask) {
-          this.update(nextTask.id, { list: 'next_actions' }, userId);
+          await this.update(nextTask.id, { list: 'next_actions' }, userId);
         }
       }
     }
-
     return result;
   },
 
-  _completeRecurring(task, userId) {
+  async _completeRecurring(task, userId) {
     // Create a completed snapshot for history
-    const db = getDb();
-    db.run(`
-      INSERT INTO tasks (title, notes, list, context, project_id, waiting_for_person, due_date, start_date, scheduled_time, duration, energy_level, time_estimate, priority, is_daily_focus, position, completed_at, user_id)
-      VALUES (?, ?, 'completed', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)
-    `, [
-      task.title, task.notes, task.context, task.project_id, task.waiting_for_person,
-      task.due_date, task.start_date, task.scheduled_time, task.duration,
-      task.energy_level, task.time_estimate,
-      task.priority, task.position, new Date().toISOString(), userId
-    ]);
-    saveDb();
+    await pool.query(
+      `INSERT INTO tasks (
+        title, notes, list, context, project_id, waiting_for_person,
+        due_date, start_date, scheduled_time, duration, energy_level,
+        time_estimate, priority, is_daily_focus, position, completed_at, user_id
+      ) VALUES ($1,$2,'completed',$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,false,$13,$14,$15)`,
+      [
+        task.title, task.notes, task.context, task.project_id, task.waiting_for_person,
+        task.due_date, task.start_date, task.scheduled_time, task.duration,
+        task.energy_level, task.time_estimate, task.priority, task.position,
+        new Date().toISOString(), userId,
+      ]
+    );
 
-    // Calculate next due date
     const nextDue = this._nextDueDate(task);
     const nextStart = task.start_date ? this._advanceDate(task.start_date, task) : null;
 
-    this.update(task.id, {
+    await this.update(task.id, {
       due_date: nextDue,
       start_date: nextStart,
-      is_daily_focus: 0,
+      is_daily_focus: false,
       completed_at: null,
     }, userId);
 
@@ -329,183 +319,210 @@ export const TaskModel = {
       default:
         d.setDate(d.getDate() + 1);
     }
-
     return d.toISOString().split('T')[0];
   },
 
-  reorderTasks(projectId, taskIds, userId) {
-    const db = getDb();
-    taskIds.forEach((taskId, index) => {
-      db.run(
-        'UPDATE tasks SET position = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND project_id = ? AND user_id = ?',
-        [index, taskId, projectId, userId]
-      );
-    });
-    saveDb();
+  async reorderTasks(projectId, taskIds, userId) {
+    // Run as a single transaction so all positions update atomically.
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      for (let i = 0; i < taskIds.length; i++) {
+        await client.query(
+          'UPDATE tasks SET position = $1, updated_at = NOW() WHERE id = $2 AND project_id = $3 AND user_id = $4',
+          [i, taskIds[i], projectId, userId]
+        );
+      }
+      await client.query('COMMIT');
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
     return this.getByProject(projectId, userId);
   },
 
-  getStats(userId) {
-    const db = getDb();
-    const getCount = (list) => {
-      if (list === 'next_actions') {
-        const stmt = db.prepare(`
-          SELECT COUNT(*) as cnt FROM tasks t
-          LEFT JOIN projects p ON t.project_id = p.id
-          WHERE t.list = 'next_actions' AND t.user_id = ?
-            AND (t.start_date IS NULL OR t.start_date <= date('now'))
-            AND (
-              p.execution_mode IS NULL
-              OR p.execution_mode = 'parallel'
-              OR t.position = (
-                SELECT MIN(t2.position) FROM tasks t2
-                WHERE t2.project_id = t.project_id
-                  AND t2.list = 'next_actions' AND t2.user_id = ?
-              )
-            )
-        `);
-        stmt.bind([userId, userId]);
-        const row = rowToObject(stmt);
-        return row ? row.cnt : 0;
-      }
-      const stmt = db.prepare(`SELECT COUNT(*) as cnt FROM tasks WHERE list = ? AND user_id = ? AND (start_date IS NULL OR start_date <= date('now'))`);
-      stmt.bind([list, userId]);
-      const row = rowToObject(stmt);
-      return row ? row.cnt : 0;
-    };
-    const getDailyFocusCount = () => {
-      const stmt = db.prepare(`SELECT COUNT(*) as cnt FROM tasks WHERE (is_daily_focus = 1 OR due_date <= date('now')) AND list != 'completed' AND list != 'someday_maybe' AND user_id = ? AND (start_date IS NULL OR start_date <= date('now'))`);
-      stmt.bind([userId]);
-      const row = rowToObject(stmt);
-      return row ? row.cnt : 0;
-    };
-    const getCompletedTodayCount = () => {
-      const stmt = db.prepare(`SELECT COUNT(*) as cnt FROM tasks WHERE list = 'completed' AND date(completed_at) = date('now') AND user_id = ?`);
-      stmt.bind([userId]);
-      const row = rowToObject(stmt);
-      return row ? row.cnt : 0;
-    };
+  async getStats(userId) {
+    const nextActionsSql = `
+      SELECT COUNT(*)::int AS cnt FROM tasks t
+      LEFT JOIN projects p ON t.project_id = p.id
+      WHERE t.list = 'next_actions' AND t.user_id = $1
+        AND (t.start_date IS NULL OR t.start_date <= CURRENT_DATE)
+        AND (
+          p.execution_mode IS NULL
+          OR p.execution_mode = 'parallel'
+          OR t.position = (
+            SELECT MIN(t2.position) FROM tasks t2
+            WHERE t2.project_id = t.project_id
+              AND t2.list = 'next_actions' AND t2.user_id = $1
+          )
+        )
+    `;
+    const simpleCountSql = `
+      SELECT COUNT(*)::int AS cnt FROM tasks
+      WHERE list = $1 AND user_id = $2
+        AND (start_date IS NULL OR start_date <= CURRENT_DATE)
+    `;
+    const dailyFocusCountSql = `
+      SELECT COUNT(*)::int AS cnt FROM tasks
+      WHERE (is_daily_focus = true OR due_date <= CURRENT_DATE)
+        AND list != 'completed' AND list != 'someday_maybe' AND user_id = $1
+        AND (start_date IS NULL OR start_date <= CURRENT_DATE)
+    `;
+    const completedTodaySql = `
+      SELECT COUNT(*)::int AS cnt FROM tasks
+      WHERE list = 'completed' AND completed_at::date = CURRENT_DATE AND user_id = $1
+    `;
+
+    const [inbox, nextActions, waiting, someday, dailyFocus, completedToday] = await Promise.all([
+      pool.query(simpleCountSql, ['inbox', userId]),
+      pool.query(nextActionsSql, [userId]),
+      pool.query(simpleCountSql, ['waiting_for', userId]),
+      pool.query(simpleCountSql, ['someday_maybe', userId]),
+      pool.query(dailyFocusCountSql, [userId]),
+      pool.query(completedTodaySql, [userId]),
+    ]);
+
     return {
-      inbox: getCount('inbox'),
-      next_actions: getCount('next_actions'),
-      waiting_for: getCount('waiting_for'),
-      someday_maybe: getCount('someday_maybe'),
-      daily_focus: getDailyFocusCount(),
-      completed_today: getCompletedTodayCount()
+      inbox: inbox.rows[0]?.cnt ?? 0,
+      next_actions: nextActions.rows[0]?.cnt ?? 0,
+      waiting_for: waiting.rows[0]?.cnt ?? 0,
+      someday_maybe: someday.rows[0]?.cnt ?? 0,
+      daily_focus: dailyFocus.rows[0]?.cnt ?? 0,
+      completed_today: completedToday.rows[0]?.cnt ?? 0,
     };
-  }
+  },
 };
 
 export const ProjectModel = {
-  getAll(userId) {
-    const db = getDb();
-    const stmt = db.prepare('SELECT * FROM projects WHERE user_id = ? ORDER BY status, created_at DESC');
-    stmt.bind([userId]);
-    const projects = rowsToObjects(stmt);
+  async getAll(userId) {
+    const { rows: projects } = await pool.query(
+      'SELECT * FROM projects WHERE user_id = $1 ORDER BY status, created_at DESC',
+      [userId]
+    );
 
-    return projects.map(p => {
-      const countStmt = db.prepare(`SELECT COUNT(*) as cnt FROM tasks WHERE project_id = ? AND list != 'completed' AND user_id = ?`);
-      countStmt.bind([p.id, userId]);
-      const countRow = rowToObject(countStmt);
-      const taskCount = countRow ? countRow.cnt : 0;
+    // Compute task_count + next_action per project in parallel
+    return Promise.all(projects.map(async (p) => {
+      const { rows: countRows } = await pool.query(
+        `SELECT COUNT(*)::int AS cnt FROM tasks WHERE project_id = $1 AND list != 'completed' AND user_id = $2`,
+        [p.id, userId]
+      );
+      const taskCount = countRows[0]?.cnt ?? 0;
 
       let nextAction;
       if (p.execution_mode === 'sequential') {
-        const nextStmt = db.prepare(`SELECT * FROM tasks WHERE project_id = ? AND list != 'completed' AND user_id = ? ORDER BY position ASC LIMIT 1`);
-        nextStmt.bind([p.id, userId]);
-        nextAction = rowToObject(nextStmt);
+        const { rows } = await pool.query(
+          `SELECT * FROM tasks WHERE project_id = $1 AND list != 'completed' AND user_id = $2 ORDER BY position ASC LIMIT 1`,
+          [p.id, userId]
+        );
+        nextAction = rows[0] || null;
       } else {
-        const nextStmt = db.prepare(`SELECT * FROM tasks WHERE project_id = ? AND list = 'next_actions' AND user_id = ? ORDER BY priority DESC LIMIT 1`);
-        nextStmt.bind([p.id, userId]);
-        nextAction = rowToObject(nextStmt);
+        const { rows } = await pool.query(
+          `SELECT * FROM tasks WHERE project_id = $1 AND list = 'next_actions' AND user_id = $2 ORDER BY priority DESC LIMIT 1`,
+          [p.id, userId]
+        );
+        nextAction = rows[0] || null;
       }
 
       return { ...p, task_count: taskCount, next_action: nextAction };
-    });
+    }));
   },
 
-  getById(id, userId) {
-    const db = getDb();
-    const stmt = db.prepare('SELECT * FROM projects WHERE id = ? AND user_id = ?');
-    stmt.bind([id, userId]);
-    const project = rowToObject(stmt);
+  async getById(id, userId) {
+    const { rows } = await pool.query(
+      'SELECT * FROM projects WHERE id = $1 AND user_id = $2',
+      [id, userId]
+    );
+    const project = rows[0];
     if (project) {
-      project.tasks = TaskModel.getByProject(id, userId);
+      project.tasks = await TaskModel.getByProject(id, userId);
     }
-    return project;
+    return project || null;
   },
 
-  create(project, userId) {
-    const db = getDb();
-    db.run('INSERT INTO projects (name, description, outcome, execution_mode, user_id) VALUES (?, ?, ?, ?, ?)', [
-      project.name,
-      project.description || null,
-      project.outcome || null,
-      project.execution_mode || 'parallel',
-      userId
-    ]);
-
-    const id = db.exec("SELECT last_insert_rowid() as id")[0].values[0][0];
-    saveDb();
-
-    return this.getById(id, userId);
+  async create(project, userId) {
+    const { rows } = await pool.query(
+      'INSERT INTO projects (name, description, outcome, execution_mode, user_id) VALUES ($1,$2,$3,$4,$5) RETURNING id',
+      [
+        project.name,
+        project.description || null,
+        project.outcome || null,
+        project.execution_mode || 'parallel',
+        userId,
+      ]
+    );
+    return this.getById(rows[0].id, userId);
   },
 
-  update(id, updates, userId) {
-    const db = getDb();
+  async update(id, updates, userId) {
     const fields = Object.keys(updates).filter(k => updates[k] !== undefined);
     if (fields.length === 0) return this.getById(id, userId);
 
-    const setClause = fields.map(f => `${f} = ?`).join(', ');
+    const setClause = fields.map((f, i) => `${f} = $${i + 1}`).join(', ');
     const values = fields.map(f => updates[f]);
     values.push(id, userId);
+    const idIdx = values.length - 1;
+    const userIdx = values.length;
 
-    db.run(`UPDATE projects SET ${setClause}, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?`, values);
+    await pool.query(
+      `UPDATE projects SET ${setClause}, updated_at = NOW() WHERE id = $${idIdx} AND user_id = $${userIdx}`,
+      values
+    );
 
     // When toggling to sequential, auto-assign positions if all are 0
     if (updates.execution_mode === 'sequential') {
-      const tasks = TaskModel.getByProject(id, userId);
+      const tasks = await TaskModel.getByProject(id, userId);
       const incomplete = tasks.filter(t => t.list !== 'completed');
       const allZero = incomplete.every(t => !t.position);
       if (allZero && incomplete.length > 1) {
-        incomplete.forEach((t, i) => {
-          db.run('UPDATE tasks SET position = ? WHERE id = ?', [i, t.id]);
-        });
+        const client = await pool.connect();
+        try {
+          await client.query('BEGIN');
+          for (let i = 0; i < incomplete.length; i++) {
+            await client.query('UPDATE tasks SET position = $1 WHERE id = $2', [i, incomplete[i].id]);
+          }
+          await client.query('COMMIT');
+        } catch (err) {
+          await client.query('ROLLBACK');
+          throw err;
+        } finally {
+          client.release();
+        }
       }
     }
 
-    saveDb();
     return this.getById(id, userId);
   },
 
-  delete(id, userId) {
-    const db = getDb();
-    db.run('DELETE FROM projects WHERE id = ? AND user_id = ?', [id, userId]);
-    saveDb();
+  async delete(id, userId) {
+    await pool.query('DELETE FROM projects WHERE id = $1 AND user_id = $2', [id, userId]);
     return { changes: 1 };
-  }
+  },
 };
 
 export const WeeklyReviewModel = {
-  getHistory(userId, limit = 10) {
-    const db = getDb();
-    const stmt = db.prepare('SELECT * FROM weekly_reviews WHERE user_id = ? ORDER BY completed_at DESC LIMIT ?');
-    stmt.bind([userId, limit]);
-    return rowsToObjects(stmt);
+  async getHistory(userId, limit = 10) {
+    const { rows } = await pool.query(
+      'SELECT * FROM weekly_reviews WHERE user_id = $1 ORDER BY completed_at DESC LIMIT $2',
+      [userId, limit]
+    );
+    return rows;
   },
 
-  getLastReview(userId) {
-    const db = getDb();
-    const stmt = db.prepare('SELECT * FROM weekly_reviews WHERE user_id = ? ORDER BY completed_at DESC LIMIT 1');
-    stmt.bind([userId]);
-    return rowToObject(stmt);
+  async getLastReview(userId) {
+    const { rows } = await pool.query(
+      'SELECT * FROM weekly_reviews WHERE user_id = $1 ORDER BY completed_at DESC LIMIT 1',
+      [userId]
+    );
+    return rows[0] || null;
   },
 
-  getStreak(userId) {
-    const db = getDb();
-    const stmt = db.prepare('SELECT completed_at FROM weekly_reviews WHERE user_id = ? ORDER BY completed_at DESC');
-    stmt.bind([userId]);
-    const reviews = rowsToObjects(stmt);
+  async getStreak(userId) {
+    const { rows: reviews } = await pool.query(
+      'SELECT completed_at FROM weekly_reviews WHERE user_id = $1 ORDER BY completed_at DESC',
+      [userId]
+    );
     if (reviews.length === 0) return 0;
 
     let streak = 1;
@@ -513,194 +530,211 @@ export const WeeklyReviewModel = {
       const prev = new Date(reviews[i - 1].completed_at);
       const curr = new Date(reviews[i].completed_at);
       const daysBetween = (prev - curr) / (1000 * 60 * 60 * 24);
-      if (daysBetween <= 10) {
-        streak++;
-      } else {
-        break;
-      }
+      if (daysBetween <= 10) streak++;
+      else break;
     }
     return streak;
   },
 
-  getCompletedTasksSince(userId, since) {
-    const db = getDb();
-    const stmt = db.prepare("SELECT COUNT(*) as cnt FROM tasks WHERE list = 'completed' AND completed_at >= ? AND user_id = ?");
-    stmt.bind([since, userId]);
-    const row = rowToObject(stmt);
-    return row ? row.cnt : 0;
+  async getCompletedTasksSince(userId, since) {
+    const { rows } = await pool.query(
+      "SELECT COUNT(*)::int AS cnt FROM tasks WHERE list = 'completed' AND completed_at >= $1 AND user_id = $2",
+      [since, userId]
+    );
+    return rows[0]?.cnt ?? 0;
   },
 
-  getStaleItems(userId, days = 14) {
-    const db = getDb();
-    const stmt = db.prepare(`
-      SELECT t.*, p.name as project_name FROM tasks t
-      LEFT JOIN projects p ON t.project_id = p.id
-      WHERE t.list IN ('next_actions', 'waiting_for', 'someday_maybe')
-        AND t.user_id = ?
-        AND t.updated_at < datetime('now', '-' || ? || ' days')
-      ORDER BY t.updated_at ASC
-      LIMIT 20
-    `);
-    stmt.bind([userId, days]);
-    return rowsToObjects(stmt);
+  async getStaleItems(userId, days = 14) {
+    const { rows } = await pool.query(
+      `SELECT t.*, p.name as project_name FROM tasks t
+       LEFT JOIN projects p ON t.project_id = p.id
+       WHERE t.list IN ('next_actions', 'waiting_for', 'someday_maybe')
+         AND t.user_id = $1
+         AND t.updated_at < NOW() - ($2 * INTERVAL '1 day')
+       ORDER BY t.updated_at ASC
+       LIMIT 20`,
+      [userId, days]
+    );
+    return rows;
   },
 
-  create(data, userId) {
-    const db = getDb();
-    db.run(`
-      INSERT INTO weekly_reviews (user_id, inbox_count_at_start, tasks_completed, tasks_moved, tasks_deleted, ai_summary)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `, [
-      userId,
-      data.inboxCountAtStart || 0,
-      data.tasksCompleted || 0,
-      data.tasksMoved || 0,
-      data.tasksDeleted || 0,
-      data.aiSummary ? JSON.stringify(data.aiSummary) : null
-    ]);
-    const id = db.exec("SELECT last_insert_rowid() as id")[0].values[0][0];
-    saveDb();
-    const stmt = db.prepare('SELECT * FROM weekly_reviews WHERE id = ?');
-    stmt.bind([id]);
-    return rowToObject(stmt);
-  }
+  async create(data, userId) {
+    const { rows } = await pool.query(
+      `INSERT INTO weekly_reviews (user_id, inbox_count_at_start, tasks_completed, tasks_moved, tasks_deleted, ai_summary)
+       VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
+      [
+        userId,
+        data.inboxCountAtStart || 0,
+        data.tasksCompleted || 0,
+        data.tasksMoved || 0,
+        data.tasksDeleted || 0,
+        data.aiSummary ? JSON.stringify(data.aiSummary) : null,
+      ]
+    );
+    return rows[0];
+  },
 };
 
 export const CustomListModel = {
-  getAll(userId) {
-    const db = getDb();
-    const stmt = db.prepare('SELECT * FROM custom_lists WHERE user_id = ? ORDER BY position ASC, created_at ASC');
-    stmt.bind([userId]);
-    const lists = rowsToObjects(stmt);
-    return lists.map(l => {
-      const countStmt = db.prepare("SELECT COUNT(*) as cnt FROM list_items WHERE list_id = ? AND user_id = ? AND status != 'done'");
-      countStmt.bind([l.id, userId]);
-      const row = rowToObject(countStmt);
-      return { ...l, item_count: row ? row.cnt : 0 };
-    });
+  async getAll(userId) {
+    const { rows: lists } = await pool.query(
+      'SELECT * FROM custom_lists WHERE user_id = $1 ORDER BY position ASC, created_at ASC',
+      [userId]
+    );
+    return Promise.all(lists.map(async (l) => {
+      const { rows } = await pool.query(
+        "SELECT COUNT(*)::int AS cnt FROM list_items WHERE list_id = $1 AND user_id = $2 AND status != 'done'",
+        [l.id, userId]
+      );
+      return { ...l, item_count: rows[0]?.cnt ?? 0 };
+    }));
   },
 
-  getById(id, userId) {
-    const db = getDb();
-    const stmt = db.prepare('SELECT * FROM custom_lists WHERE id = ? AND user_id = ?');
-    stmt.bind([id, userId]);
-    return rowToObject(stmt);
+  async getById(id, userId) {
+    const { rows } = await pool.query(
+      'SELECT * FROM custom_lists WHERE id = $1 AND user_id = $2',
+      [id, userId]
+    );
+    return rows[0] || null;
   },
 
-  create(data, userId) {
-    const db = getDb();
-    const maxResult = db.exec(`SELECT COALESCE(MAX(position), -1) as mp FROM custom_lists WHERE user_id = ${userId}`);
-    const position = (maxResult[0]?.values[0]?.[0] ?? -1) + 1;
-    db.run(
-      'INSERT INTO custom_lists (name, icon, color, position, user_id) VALUES (?, ?, ?, ?, ?)',
+  async create(data, userId) {
+    const { rows: maxRows } = await pool.query(
+      'SELECT COALESCE(MAX(position), -1) AS mp FROM custom_lists WHERE user_id = $1',
+      [userId]
+    );
+    const position = (maxRows[0]?.mp ?? -1) + 1;
+    const { rows } = await pool.query(
+      'INSERT INTO custom_lists (name, icon, color, position, user_id) VALUES ($1,$2,$3,$4,$5) RETURNING id',
       [data.name, data.icon || 'list', data.color || 'violet', position, userId]
     );
-    const id = db.exec("SELECT last_insert_rowid() as id")[0].values[0][0];
-    saveDb();
-    return this.getById(id, userId);
+    return this.getById(rows[0].id, userId);
   },
 
-  update(id, updates, userId) {
-    const db = getDb();
+  async update(id, updates, userId) {
     const allowed = ['name', 'icon', 'color'];
     const fields = Object.keys(updates).filter(k => allowed.includes(k) && updates[k] !== undefined);
     if (fields.length === 0) return this.getById(id, userId);
-    const setClause = fields.map(f => `${f} = ?`).join(', ');
+    const setClause = fields.map((f, i) => `${f} = $${i + 1}`).join(', ');
     const values = [...fields.map(f => updates[f]), id, userId];
-    db.run(`UPDATE custom_lists SET ${setClause} WHERE id = ? AND user_id = ?`, values);
-    saveDb();
+    const idIdx = values.length - 1;
+    const userIdx = values.length;
+    await pool.query(
+      `UPDATE custom_lists SET ${setClause} WHERE id = $${idIdx} AND user_id = $${userIdx}`,
+      values
+    );
     return this.getById(id, userId);
   },
 
-  delete(id, userId) {
-    const db = getDb();
-    db.run('DELETE FROM custom_lists WHERE id = ? AND user_id = ?', [id, userId]);
-    saveDb();
+  async delete(id, userId) {
+    await pool.query('DELETE FROM custom_lists WHERE id = $1 AND user_id = $2', [id, userId]);
     return { changes: 1 };
   },
 
-  reorder(listIds, userId) {
-    const db = getDb();
-    listIds.forEach((listId, index) => {
-      db.run('UPDATE custom_lists SET position = ? WHERE id = ? AND user_id = ?', [index, listId, userId]);
-    });
-    saveDb();
+  async reorder(listIds, userId) {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      for (let i = 0; i < listIds.length; i++) {
+        await client.query(
+          'UPDATE custom_lists SET position = $1 WHERE id = $2 AND user_id = $3',
+          [i, listIds[i], userId]
+        );
+      }
+      await client.query('COMMIT');
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
     return this.getAll(userId);
   },
 };
 
 export const ListItemModel = {
-  getByList(listId, userId) {
-    const db = getDb();
-    const stmt = db.prepare('SELECT * FROM list_items WHERE list_id = ? AND user_id = ? ORDER BY position ASC, created_at ASC');
-    stmt.bind([listId, userId]);
-    return rowsToObjects(stmt);
+  async getByList(listId, userId) {
+    const { rows } = await pool.query(
+      'SELECT * FROM list_items WHERE list_id = $1 AND user_id = $2 ORDER BY position ASC, created_at ASC',
+      [listId, userId]
+    );
+    return rows;
   },
 
-  getById(id, userId) {
-    const db = getDb();
-    const stmt = db.prepare('SELECT * FROM list_items WHERE id = ? AND user_id = ?');
-    stmt.bind([id, userId]);
-    return rowToObject(stmt);
+  async getById(id, userId) {
+    const { rows } = await pool.query(
+      'SELECT * FROM list_items WHERE id = $1 AND user_id = $2',
+      [id, userId]
+    );
+    return rows[0] || null;
   },
 
-  create(data, userId) {
-    const db = getDb();
-    const maxResult = db.exec(`SELECT COALESCE(MAX(position), -1) as mp FROM list_items WHERE list_id = ${data.list_id} AND user_id = ${userId}`);
-    const position = (maxResult[0]?.values[0]?.[0] ?? -1) + 1;
-    db.run(
-      'INSERT INTO list_items (list_id, title, notes, url, status, position, user_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
+  async create(data, userId) {
+    const { rows: maxRows } = await pool.query(
+      'SELECT COALESCE(MAX(position), -1) AS mp FROM list_items WHERE list_id = $1 AND user_id = $2',
+      [data.list_id, userId]
+    );
+    const position = (maxRows[0]?.mp ?? -1) + 1;
+    const { rows } = await pool.query(
+      'INSERT INTO list_items (list_id, title, notes, url, status, position, user_id) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id',
       [data.list_id, data.title, data.notes || null, data.url || null, data.status || 'todo', position, userId]
     );
-    const id = db.exec("SELECT last_insert_rowid() as id")[0].values[0][0];
-    saveDb();
-    return this.getById(id, userId);
+    return this.getById(rows[0].id, userId);
   },
 
-  update(id, updates, userId) {
-    const db = getDb();
+  async update(id, updates, userId) {
     const allowed = ['title', 'notes', 'url', 'status', 'rating', 'position', 'linked_task_id', 'completed_at'];
-    const fields = Object.keys(updates).filter(k => allowed.includes(k) && updates[k] !== undefined);
+    // Auto-fill completed_at and clear rating based on status transitions
     if (updates.status === 'done' && !updates.completed_at) {
-      updates.completed_at = new Date().toISOString();
-      if (!fields.includes('completed_at')) fields.push('completed_at');
+      updates = { ...updates, completed_at: new Date().toISOString() };
     }
     if (updates.status && updates.status !== 'done') {
-      updates.completed_at = null;
-      updates.rating = null;
-      if (!fields.includes('completed_at')) fields.push('completed_at');
-      if (!fields.includes('rating')) fields.push('rating');
+      updates = { ...updates, completed_at: null, rating: null };
     }
+    const fields = Object.keys(updates).filter(k => allowed.includes(k) && updates[k] !== undefined);
     if (fields.length === 0) return this.getById(id, userId);
-    const setClause = fields.map(f => `${f} = ?`).join(', ');
+    const setClause = fields.map((f, i) => `${f} = $${i + 1}`).join(', ');
     const values = [...fields.map(f => updates[f]), id, userId];
-    db.run(`UPDATE list_items SET ${setClause} WHERE id = ? AND user_id = ?`, values);
-    saveDb();
+    const idIdx = values.length - 1;
+    const userIdx = values.length;
+    await pool.query(
+      `UPDATE list_items SET ${setClause} WHERE id = $${idIdx} AND user_id = $${userIdx}`,
+      values
+    );
     return this.getById(id, userId);
   },
 
-  delete(id, userId) {
-    const db = getDb();
-    db.run('DELETE FROM list_items WHERE id = ? AND user_id = ?', [id, userId]);
-    saveDb();
+  async delete(id, userId) {
+    await pool.query('DELETE FROM list_items WHERE id = $1 AND user_id = $2', [id, userId]);
     return { changes: 1 };
   },
 
-  reorder(listId, itemIds, userId) {
-    const db = getDb();
-    itemIds.forEach((itemId, index) => {
-      db.run('UPDATE list_items SET position = ? WHERE id = ? AND list_id = ? AND user_id = ?', [index, itemId, listId, userId]);
-    });
-    saveDb();
+  async reorder(listId, itemIds, userId) {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      for (let i = 0; i < itemIds.length; i++) {
+        await client.query(
+          'UPDATE list_items SET position = $1 WHERE id = $2 AND list_id = $3 AND user_id = $4',
+          [i, itemIds[i], listId, userId]
+        );
+      }
+      await client.query('COMMIT');
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
     return this.getByList(listId, userId);
   },
 
-  promoteToTask(id, userId) {
-    const item = this.getById(id, userId);
+  async promoteToTask(id, userId) {
+    const item = await this.getById(id, userId);
     if (!item) return null;
     if (item.linked_task_id) return { item, task: null, alreadyLinked: true };
-    const task = TaskModel.create({ title: item.title, notes: item.notes || null, list: 'next_actions' }, userId);
-    this.update(id, { linked_task_id: task.id }, userId);
-    return { item: this.getById(id, userId), task };
+    const task = await TaskModel.create({ title: item.title, notes: item.notes || null, list: 'next_actions' }, userId);
+    await this.update(id, { linked_task_id: task.id }, userId);
+    return { item: await this.getById(id, userId), task };
   },
 };

@@ -80,7 +80,7 @@ export default function TaskModal({ task, projects, onClose, onSave }) {
         duration: task.duration || '',
         energy_level: task.energy_level || '',
         time_estimate: task.time_estimate || '',
-        is_daily_focus: task.is_daily_focus === 1,
+        is_daily_focus: !!task.is_daily_focus,
         recurrence_rule: task.recurrence_rule || '',
         recurrence_interval: task.recurrence_interval || 1,
         recurrence_days: task.recurrence_days || '',

@@ -33,7 +33,7 @@ function formatScheduledTime(time) {
 
 export default function TaskCard({ task, onComplete, onEdit, showList = false, queued = false }) {
   const isCompleted = task.list === 'completed';
-  const focus = task.is_daily_focus === 1 && !queued && !isCompleted;
+  const focus = !!task.is_daily_focus && !queued && !isCompleted;
   const energyTone = ENERGY_TONES[task.energy_level];
   const { text: notesText, urls: noteUrls } = parseNotes(task.notes);
 

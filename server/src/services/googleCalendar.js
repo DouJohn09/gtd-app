@@ -1,5 +1,5 @@
 import { OAuth2Client } from 'google-auth-library';
-import { getDb, saveDb } from '../db/schema.js';
+import { pool } from '../db/pool.js';
 
 const CALENDAR_API_BASE = 'https://www.googleapis.com/calendar/v3';
 
@@ -11,41 +11,32 @@ function createOAuth2Client() {
   );
 }
 
-function getUserTokens(userId) {
-  const db = getDb();
-  const stmt = db.prepare(
-    'SELECT google_calendar_access_token, google_calendar_refresh_token, google_calendar_token_expiry FROM users WHERE id = ?'
-  );
-  stmt.bind([userId]);
-  if (stmt.step()) {
-    const row = stmt.getAsObject();
-    stmt.free();
-    return {
-      access_token: row.google_calendar_access_token,
-      refresh_token: row.google_calendar_refresh_token,
-      expiry_date: row.google_calendar_token_expiry,
-    };
-  }
-  stmt.free();
-  return null;
-}
-
-function saveUserTokens(userId, tokens) {
-  const db = getDb();
-  db.run(
-    'UPDATE users SET google_calendar_access_token = ?, google_calendar_refresh_token = ?, google_calendar_token_expiry = ? WHERE id = ?',
-    [tokens.access_token, tokens.refresh_token, tokens.expiry_date, userId]
-  );
-  saveDb();
-}
-
-function clearUserTokens(userId) {
-  const db = getDb();
-  db.run(
-    'UPDATE users SET google_calendar_access_token = NULL, google_calendar_refresh_token = NULL, google_calendar_token_expiry = NULL WHERE id = ?',
+async function getUserTokens(userId) {
+  const { rows } = await pool.query(
+    'SELECT google_calendar_access_token, google_calendar_refresh_token, google_calendar_token_expiry FROM users WHERE id = $1',
     [userId]
   );
-  saveDb();
+  const row = rows[0];
+  if (!row) return null;
+  return {
+    access_token: row.google_calendar_access_token,
+    refresh_token: row.google_calendar_refresh_token,
+    expiry_date: row.google_calendar_token_expiry,
+  };
+}
+
+async function saveUserTokens(userId, tokens) {
+  await pool.query(
+    'UPDATE users SET google_calendar_access_token = $1, google_calendar_refresh_token = $2, google_calendar_token_expiry = $3 WHERE id = $4',
+    [tokens.access_token, tokens.refresh_token, tokens.expiry_date, userId]
+  );
+}
+
+async function clearUserTokens(userId) {
+  await pool.query(
+    'UPDATE users SET google_calendar_access_token = NULL, google_calendar_refresh_token = NULL, google_calendar_token_expiry = NULL WHERE id = $1',
+    [userId]
+  );
 }
 
 export const CALENDAR_WRITE_SCOPE = 'https://www.googleapis.com/auth/calendar';
@@ -61,21 +52,16 @@ export async function exchangeCodeForTokens(code) {
   };
 }
 
-export function userHasWriteScope(userId) {
-  const db = getDb();
-  const stmt = db.prepare('SELECT google_calendar_scopes FROM users WHERE id = ?');
-  stmt.bind([userId]);
-  if (stmt.step()) {
-    const row = stmt.getAsObject();
-    stmt.free();
-    return (row.google_calendar_scopes || '').includes(CALENDAR_WRITE_SCOPE);
-  }
-  stmt.free();
-  return false;
+export async function userHasWriteScope(userId) {
+  const { rows } = await pool.query(
+    'SELECT google_calendar_scopes FROM users WHERE id = $1',
+    [userId]
+  );
+  return (rows[0]?.google_calendar_scopes || '').includes(CALENDAR_WRITE_SCOPE);
 }
 
 async function getValidAccessToken(userId) {
-  const tokens = getUserTokens(userId);
+  const tokens = await getUserTokens(userId);
   if (!tokens || (!tokens.refresh_token && !tokens.access_token)) return null;
 
   // Check if token is still valid (with 5-minute buffer)
@@ -86,26 +72,22 @@ async function getValidAccessToken(userId) {
     return tokens.access_token;
   }
 
-  // Token expired — try to refresh if we have a refresh token
   if (!tokens.refresh_token) return null;
 
   try {
     const client = createOAuth2Client();
-    client.setCredentials({
-      refresh_token: tokens.refresh_token,
-    });
+    client.setCredentials({ refresh_token: tokens.refresh_token });
     const { credentials } = await client.refreshAccessToken();
     const newTokens = {
       access_token: credentials.access_token,
       refresh_token: tokens.refresh_token, // keep existing refresh token
       expiry_date: credentials.expiry_date ? new Date(credentials.expiry_date).toISOString() : null,
     };
-    saveUserTokens(userId, newTokens);
+    await saveUserTokens(userId, newTokens);
     return credentials.access_token;
   } catch (err) {
     console.error('Failed to refresh Google Calendar token:', err.message);
-    // Token revoked or invalid — clear stored tokens
-    clearUserTokens(userId);
+    await clearUserTokens(userId);
     return null;
   }
 }
@@ -122,7 +104,6 @@ function normalizeEvent(event) {
   const startDateTime = event.start?.dateTime;
   const startDate = event.start?.date;
   const endDateTime = event.end?.dateTime;
-  const endDate = event.end?.date;
   const allDay = !!startDate;
 
   const dueDateStr = allDay ? startDate : formatDateKey(new Date(startDateTime));
@@ -144,12 +125,11 @@ function expandMultiDayEvent(event, rangeStart, rangeEnd) {
   const startDate = event.start?.date;
   const endDate = event.end?.date;
 
-  // Only all-day events can span multiple days in this context
   if (!startDate || !endDate) return [normalizeEvent(event)];
 
   const entries = [];
   const start = new Date(startDate + 'T00:00:00');
-  const end = new Date(endDate + 'T00:00:00'); // end date is exclusive in Google API
+  const end = new Date(endDate + 'T00:00:00'); // end date is exclusive
 
   for (let d = new Date(start); d < end; d.setDate(d.getDate() + 1)) {
     const dateKey = formatDateKey(d);
@@ -193,8 +173,7 @@ export async function getCalendarEvents(userId, startDate, endDate) {
     const error = await response.text();
     console.error('Google Calendar API error:', response.status, error);
     if (response.status === 401) {
-      // Token invalid — clear it
-      clearUserTokens(userId);
+      await clearUserTokens(userId);
     }
     return [];
   }
@@ -202,7 +181,6 @@ export async function getCalendarEvents(userId, startDate, endDate) {
   const data = await response.json();
   const events = data.items || [];
 
-  // Normalize and expand multi-day events
   const normalized = [];
   for (const event of events) {
     if (event.status === 'cancelled') continue;
@@ -214,8 +192,7 @@ export async function getCalendarEvents(userId, startDate, endDate) {
 }
 
 export async function revokeCalendarAccess(userId) {
-  const tokens = getUserTokens(userId);
-  // Prefer revoking refresh_token — this revokes all associated tokens
+  const tokens = await getUserTokens(userId);
   const tokenToRevoke = tokens?.refresh_token || tokens?.access_token;
   if (tokenToRevoke) {
     try {
@@ -227,31 +204,21 @@ export async function revokeCalendarAccess(userId) {
       console.error('Failed to revoke Google token:', err.message);
     }
   }
-  clearUserTokens(userId);
+  await clearUserTokens(userId);
 }
 
-export function isCalendarConnected(userId) {
-  const tokens = getUserTokens(userId);
+export async function isCalendarConnected(userId) {
+  const tokens = await getUserTokens(userId);
   return !!(tokens?.refresh_token || tokens?.access_token);
 }
 
-function getGtdCalendarId(userId) {
-  const db = getDb();
-  const stmt = db.prepare('SELECT gtd_calendar_id FROM users WHERE id = ?');
-  stmt.bind([userId]);
-  if (stmt.step()) {
-    const row = stmt.getAsObject();
-    stmt.free();
-    return row.gtd_calendar_id || null;
-  }
-  stmt.free();
-  return null;
+async function getGtdCalendarId(userId) {
+  const { rows } = await pool.query('SELECT gtd_calendar_id FROM users WHERE id = $1', [userId]);
+  return rows[0]?.gtd_calendar_id || null;
 }
 
-function setGtdCalendarId(userId, id) {
-  const db = getDb();
-  db.run('UPDATE users SET gtd_calendar_id = ? WHERE id = ?', [id, userId]);
-  saveDb();
+async function setGtdCalendarId(userId, id) {
+  await pool.query('UPDATE users SET gtd_calendar_id = $1 WHERE id = $2', [id, userId]);
 }
 
 // One-time rename of legacy "GTD Flow" calendars to "Cleartable" after the rebrand.
@@ -286,7 +253,7 @@ async function migrateLegacyCalendarName(userId, calendarId, accessToken) {
 }
 
 async function ensureGtdCalendar(userId, accessToken) {
-  const existing = getGtdCalendarId(userId);
+  const existing = await getGtdCalendarId(userId);
   if (existing) {
     migrateLegacyCalendarName(userId, existing, accessToken);
     return existing;
@@ -308,7 +275,7 @@ async function ensureGtdCalendar(userId, accessToken) {
     throw new Error(`Failed to create Cleartable calendar: ${response.status} ${err}`);
   }
   const data = await response.json();
-  setGtdCalendarId(userId, data.id);
+  await setGtdCalendarId(userId, data.id);
   return data.id;
 }
 
@@ -337,17 +304,15 @@ function buildEventPayload(task, clientTimezone) {
   };
 }
 
-function setTaskEventId(taskId, eventId) {
-  const db = getDb();
-  db.run('UPDATE tasks SET google_event_id = ? WHERE id = ?', [eventId, taskId]);
-  saveDb();
+async function setTaskEventId(taskId, eventId) {
+  await pool.query('UPDATE tasks SET google_event_id = $1 WHERE id = $2', [eventId, taskId]);
 }
 
 export async function pushTaskToCalendar(userId, task, clientTimezone) {
   if (!task || !task.scheduled_time || !task.due_date) return;
   const accessToken = await getValidAccessToken(userId);
   if (!accessToken) return;
-  if (!userHasWriteScope(userId)) return;
+  if (!(await userHasWriteScope(userId))) return;
 
   try {
     const calendarId = await ensureGtdCalendar(userId, accessToken);
@@ -355,7 +320,6 @@ export async function pushTaskToCalendar(userId, task, clientTimezone) {
     if (!payload) return;
 
     if (task.google_event_id) {
-      // Update existing event
       const r = await fetch(
         `${CALENDAR_API_BASE}/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(task.google_event_id)}`,
         {
@@ -376,7 +340,7 @@ export async function pushTaskToCalendar(userId, task, clientTimezone) {
         );
         if (created.ok) {
           const data = await created.json();
-          setTaskEventId(task.id, data.id);
+          await setTaskEventId(task.id, data.id);
         }
       } else if (!r.ok) {
         console.error('Failed to update Cleartable event:', r.status, await r.text());
@@ -392,7 +356,7 @@ export async function pushTaskToCalendar(userId, task, clientTimezone) {
       );
       if (r.ok) {
         const data = await r.json();
-        setTaskEventId(task.id, data.id);
+        await setTaskEventId(task.id, data.id);
       } else {
         console.error('Failed to create Cleartable event:', r.status, await r.text());
       }
@@ -402,10 +366,8 @@ export async function pushTaskToCalendar(userId, task, clientTimezone) {
   }
 }
 
-function clearTaskEventId(taskId) {
-  const db = getDb();
-  db.run('UPDATE tasks SET google_event_id = NULL WHERE id = ?', [taskId]);
-  saveDb();
+async function clearTaskEventId(taskId) {
+  await pool.query('UPDATE tasks SET google_event_id = NULL WHERE id = $1', [taskId]);
 }
 
 // Sync a task's state to its Google Calendar event.
@@ -419,7 +381,7 @@ export async function syncTaskToCalendar(userId, task, clientTimezone) {
     await pushTaskToCalendar(userId, task, clientTimezone);
   } else if (task.google_event_id) {
     await deleteTaskFromCalendar(userId, task.google_event_id);
-    clearTaskEventId(task.id);
+    await clearTaskEventId(task.id);
   }
 }
 
@@ -427,10 +389,10 @@ export async function deleteTaskFromCalendar(userId, eventId) {
   if (!eventId) return;
   const accessToken = await getValidAccessToken(userId);
   if (!accessToken) return;
-  if (!userHasWriteScope(userId)) return;
+  if (!(await userHasWriteScope(userId))) return;
 
   try {
-    const calendarId = getGtdCalendarId(userId);
+    const calendarId = await getGtdCalendarId(userId);
     if (!calendarId) return;
     const r = await fetch(
       `${CALENDAR_API_BASE}/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(eventId)}`,

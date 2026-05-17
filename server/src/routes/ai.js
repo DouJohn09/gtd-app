@@ -1,18 +1,16 @@
 import { Router } from 'express';
 import { TaskModel, ProjectModel, WeeklyReviewModel } from '../db/models.js';
-import { getDb } from '../db/schema.js';
+import { pool } from '../db/pool.js';
 import { processInbox, getDailyPriorities, importNotes, findDuplicates, weeklyReviewAnalysis, smartCapture } from '../services/ai.js';
 import { syncTaskToCalendar } from '../services/googleCalendar.js';
 import { findFreeSlot } from '../services/scheduling.js';
 
-function getUserContexts(userId) {
-  const db = getDb();
-  const stmt = db.prepare('SELECT name FROM contexts WHERE user_id = ? ORDER BY name');
-  stmt.bind([userId]);
-  const results = [];
-  while (stmt.step()) results.push(stmt.getAsObject());
-  stmt.free();
-  return results;
+async function getUserContexts(userId) {
+  const { rows } = await pool.query(
+    'SELECT name FROM contexts WHERE user_id = $1 ORDER BY name',
+    [userId]
+  );
+  return rows;
 }
 
 // Few-shot examples: the user's recent classified tasks. Drives the AI toward
@@ -20,23 +18,19 @@ function getUserContexts(userId) {
 // Ordered by updated_at so user CORRECTIONS (moving a task between lists,
 // fixing its context) surface in the next capture's prompt — the AI learns
 // from edits, not just initial classifications.
-function getRecentClassifiedTasks(userId, limit = 10) {
-  const db = getDb();
-  const stmt = db.prepare(`
-    SELECT title, context, list, project_id
-    FROM tasks
-    WHERE user_id = ?
-      AND context IS NOT NULL
-      AND context != ''
-      AND list != 'inbox'
-    ORDER BY updated_at DESC
-    LIMIT ?
-  `);
-  stmt.bind([userId, limit]);
-  const results = [];
-  while (stmt.step()) results.push(stmt.getAsObject());
-  stmt.free();
-  return results;
+async function getRecentClassifiedTasks(userId, limit = 10) {
+  const { rows } = await pool.query(
+    `SELECT title, context, list, project_id
+     FROM tasks
+     WHERE user_id = $1
+       AND context IS NOT NULL
+       AND context != ''
+       AND list != 'inbox'
+     ORDER BY updated_at DESC
+     LIMIT $2`,
+    [userId, limit]
+  );
+  return rows;
 }
 
 const router = Router();
@@ -49,9 +43,12 @@ router.post('/smart-capture', async (req, res) => {
     }
     const rawText = text.trim();
     const urls = rawText.match(/https?:\/\/[^\s]+/gi) || [];
-    const contexts = getUserContexts(req.user.id);
-    const projects = ProjectModel.getAll(req.user.id).filter(p => p.status === 'active');
-    const history = getRecentClassifiedTasks(req.user.id, 10);
+    const [contexts, allProjects, history] = await Promise.all([
+      getUserContexts(req.user.id),
+      ProjectModel.getAll(req.user.id),
+      getRecentClassifiedTasks(req.user.id, 10),
+    ]);
+    const projects = allProjects.filter(p => p.status === 'active');
     const now = new Date();
     const today = now.toISOString().split('T')[0];
     const dayName = now.toLocaleDateString('en-US', { weekday: 'long' });
@@ -60,7 +57,7 @@ router.post('/smart-capture', async (req, res) => {
     if (!ai) {
       const taskData = { title: rawText };
       if (urls.length) taskData.notes = urls.join('\n');
-      const task = TaskModel.create(taskData, req.user.id);
+      const task = await TaskModel.create(taskData, req.user.id);
       return res.json({ task, ai: null, fallback: true });
     }
 
@@ -124,13 +121,13 @@ router.post('/smart-capture', async (req, res) => {
       start_date: ai.start_date || null,
       scheduled_time: ai.scheduled_time || null,
       duration: ai.duration || null,
-      is_daily_focus: ai.is_daily_focus ? 1 : 0,
+      is_daily_focus: !!ai.is_daily_focus,
       waiting_for_person: ai.waiting_for_person || null,
       recurrence_rule: ai.recurrence_rule || null,
       recurrence_interval: ai.recurrence_interval || null,
       recurrence_days: ai.recurrence_days || null,
     };
-    const task = TaskModel.create(taskData, req.user.id);
+    const task = await TaskModel.create(taskData, req.user.id);
     res.json({ task, ai, bookedSlot, slotSearchFailed, routedToInbox });
     syncTaskToCalendar(req.user.id, task, req.clientTimezone).catch(err => console.error('syncTaskToCalendar (smart-capture):', err));
   } catch (error) {
@@ -141,12 +138,12 @@ router.post('/smart-capture', async (req, res) => {
 
 router.post('/process-inbox', async (req, res) => {
   try {
-    const inboxTasks = TaskModel.getAll('inbox', req.user.id);
+    const inboxTasks = await TaskModel.getAll('inbox', req.user.id);
     if (inboxTasks.length === 0) {
       return res.json({ message: 'Inbox is empty', processed_items: [] });
     }
 
-    const userContexts = getUserContexts(req.user.id);
+    const userContexts = await getUserContexts(req.user.id);
     const result = await processInbox(inboxTasks, userContexts);
     if (!result) {
       return res.status(500).json({ error: 'AI processing failed' });
@@ -163,7 +160,7 @@ router.post('/apply-inbox-processing', async (req, res) => {
   try {
     const { items } = req.body;
 
-    const updatedTasks = items.map(item => {
+    const updatedTasks = await Promise.all(items.map(item => {
       const updates = {
         list: item.recommended_list,
         context: item.context,
@@ -174,10 +171,10 @@ router.post('/apply-inbox-processing', async (req, res) => {
       if (item.due_date !== undefined) updates.due_date = item.due_date || null;
       if (item.energy_level !== undefined) updates.energy_level = item.energy_level || null;
       if (item.time_estimate !== undefined) updates.time_estimate = item.time_estimate || null;
-      if (item.is_daily_focus !== undefined) updates.is_daily_focus = item.is_daily_focus ? 1 : 0;
+      if (item.is_daily_focus !== undefined) updates.is_daily_focus = !!item.is_daily_focus;
       if (item.waiting_for_person !== undefined) updates.waiting_for_person = item.waiting_for_person || null;
       return TaskModel.update(item.task_id, updates, req.user.id);
-    });
+    }));
 
     res.json(updatedTasks);
   } catch (error) {
@@ -187,8 +184,10 @@ router.post('/apply-inbox-processing', async (req, res) => {
 
 router.post('/daily-priorities', async (req, res) => {
   try {
-    const nextActions = TaskModel.getAll('next_actions', req.user.id);
-    const stats = TaskModel.getStats(req.user.id);
+    const [nextActions, stats] = await Promise.all([
+      TaskModel.getAll('next_actions', req.user.id),
+      TaskModel.getStats(req.user.id),
+    ]);
 
     if (nextActions.length === 0) {
       return res.json({
@@ -198,7 +197,7 @@ router.post('/daily-priorities', async (req, res) => {
       });
     }
 
-    const userContexts = getUserContexts(req.user.id);
+    const userContexts = await getUserContexts(req.user.id);
     const result = await getDailyPriorities(nextActions, stats, userContexts);
     if (!result) {
       return res.status(500).json({ error: 'AI processing failed' });
@@ -218,8 +217,11 @@ router.post('/import-notes', async (req, res) => {
       return res.status(400).json({ error: 'No text provided' });
     }
 
-    const userContexts = getUserContexts(req.user.id);
-    const projects = ProjectModel.getAll(req.user.id).filter(p => p.status === 'active');
+    const [userContexts, allProjects] = await Promise.all([
+      getUserContexts(req.user.id),
+      ProjectModel.getAll(req.user.id),
+    ]);
+    const projects = allProjects.filter(p => p.status === 'active');
     const now = new Date();
     const today = now.toISOString().split('T')[0];
     const dayName = now.toLocaleDateString('en-US', { weekday: 'long' });
@@ -228,7 +230,6 @@ router.post('/import-notes', async (req, res) => {
       return res.status(500).json({ error: 'AI processing failed' });
     }
 
-    // Resolve project_name → project_id for each item
     if (Array.isArray(result.items)) {
       result.items = result.items.map(item => {
         let project_id = null;
@@ -253,8 +254,8 @@ router.post('/apply-import', async (req, res) => {
       return res.status(400).json({ error: 'No items to import' });
     }
 
-    const created = items.map(item => {
-      return TaskModel.create({
+    const created = await Promise.all(items.map(item =>
+      TaskModel.create({
         title: item.title,
         notes: item.notes || null,
         list: item.recommended_list || 'inbox',
@@ -265,9 +266,9 @@ router.post('/apply-import', async (req, res) => {
         priority: item.priority || null,
         energy_level: item.energy_level || null,
         time_estimate: item.time_estimate || null,
-        is_daily_focus: item.is_daily_focus ? 1 : 0,
-      }, req.user.id);
-    });
+        is_daily_focus: !!item.is_daily_focus,
+      }, req.user.id)
+    ));
 
     res.json({ count: created.length, tasks: created });
   } catch (error) {
@@ -279,13 +280,17 @@ router.post('/apply-daily-focus', async (req, res) => {
   try {
     const { taskIds } = req.body;
 
-    TaskModel.getAll('next_actions', req.user.id).forEach(task => {
-      TaskModel.update(task.id, { is_daily_focus: 0 }, req.user.id);
-    });
+    // Clear daily focus on all current next-actions, then set on the chosen ones.
+    // Could be done as two SQL statements directly but going through TaskModel
+    // keeps the auto-promotion + updated_at semantics consistent.
+    const nextActions = await TaskModel.getAll('next_actions', req.user.id);
+    await Promise.all(nextActions.map(task =>
+      TaskModel.update(task.id, { is_daily_focus: false }, req.user.id)
+    ));
 
-    const updatedTasks = taskIds.map(id =>
-      TaskModel.update(id, { is_daily_focus: 1 }, req.user.id)
-    );
+    const updatedTasks = await Promise.all(taskIds.map(id =>
+      TaskModel.update(id, { is_daily_focus: true }, req.user.id)
+    ));
 
     res.json(updatedTasks);
   } catch (error) {
@@ -295,14 +300,18 @@ router.post('/apply-daily-focus', async (req, res) => {
 
 router.post('/find-duplicates', async (req, res) => {
   try {
-    const allTasks = ['inbox', 'next_actions', 'waiting_for', 'someday_maybe']
-      .flatMap(list => TaskModel.getAll(list, req.user.id));
+    const lists = await Promise.all(
+      ['inbox', 'next_actions', 'waiting_for', 'someday_maybe'].map(list =>
+        TaskModel.getAll(list, req.user.id)
+      )
+    );
+    const allTasks = lists.flat();
 
     if (allTasks.length < 2) {
       return res.json({ duplicate_groups: [], summary: 'Not enough tasks to compare' });
     }
 
-    const userContexts = getUserContexts(req.user.id);
+    const userContexts = await getUserContexts(req.user.id);
     const result = await findDuplicates(allTasks, userContexts);
     if (!result) {
       return res.status(500).json({ error: 'AI processing failed' });
@@ -321,30 +330,26 @@ router.post('/apply-duplicates', async (req, res) => {
       return res.status(400).json({ error: 'No tasks to remove' });
     }
 
-    taskIds.forEach(id => TaskModel.delete(id, req.user.id));
+    await Promise.all(taskIds.map(id => TaskModel.delete(id, req.user.id)));
     res.json({ count: taskIds.length });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
-// Helper to query habit stats (reused from habits route pattern)
-function getHabitStats(userId) {
-  const db = getDb();
-  const stmt = db.prepare('SELECT * FROM habits WHERE user_id = ? AND active = 1 ORDER BY name');
-  stmt.bind([userId]);
-  const habits = [];
-  while (stmt.step()) habits.push(stmt.getAsObject());
-  stmt.free();
-
-  const ninetyDaysAgo = new Date();
-  ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
-  const startDate = ninetyDaysAgo.toISOString().split('T')[0];
-  const logStmt = db.prepare('SELECT habit_id, completed_date FROM habit_logs WHERE user_id = ? AND completed_date >= ?');
-  logStmt.bind([userId, startDate]);
-  const allLogs = [];
-  while (logStmt.step()) allLogs.push(logStmt.getAsObject());
-  logStmt.free();
+async function getHabitStats(userId) {
+  const [{ rows: habits }, { rows: allLogs }] = await Promise.all([
+    pool.query('SELECT * FROM habits WHERE user_id = $1 AND active = true ORDER BY name', [userId]),
+    (() => {
+      const ninetyDaysAgo = new Date();
+      ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+      const startDate = ninetyDaysAgo.toISOString().split('T')[0];
+      return pool.query(
+        'SELECT habit_id, completed_date FROM habit_logs WHERE user_id = $1 AND completed_date >= $2',
+        [userId, startDate]
+      );
+    })(),
+  ]);
 
   const today = new Date().toISOString().split('T')[0];
   return {
@@ -378,20 +383,22 @@ function getHabitStats(userId) {
 router.post('/weekly-review', async (req, res) => {
   try {
     const userId = req.user.id;
-    const stats = TaskModel.getStats(userId);
-    const inboxItems = TaskModel.getAll('inbox', userId);
-    const nextActions = TaskModel.getAll('next_actions', userId);
-    const waitingFor = TaskModel.getAll('waiting_for', userId);
-    const somedayMaybe = TaskModel.getAll('someday_maybe', userId);
-    const projects = ProjectModel.getAll(userId);
-    const staleItems = WeeklyReviewModel.getStaleItems(userId);
-    const lastReview = WeeklyReviewModel.getLastReview(userId);
-    const streak = WeeklyReviewModel.getStreak(userId);
-    const habitStats = getHabitStats(userId);
-    const userContexts = getUserContexts(userId);
+    const [stats, inboxItems, nextActions, waitingFor, somedayMaybe, projects, staleItems, lastReview, streak, habitStats, userContexts] = await Promise.all([
+      TaskModel.getStats(userId),
+      TaskModel.getAll('inbox', userId),
+      TaskModel.getAll('next_actions', userId),
+      TaskModel.getAll('waiting_for', userId),
+      TaskModel.getAll('someday_maybe', userId),
+      ProjectModel.getAll(userId),
+      WeeklyReviewModel.getStaleItems(userId),
+      WeeklyReviewModel.getLastReview(userId),
+      WeeklyReviewModel.getStreak(userId),
+      getHabitStats(userId),
+      getUserContexts(userId),
+    ]);
 
     const since = lastReview?.completed_at || new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-    const completedThisWeek = WeeklyReviewModel.getCompletedTasksSince(userId, since);
+    const completedThisWeek = await WeeklyReviewModel.getCompletedTasksSince(userId, since);
 
     const aiAnalysis = await weeklyReviewAnalysis({
       stats, nextActions, waitingFor, somedayMaybe, projects,
@@ -414,11 +421,13 @@ router.post('/complete-review', async (req, res) => {
     const { tasksCompleted = [], tasksDeleted = [], tasksMoved = [], inboxCountAtStart = 0, aiSummary } = req.body;
     const userId = req.user.id;
 
-    tasksCompleted.forEach(id => TaskModel.complete(id, userId));
-    tasksDeleted.forEach(id => TaskModel.delete(id, userId));
-    tasksMoved.forEach(({ id, toList }) => TaskModel.update(id, { list: toList }, userId));
+    await Promise.all([
+      ...tasksCompleted.map(id => TaskModel.complete(id, userId)),
+      ...tasksDeleted.map(id => TaskModel.delete(id, userId)),
+      ...tasksMoved.map(({ id, toList }) => TaskModel.update(id, { list: toList }, userId)),
+    ]);
 
-    const review = WeeklyReviewModel.create({
+    const review = await WeeklyReviewModel.create({
       inboxCountAtStart,
       tasksCompleted: tasksCompleted.length,
       tasksMoved: tasksMoved.length,
@@ -426,7 +435,7 @@ router.post('/complete-review', async (req, res) => {
       aiSummary,
     }, userId);
 
-    const streak = WeeklyReviewModel.getStreak(userId);
+    const streak = await WeeklyReviewModel.getStreak(userId);
     res.json({ review, streak });
   } catch (error) {
     res.status(500).json({ error: error.message });

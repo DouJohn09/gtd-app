@@ -1,16 +1,12 @@
 import express from 'express';
-import { getDb } from '../db/schema.js';
+import { pool } from '../db/pool.js';
 
 const router = express.Router();
 
-function getRows(table, userId) {
-  const db = getDb();
-  const stmt = db.prepare(`SELECT * FROM ${table} WHERE user_id = ?`);
-  stmt.bind([userId]);
-  const out = [];
-  while (stmt.step()) out.push(stmt.getAsObject());
-  stmt.free();
-  return out;
+async function getRows(table, userId) {
+  // Table name comes from a hardcoded literal in callers, never from request input.
+  const { rows } = await pool.query(`SELECT * FROM ${table} WHERE user_id = $1`, [userId]);
+  return rows;
 }
 
 const TASK_FIELDS = [
@@ -35,14 +31,22 @@ function todayStamp() {
   return new Date().toISOString().slice(0, 10);
 }
 
-router.get('/json', (req, res) => {
+router.get('/json', async (req, res) => {
   try {
     const userId = req.user.id;
-    const tasks = getRows('tasks', userId).map(t => pick(t, TASK_FIELDS));
-    const projects = getRows('projects', userId).map(p => pick(p, PROJECT_FIELDS));
-    const contexts = getRows('contexts', userId).map(c => pick(c, CONTEXT_FIELDS));
-    const habits = getRows('habits', userId).map(h => pick(h, HABIT_FIELDS));
-    const habit_logs = getRows('habit_logs', userId).map(l => pick(l, HABIT_LOG_FIELDS));
+    const [tasksRaw, projectsRaw, contextsRaw, habitsRaw, habitLogsRaw] = await Promise.all([
+      getRows('tasks', userId),
+      getRows('projects', userId),
+      getRows('contexts', userId),
+      getRows('habits', userId),
+      getRows('habit_logs', userId),
+    ]);
+
+    const tasks = tasksRaw.map(t => pick(t, TASK_FIELDS));
+    const projects = projectsRaw.map(p => pick(p, PROJECT_FIELDS));
+    const contexts = contextsRaw.map(c => pick(c, CONTEXT_FIELDS));
+    const habits = habitsRaw.map(h => pick(h, HABIT_FIELDS));
+    const habit_logs = habitLogsRaw.map(l => pick(l, HABIT_LOG_FIELDS));
 
     const payload = {
       app: 'Cleartable',
@@ -89,12 +93,14 @@ const CSV_HEADERS = [
   'COMPLETED', 'COMPLETED_AT', 'RECURRENCE',
 ];
 
-router.get('/csv', (req, res) => {
+router.get('/csv', async (req, res) => {
   try {
     const userId = req.user.id;
-    const projects = getRows('projects', userId);
+    const [projects, tasks] = await Promise.all([
+      getRows('projects', userId),
+      getRows('tasks', userId),
+    ]);
     const projectName = new Map(projects.map(p => [p.id, p.name]));
-    const tasks = getRows('tasks', userId);
 
     const lines = [CSV_HEADERS.join(',')];
 

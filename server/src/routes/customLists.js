@@ -14,87 +14,87 @@ router.post('/extract-url', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-router.get('/', (req, res) => {
+router.get('/', async (req, res) => {
   try {
-    res.json(CustomListModel.getAll(req.user.id));
+    res.json(await CustomListModel.getAll(req.user.id));
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-router.get('/:id', (req, res) => {
+router.get('/:id', async (req, res) => {
   try {
-    const list = CustomListModel.getById(req.params.id, req.user.id);
+    const list = await CustomListModel.getById(req.params.id, req.user.id);
     if (!list) return res.status(404).json({ error: 'List not found' });
     res.json(list);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-router.post('/', (req, res) => {
+router.post('/', async (req, res) => {
   try {
     if (!req.body.name?.trim()) return res.status(400).json({ error: 'Name is required' });
-    res.status(201).json(CustomListModel.create(req.body, req.user.id));
+    res.status(201).json(await CustomListModel.create(req.body, req.user.id));
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-router.put('/:id', (req, res) => {
+router.put('/:id', async (req, res) => {
   try {
-    const list = CustomListModel.update(req.params.id, req.body, req.user.id);
+    const list = await CustomListModel.update(req.params.id, req.body, req.user.id);
     if (!list) return res.status(404).json({ error: 'List not found' });
     res.json(list);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-router.delete('/:id', (req, res) => {
+router.delete('/:id', async (req, res) => {
   try {
-    CustomListModel.delete(req.params.id, req.user.id);
+    await CustomListModel.delete(req.params.id, req.user.id);
     res.status(204).send();
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-router.post('/reorder', (req, res) => {
+router.post('/reorder', async (req, res) => {
   try {
-    res.json(CustomListModel.reorder(req.body.listIds, req.user.id));
+    res.json(await CustomListModel.reorder(req.body.listIds, req.user.id));
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // Items
 
-router.get('/:id/items', (req, res) => {
+router.get('/:id/items', async (req, res) => {
   try {
-    res.json(ListItemModel.getByList(req.params.id, req.user.id));
+    res.json(await ListItemModel.getByList(req.params.id, req.user.id));
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-router.post('/:id/items', (req, res) => {
+router.post('/:id/items', async (req, res) => {
   try {
     if (!req.body.title?.trim()) return res.status(400).json({ error: 'Title is required' });
-    res.status(201).json(ListItemModel.create({ ...req.body, list_id: parseInt(req.params.id) }, req.user.id));
+    res.status(201).json(await ListItemModel.create({ ...req.body, list_id: parseInt(req.params.id) }, req.user.id));
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-router.put('/:id/items/:itemId', (req, res) => {
+router.put('/:id/items/:itemId', async (req, res) => {
   try {
-    const item = ListItemModel.update(req.params.itemId, req.body, req.user.id);
+    const item = await ListItemModel.update(req.params.itemId, req.body, req.user.id);
     if (!item) return res.status(404).json({ error: 'Item not found' });
     res.json(item);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-router.delete('/:id/items/:itemId', (req, res) => {
+router.delete('/:id/items/:itemId', async (req, res) => {
   try {
-    ListItemModel.delete(req.params.itemId, req.user.id);
+    await ListItemModel.delete(req.params.itemId, req.user.id);
     res.status(204).send();
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-router.post('/:id/items/reorder', (req, res) => {
+router.post('/:id/items/reorder', async (req, res) => {
   try {
-    res.json(ListItemModel.reorder(req.params.id, req.body.itemIds, req.user.id));
+    res.json(await ListItemModel.reorder(req.params.id, req.body.itemIds, req.user.id));
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-router.post('/:id/items/:itemId/promote', (req, res) => {
+router.post('/:id/items/:itemId/promote', async (req, res) => {
   try {
-    const result = ListItemModel.promoteToTask(req.params.itemId, req.user.id);
+    const result = await ListItemModel.promoteToTask(req.params.itemId, req.user.id);
     if (!result) return res.status(404).json({ error: 'Item not found' });
     if (result.alreadyLinked) return res.status(409).json({ error: 'Item already linked to a task' });
     res.status(201).json(result);

@@ -1,22 +1,22 @@
 import { Router } from 'express';
 import { ProjectModel, TaskModel } from '../db/models.js';
-import { getDb } from '../db/schema.js';
+import { pool } from '../db/pool.js';
 import { suggestProjectBreakdown } from '../services/ai.js';
 
 const router = Router();
 
-router.get('/', (req, res) => {
+router.get('/', async (req, res) => {
   try {
-    const projects = ProjectModel.getAll(req.user.id);
+    const projects = await ProjectModel.getAll(req.user.id);
     res.json(projects);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
-router.get('/:id', (req, res) => {
+router.get('/:id', async (req, res) => {
   try {
-    const project = ProjectModel.getById(req.params.id, req.user.id);
+    const project = await ProjectModel.getById(req.params.id, req.user.id);
     if (!project) {
       return res.status(404).json({ error: 'Project not found' });
     }
@@ -26,18 +26,18 @@ router.get('/:id', (req, res) => {
   }
 });
 
-router.post('/', (req, res) => {
+router.post('/', async (req, res) => {
   try {
-    const project = ProjectModel.create(req.body, req.user.id);
+    const project = await ProjectModel.create(req.body, req.user.id);
     res.status(201).json(project);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
-router.put('/:id', (req, res) => {
+router.put('/:id', async (req, res) => {
   try {
-    const project = ProjectModel.update(req.params.id, req.body, req.user.id);
+    const project = await ProjectModel.update(req.params.id, req.body, req.user.id);
     if (!project) {
       return res.status(404).json({ error: 'Project not found' });
     }
@@ -47,9 +47,9 @@ router.put('/:id', (req, res) => {
   }
 });
 
-router.delete('/:id', (req, res) => {
+router.delete('/:id', async (req, res) => {
   try {
-    ProjectModel.delete(req.params.id, req.user.id);
+    await ProjectModel.delete(req.params.id, req.user.id);
     res.status(204).send();
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -58,17 +58,14 @@ router.delete('/:id', (req, res) => {
 
 router.post('/:id/breakdown', async (req, res) => {
   try {
-    const project = ProjectModel.getById(req.params.id, req.user.id);
+    const project = await ProjectModel.getById(req.params.id, req.user.id);
     if (!project) {
       return res.status(404).json({ error: 'Project not found' });
     }
-    const db = getDb();
-    const ctxStmt = db.prepare('SELECT name FROM contexts WHERE user_id = ? ORDER BY name');
-    ctxStmt.bind([req.user.id]);
-    const userContexts = [];
-    while (ctxStmt.step()) userContexts.push(ctxStmt.getAsObject());
-    ctxStmt.free();
-
+    const { rows: userContexts } = await pool.query(
+      'SELECT name FROM contexts WHERE user_id = $1 ORDER BY name',
+      [req.user.id]
+    );
     const breakdown = await suggestProjectBreakdown(project, userContexts);
     res.json(breakdown);
   } catch (error) {
@@ -81,13 +78,15 @@ router.post('/:id/apply-breakdown', async (req, res) => {
     const { tasks } = req.body;
     const projectId = req.params.id;
 
-    const createdTasks = tasks.map((task, index) =>
-      TaskModel.create({
-        ...task,
-        project_id: projectId,
-        list: 'next_actions',
-        position: task.order ?? index
-      }, req.user.id)
+    const createdTasks = await Promise.all(
+      tasks.map((task, index) =>
+        TaskModel.create({
+          ...task,
+          project_id: projectId,
+          list: 'next_actions',
+          position: task.order ?? index,
+        }, req.user.id)
+      )
     );
 
     res.json(createdTasks);
@@ -96,13 +95,13 @@ router.post('/:id/apply-breakdown', async (req, res) => {
   }
 });
 
-router.post('/:id/reorder', (req, res) => {
+router.post('/:id/reorder', async (req, res) => {
   try {
     const { taskIds } = req.body;
     if (!Array.isArray(taskIds)) {
       return res.status(400).json({ error: 'taskIds must be an array' });
     }
-    const tasks = TaskModel.reorderTasks(req.params.id, taskIds, req.user.id);
+    const tasks = await TaskModel.reorderTasks(req.params.id, taskIds, req.user.id);
     res.json(tasks);
   } catch (error) {
     res.status(500).json({ error: error.message });

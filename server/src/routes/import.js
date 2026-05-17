@@ -1,6 +1,6 @@
 import express from 'express';
-import { getDb, saveDb } from '../db/schema.js';
-import { TaskModel, ProjectModel } from '../db/models.js';
+import { pool } from '../db/pool.js';
+import { ProjectModel } from '../db/models.js';
 
 const router = express.Router();
 
@@ -111,7 +111,7 @@ function buildTasksFromCSV(rows) {
 
 // ─── Preview ─────────────────────────────────────────────────────────────────
 
-router.post('/preview', (req, res) => {
+router.post('/preview', async (req, res) => {
   try {
     const { filename, content } = req.body || {};
     if (typeof content !== 'string' || !content.trim()) {
@@ -121,7 +121,7 @@ router.post('/preview', (req, res) => {
     const looksJson = ext === 'json' || content.trim().startsWith('{');
     const looksCsv = ext === 'csv' || /^[A-Z_]+,/.test(content.trim());
 
-    const existingProjects = ProjectModel.getAll(req.user.id);
+    const existingProjects = await ProjectModel.getAll(req.user.id);
     const existingNames = new Set(existingProjects.map(p => (p.name || '').toLowerCase()));
 
     if (looksJson) {
@@ -181,58 +181,58 @@ router.post('/preview', (req, res) => {
 
 // ─── Commit ──────────────────────────────────────────────────────────────────
 
-function insertTaskRaw(task, userId) {
-  const db = getDb();
-  db.run(`
-    INSERT INTO tasks (title, notes, list, context, project_id, waiting_for_person,
+async function insertTaskRaw(task, userId) {
+  await pool.query(
+    `INSERT INTO tasks (
+      title, notes, list, context, project_id, waiting_for_person,
       due_date, start_date, scheduled_time, duration, energy_level, time_estimate,
       priority, is_daily_focus, position, recurrence_rule, recurrence_interval,
-      recurrence_days, recurrence_type, completed_at, user_id)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `, [
-    task.title,
-    task.notes || null,
-    task.list || 'inbox',
-    task.context || null,
-    task.project_id || null,
-    task.waiting_for_person || null,
-    task.due_date || null,
-    task.start_date || null,
-    task.scheduled_time || null,
-    task.duration || null,
-    task.energy_level || null,
-    task.time_estimate || null,
-    task.priority || 0,
-    task.is_daily_focus || 0,
-    task.position || 0,
-    task.recurrence_rule || null,
-    task.recurrence_interval || 1,
-    task.recurrence_days || null,
-    task.recurrence_type || 'absolute',
-    task.completed_at || null,
-    userId,
-  ]);
+      recurrence_days, recurrence_type, completed_at, user_id
+    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)`,
+    [
+      task.title,
+      task.notes || null,
+      task.list || 'inbox',
+      task.context || null,
+      task.project_id || null,
+      task.waiting_for_person || null,
+      task.due_date || null,
+      task.start_date || null,
+      task.scheduled_time || null,
+      task.duration || null,
+      task.energy_level || null,
+      task.time_estimate || null,
+      task.priority || 0,
+      !!task.is_daily_focus,
+      task.position || 0,
+      task.recurrence_rule || null,
+      task.recurrence_interval || 1,
+      task.recurrence_days || null,
+      task.recurrence_type || 'absolute',
+      task.completed_at || null,
+      userId,
+    ]
+  );
 }
 
-router.post('/commit', (req, res) => {
+router.post('/commit', async (req, res) => {
   try {
     const userId = req.user.id;
     const { format, payload } = req.body || {};
     if (!payload) return res.status(400).json({ error: 'No payload' });
 
-    const db = getDb();
     const counts = { tasks: 0, projects_new: 0, projects_merged: 0, contexts: 0, habits: 0, habit_logs: 0 };
 
     // Project resolver — case-insensitive match by name; create if missing.
-    const existingProjects = ProjectModel.getAll(userId);
+    const existingProjects = await ProjectModel.getAll(userId);
     const projectIdByName = new Map(existingProjects.map(p => [(p.name || '').toLowerCase(), p.id]));
-    function resolveProject(name, projectShape) {
+    async function resolveProject(name, projectShape) {
       if (!name) return null;
       const key = name.toLowerCase();
       if (projectIdByName.has(key)) {
         return { id: projectIdByName.get(key), merged: true };
       }
-      const created = ProjectModel.create({
+      const created = await ProjectModel.create({
         name,
         description: projectShape?.description,
         outcome: projectShape?.outcome,
@@ -246,33 +246,24 @@ router.post('/commit', (req, res) => {
       // Map old project ids → new
       const oldToNewProjectId = new Map();
       for (const p of (payload.projects || [])) {
-        const r = resolveProject(p.name, p);
+        const r = await resolveProject(p.name, p);
         if (!r) continue;
         if (r.merged) counts.projects_merged++; else counts.projects_new++;
         oldToNewProjectId.set(p.id, r.id);
       }
 
       // Contexts (skip if name already exists)
-      const existingCtx = new Set();
-      const cstmt = db.prepare('SELECT name FROM contexts WHERE user_id = ?');
-      cstmt.bind([userId]);
-      while (cstmt.step()) existingCtx.add(cstmt.getAsObject().name);
-      cstmt.free();
+      const { rows: ctxRows } = await pool.query('SELECT name FROM contexts WHERE user_id = $1', [userId]);
+      const existingCtx = new Set(ctxRows.map(r => r.name));
       for (const c of (payload.contexts || [])) {
         if (!c.name || existingCtx.has(c.name)) continue;
-        db.run('INSERT INTO contexts (name, user_id) VALUES (?, ?)', [c.name, userId]);
+        await pool.query('INSERT INTO contexts (name, user_id) VALUES ($1, $2)', [c.name, userId]);
         counts.contexts++;
       }
 
       // Habits (merge by name; map old→new id for log import)
-      const habitIdByName = new Map();
-      const hstmt = db.prepare('SELECT id, name FROM habits WHERE user_id = ?');
-      hstmt.bind([userId]);
-      while (hstmt.step()) {
-        const r = hstmt.getAsObject();
-        habitIdByName.set((r.name || '').toLowerCase(), r.id);
-      }
-      hstmt.free();
+      const { rows: habitRows } = await pool.query('SELECT id, name FROM habits WHERE user_id = $1', [userId]);
+      const habitIdByName = new Map(habitRows.map(r => [(r.name || '').toLowerCase(), r.id]));
       const oldToNewHabitId = new Map();
       for (const h of (payload.habits || [])) {
         const key = (h.name || '').toLowerCase();
@@ -280,28 +271,34 @@ router.post('/commit', (req, res) => {
           oldToNewHabitId.set(h.id, habitIdByName.get(key));
           continue;
         }
-        db.run(`INSERT INTO habits (name, description, frequency, target_days, category, color, active, user_id)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        const { rows: insertRows } = await pool.query(
+          `INSERT INTO habits (name, description, frequency, target_days, category, color, active, user_id)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
           [h.name, h.description || null, h.frequency || 'daily', h.target_days || null,
-           h.category || null, h.color || '#3b82f6', h.active ?? 1, userId]);
-        const newId = db.exec('SELECT last_insert_rowid() as id')[0].values[0][0];
+           h.category || null, h.color || '#3b82f6', !!(h.active ?? true), userId]
+        );
+        const newId = insertRows[0].id;
         habitIdByName.set(key, newId);
         oldToNewHabitId.set(h.id, newId);
         counts.habits++;
       }
 
-      // Habit logs (use new habit id; INSERT OR IGNORE to skip dup dates)
+      // Habit logs (use new habit id; ON CONFLICT DO NOTHING to skip dup dates)
       for (const log of (payload.habit_logs || [])) {
         const newHabitId = oldToNewHabitId.get(log.habit_id);
         if (!newHabitId || !log.completed_date) continue;
-        db.run(`INSERT OR IGNORE INTO habit_logs (habit_id, completed_date, user_id) VALUES (?, ?, ?)`,
-          [newHabitId, log.completed_date, userId]);
+        await pool.query(
+          `INSERT INTO habit_logs (habit_id, completed_date, user_id)
+           VALUES ($1, $2, $3)
+           ON CONFLICT (habit_id, completed_date) DO NOTHING`,
+          [newHabitId, log.completed_date, userId]
+        );
         counts.habit_logs++;
       }
 
       // Tasks — append-only, map project ids
       for (const t of (payload.tasks || [])) {
-        insertTaskRaw({
+        await insertTaskRaw({
           ...t,
           project_id: t.project_id ? oldToNewProjectId.get(t.project_id) : null,
         }, userId);
@@ -319,9 +316,9 @@ router.post('/commit', (req, res) => {
             if (preExisting.has(key)) counts.projects_merged++;
             else counts.projects_new++;
           }
-          project_id = resolveProject(t.project_name, null).id;
+          project_id = (await resolveProject(t.project_name, null)).id;
         }
-        insertTaskRaw({
+        await insertTaskRaw({
           title: t.title,
           notes: t.notes,
           list: t.list,
@@ -344,7 +341,6 @@ router.post('/commit', (req, res) => {
       return res.status(400).json({ error: 'Unknown format' });
     }
 
-    saveDb();
     res.json({ ok: true, counts });
   } catch (err) {
     console.error('Import commit failed:', err);

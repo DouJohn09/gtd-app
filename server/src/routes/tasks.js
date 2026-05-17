@@ -1,44 +1,44 @@
 import { Router } from 'express';
 import { TaskModel } from '../db/models.js';
-import { getDb } from '../db/schema.js';
+import { pool } from '../db/pool.js';
 import { analyzeTask } from '../services/ai.js';
 import { getCalendarEvents, syncTaskToCalendar, deleteTaskFromCalendar } from '../services/googleCalendar.js';
 
 const router = Router();
 
-router.get('/', (req, res) => {
+router.get('/', async (req, res) => {
   try {
     const { list } = req.query;
-    const tasks = TaskModel.getAll(list || null, req.user.id);
+    const tasks = await TaskModel.getAll(list || null, req.user.id);
     res.json(tasks);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
-router.get('/deferred', (req, res) => {
+router.get('/deferred', async (req, res) => {
   try {
     const { list } = req.query;
     if (!list) return res.status(400).json({ error: 'list query parameter is required' });
-    const tasks = TaskModel.getDeferred(list, req.user.id);
+    const tasks = await TaskModel.getDeferred(list, req.user.id);
     res.json(tasks);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
-router.get('/stats', (req, res) => {
+router.get('/stats', async (req, res) => {
   try {
-    const stats = TaskModel.getStats(req.user.id);
+    const stats = await TaskModel.getStats(req.user.id);
     res.json(stats);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
-router.get('/daily-focus', (req, res) => {
+router.get('/daily-focus', async (req, res) => {
   try {
-    const tasks = TaskModel.getDailyFocus(req.user.id);
+    const tasks = await TaskModel.getDailyFocus(req.user.id);
     res.json(tasks);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -51,8 +51,8 @@ router.get('/calendar', async (req, res) => {
     if (!start || !end) {
       return res.status(400).json({ error: 'start and end query parameters are required (YYYY-MM-DD)' });
     }
-    const scheduled = TaskModel.getByDateRange(start, end, req.user.id);
-    const unscheduled = TaskModel.getUnscheduled(req.user.id);
+    const scheduled = await TaskModel.getByDateRange(start, end, req.user.id);
+    const unscheduled = await TaskModel.getUnscheduled(req.user.id);
 
     let googleEvents = [];
     try {
@@ -67,9 +67,9 @@ router.get('/calendar', async (req, res) => {
   }
 });
 
-router.get('/:id', (req, res) => {
+router.get('/:id', async (req, res) => {
   try {
-    const task = TaskModel.getById(req.params.id, req.user.id);
+    const task = await TaskModel.getById(req.params.id, req.user.id);
     if (!task) {
       return res.status(404).json({ error: 'Task not found' });
     }
@@ -79,9 +79,9 @@ router.get('/:id', (req, res) => {
   }
 });
 
-router.post('/', (req, res) => {
+router.post('/', async (req, res) => {
   try {
-    const task = TaskModel.create(req.body, req.user.id);
+    const task = await TaskModel.create(req.body, req.user.id);
     res.status(201).json(task);
     syncTaskToCalendar(req.user.id, task, req.clientTimezone).catch(err => console.error('syncTaskToCalendar (create):', err));
   } catch (error) {
@@ -89,9 +89,9 @@ router.post('/', (req, res) => {
   }
 });
 
-router.put('/:id', (req, res) => {
+router.put('/:id', async (req, res) => {
   try {
-    const task = TaskModel.update(req.params.id, req.body, req.user.id);
+    const task = await TaskModel.update(req.params.id, req.body, req.user.id);
     if (!task) {
       return res.status(404).json({ error: 'Task not found' });
     }
@@ -102,12 +102,12 @@ router.put('/:id', (req, res) => {
   }
 });
 
-router.delete('/:id', (req, res) => {
+router.delete('/:id', async (req, res) => {
   try {
-    const existing = TaskModel.getById(req.params.id, req.user.id);
+    const existing = await TaskModel.getById(req.params.id, req.user.id);
     const eventId = existing?.google_event_id || null;
     // TaskModel.delete handles sequential promotion internally
-    TaskModel.delete(req.params.id, req.user.id);
+    await TaskModel.delete(req.params.id, req.user.id);
     res.status(204).send();
     if (eventId) {
       deleteTaskFromCalendar(req.user.id, eventId).catch(err => console.error('deleteTaskFromCalendar:', err));
@@ -117,9 +117,9 @@ router.delete('/:id', (req, res) => {
   }
 });
 
-router.post('/:id/complete', (req, res) => {
+router.post('/:id/complete', async (req, res) => {
   try {
-    const task = TaskModel.complete(req.params.id, req.user.id);
+    const task = await TaskModel.complete(req.params.id, req.user.id);
     if (!task) {
       return res.status(404).json({ error: 'Task not found' });
     }
@@ -136,17 +136,14 @@ router.post('/:id/complete', (req, res) => {
 
 router.post('/:id/analyze', async (req, res) => {
   try {
-    const task = TaskModel.getById(req.params.id, req.user.id);
+    const task = await TaskModel.getById(req.params.id, req.user.id);
     if (!task) {
       return res.status(404).json({ error: 'Task not found' });
     }
-    const db = getDb();
-    const ctxStmt = db.prepare('SELECT name FROM contexts WHERE user_id = ? ORDER BY name');
-    ctxStmt.bind([req.user.id]);
-    const userContexts = [];
-    while (ctxStmt.step()) userContexts.push(ctxStmt.getAsObject());
-    ctxStmt.free();
-
+    const { rows: userContexts } = await pool.query(
+      'SELECT name FROM contexts WHERE user_id = $1 ORDER BY name',
+      [req.user.id]
+    );
     const analysis = await analyzeTask(task, userContexts);
     res.json(analysis);
   } catch (error) {
