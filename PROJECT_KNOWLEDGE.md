@@ -559,6 +559,9 @@ Given subscription fatigue and Todoist's backlash ($48 → $60/yr):
 38. Smart Capture confidence-gated routing — AI returns `list_confidence`; server routes low-confidence tasks to Inbox even when other parsing is confident; Settings → Smart Capture toggle for "Auto-route (recommended)" vs "Always send to Inbox"; prompt tightened to forbid hallucinating verbs for noun-only inputs ("birthday gift" stays "birthday gift", not "Buy birthday gift"); few-shot now orders by `updated_at` so user corrections (re-classifying tasks) train the AI for next capture
 39. Mobile bugfix: Custom Lists section was missing from the mobile "More" sheet — only the desktop sidebar rendered them. Added a `lists` group with add-new affordance to the More sheet
 40. Postgres migration (Phase 1-5 shipped locally) — full data layer swap from in-memory sql.js to managed PG. Schema ported to `node-pg-migrate`, all models + routes + services rewritten async on `pg.Pool`, BOOLEAN columns replace INT-as-bool, one-shot data migration script preserves IDs. Docker Compose for local dev; Railway-managed PG provisioned but cutover deferred to Phase 6.
+41. Postgres cutover on Railway (Phase 6) — `gtd-app` service wired to `DATABASE_URL` reference of the Postgres addon. Schema migration ran against Railway PG via `DATABASE_PUBLIC_URL` (the internal `postgres.railway.internal` hostname is only resolvable inside Railway's network). Prod cleartable.app verified healthy.
+42. Data recovery from Railway volume — legacy `/data/gtd.db` (164K) survived on the `gtd-app-volume` mount across the deploy. Recovered via a temporary token-protected `GET /__recovery/gtd-db` endpoint streamed to local Mac, since `railway ssh` host-key verification doesn't auto-accept in non-TTY. `server/scripts/recover-user-data.js` then migrated jan.bambas@rohlik.cz's 80 tasks + 7 projects + 4 habits + 15 habit logs + 1 custom list + 7 list items + 8 contexts (local user_id=2 → prod user_id=1) with full FK remapping.
+43. Pre-created theliau.bevilacqua@rohlik.cz prod user row directly from sqlite (preserving google_id so Google OAuth matches on next login), then migrated their 5 tasks + 6 contexts. Recovery endpoint reverted, RECOVERY_TOKEN unset, local copy of prod DB deleted.
 
 ---
 
@@ -599,7 +602,7 @@ Features to build, ordered by impact and launch-readiness.
 |---|---------|-----|--------|--------|
 | 1 | **Recurring tasks** | Table stakes — every competitor has it. Users can't manage real workflows without it. | Medium | **Shipped** |
 | 2 | **Start/defer dates** | #1 GTD-specific request. Hide tasks until actionable. Core GTD philosophy. | Medium | **Shipped** |
-| 3 | ~~**Migrate off sql.js**~~ | Server runs on Postgres via `pg` + `node-pg-migrate`. Docker Compose for local dev, Railway-managed PG in prod. One-shot data migration script ships in `server/scripts/migrate-sqlite-to-pg.js`. | High | **Shipped (local)** — Railway cutover still pending |
+| 3 | ~~**Migrate off sql.js**~~ | Server runs on Postgres via `pg` + `node-pg-migrate`. Docker Compose for local dev, Railway-managed PG in prod. Schema applied on both. Production user data was recovered from the legacy `/data/gtd.db` Railway volume via a temporary token-protected `/__recovery/gtd-db` endpoint (commit history entries 41-43). | High | **Shipped** |
 
 ### P1 — High impact, build before or shortly after launch
 | # | Feature | Why | Effort | Status |
