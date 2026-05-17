@@ -54,12 +54,31 @@ app.get('/api/config', (req, res) => {
   res.json({ googleClientId: process.env.GOOGLE_CLIENT_ID });
 });
 
-// Serve client build in production
+// Static + SPA routing in production:
+//   /                  → landing page (marketing site, static HTML)
+//   /app, /app/*       → React app (SPA with client-side routing)
+//   /api/*             → already registered above (auth, tasks, etc.)
+//
+// Built React assets reference paths like /app/assets/index-XXXX.js (Vite's
+// `base` config), and Express serves dist/ under /app, so the URLs match.
+// SPA fallback returns /app's index.html for any /app/* path that isn't a
+// real file, so deep links like /app/inbox work after refresh.
 if (process.env.NODE_ENV === 'production') {
+  const landingPath = join(__dirname, '../../landing-page');
   const clientDistPath = join(__dirname, '../../client/dist');
-  app.use(express.static(clientDistPath));
-  app.get('*', (req, res) => {
+
+  // App lives at /app/*
+  app.use('/app', express.static(clientDistPath));
+  app.get('/app/*', (req, res) => {
     res.sendFile(join(clientDistPath, 'index.html'));
+  });
+
+  // Landing page at root. The static middleware serves /style.css, /icons/*,
+  // etc. directly; the catch-all falls back to landing-page/index.html for
+  // anything not matched above (including bare `/`).
+  app.use(express.static(landingPath));
+  app.get('*', (req, res) => {
+    res.sendFile(join(landingPath, 'index.html'));
   });
 }
 

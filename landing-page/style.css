@@ -209,6 +209,25 @@ nav .container {
 
 .logo span { color: var(--violet); }
 
+.nav-right {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.nav-link {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  color: var(--text-2);
+  text-decoration: none;
+  transition: color 200ms;
+}
+
+.nav-link:hover {
+  color: var(--text-1);
+}
+
 .nav-cta {
   font-family: var(--font-mono);
   font-size: 12px;

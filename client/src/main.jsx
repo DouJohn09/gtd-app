@@ -28,7 +28,9 @@ function Root() {
 
   return (
     <GoogleOAuthProvider clientId={googleClientId}>
-      <BrowserRouter>
+      {/* basename matches Vite's `base` config so the app works at both
+          `/` in dev and `/app/` in production without changing route paths. */}
+      <BrowserRouter basename={import.meta.env.BASE_URL}>
         <AuthProvider>
           <ToastProvider>
             <App />
