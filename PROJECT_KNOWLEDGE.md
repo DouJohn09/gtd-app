@@ -117,6 +117,7 @@ gtd-app/
 - **contexts** — `id`, `name`, `user_id`, `created_at`
 - **habits** — `id`, `name`, `description`, `frequency` (daily|weekly|specific_days), `target_days`, `category`, `color`, `user_id`, `active`, `created_at`
 - **habit_logs** — `id`, `habit_id`, `completed_date`, `user_id`, `created_at`
+- **waitlist** — `id`, `email` (UNIQUE), `source` (`hero`|`bottom-cta`), `created_at`, `unsubscribed_at`. Captured from the marketing landing page form; not tied to a logged-in user.
 
 ---
 
@@ -233,6 +234,9 @@ gtd-app/
 - `POST /google-calendar` — Connect Google Calendar (exchange auth code for tokens)
 - `DELETE /google-calendar` — Disconnect Google Calendar (revoke + clear tokens)
 - `GET /config` — Get Google Client ID
+
+### Waitlist: `/api/waitlist`
+- `POST /` — Public, no auth. Accepts `{ email, source }`. Inserts into `waitlist` table with `ON CONFLICT (email) DO NOTHING`. Server-side email regex catches bot garbage; in-memory rate limit (5/min/IP). Always returns `{ ok: true }` to prevent email enumeration on duplicates.
 
 ---
 
@@ -564,6 +568,8 @@ Given subscription fatigue and Todoist's backlash ($48 → $60/yr):
 42. Data recovery from Railway volume — legacy `/data/gtd.db` (164K) survived on the `gtd-app-volume` mount across the deploy. Recovered via a temporary token-protected `GET /__recovery/gtd-db` endpoint streamed to local Mac, since `railway ssh` host-key verification doesn't auto-accept in non-TTY. `server/scripts/recover-user-data.js` then migrated jan.bambas@rohlik.cz's 80 tasks + 7 projects + 4 habits + 15 habit logs + 1 custom list + 7 list items + 8 contexts (local user_id=2 → prod user_id=1) with full FK remapping.
 43. Pre-created theliau.bevilacqua@rohlik.cz prod user row directly from sqlite (preserving google_id so Google OAuth matches on next login), then migrated their 5 tasks + 6 contexts. Recovery endpoint reverted, RECOVERY_TOKEN unset, local copy of prod DB deleted.
 44. PWA support via `vite-plugin-pwa` — manifest.webmanifest, Workbox service worker (autoUpdate, precaches ~461 KiB app shell, NetworkOnly for `/api/*` so task data is never stale), iOS Add-to-Home-Screen meta tags, theme-color matching the dark UI. App icons (192/512/512-maskable/180/favicon) generated from the brand identity (violet→mint gradient + Lucide Sparkles glyph) by a one-source-SVG script (`npm run pwa:icons`).
+45. Waitlist signup flow — new `waitlist` PG table (id, email UNIQUE, source, created_at, unsubscribed_at) + `POST /api/waitlist` public endpoint with server-side email regex, in-memory 5/min/IP rate limit, `ON CONFLICT (email) DO NOTHING` idempotency, always returns `{ ok: true }` to prevent email enumeration. Landing page form wired to it; passes `source: hero|bottom-cta` for conversion attribution. Own the data, no vendor lock-in, can mass-mail the list ourselves at launch via Resend.
+46. URL routing split: cleartable.app/ now serves the landing page (marketing) and cleartable.app/app/* serves the React app. Vite `base: '/app/'` on build only (dev stays at `/`). BrowserRouter `basename={import.meta.env.BASE_URL}` so routes work transparently. PWA manifest scope/start_url moved to `/app/` so installed PWA opens the app, not the landing page. Express production block dual-static-serves `landing-page/` at root and `client/dist/` at `/app` with SPA fallback. Landing nav gets a discreet "Sign in" link pointing to `/app`.
 
 ---
 
