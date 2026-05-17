@@ -16,7 +16,7 @@ Cleartable is a productivity app inspired by the Getting Things Done (GTD) metho
 |------------|-------------------------------------|
 | Frontend   | React 18 + Vite 5 + Tailwind CSS   |
 | Backend    | Express 4 (Node.js, ES Modules)     |
-| Database   | sql.js (SQLite in-memory, persisted to file) |
+| Database   | PostgreSQL 16 via `pg` + `node-pg-migrate` (Docker for local dev, Railway-managed in prod) |
 | AI         | OpenAI GPT-4o / GPT-4o-mini (JSON response format) |
 | Auth       | Google OAuth 2.0 + JWT              |
 | Deployment | Railway                             |
@@ -558,6 +558,7 @@ Given subscription fatigue and Todoist's backlash ($48 → $60/yr):
 37. Smart Capture context overhaul — prefer life-domain (Personal/Work/Family) over activity-type (@phone/@computer); inject user's 10 most recent classified tasks as few-shot history; add context delete UI in Settings (chips with X + ConfirmModal)
 38. Smart Capture confidence-gated routing — AI returns `list_confidence`; server routes low-confidence tasks to Inbox even when other parsing is confident; Settings → Smart Capture toggle for "Auto-route (recommended)" vs "Always send to Inbox"; prompt tightened to forbid hallucinating verbs for noun-only inputs ("birthday gift" stays "birthday gift", not "Buy birthday gift"); few-shot now orders by `updated_at` so user corrections (re-classifying tasks) train the AI for next capture
 39. Mobile bugfix: Custom Lists section was missing from the mobile "More" sheet — only the desktop sidebar rendered them. Added a `lists` group with add-new affordance to the More sheet
+40. Postgres migration (Phase 1-5 shipped locally) — full data layer swap from in-memory sql.js to managed PG. Schema ported to `node-pg-migrate`, all models + routes + services rewritten async on `pg.Pool`, BOOLEAN columns replace INT-as-bool, one-shot data migration script preserves IDs. Docker Compose for local dev; Railway-managed PG provisioned but cutover deferred to Phase 6.
 
 ---
 
@@ -598,7 +599,7 @@ Features to build, ordered by impact and launch-readiness.
 |---|---------|-----|--------|--------|
 | 1 | **Recurring tasks** | Table stakes — every competitor has it. Users can't manage real workflows without it. | Medium | **Shipped** |
 | 2 | **Start/defer dates** | #1 GTD-specific request. Hide tasks until actionable. Core GTD philosophy. | Medium | **Shipped** |
-| 3 | **Migrate off sql.js** | In-memory SQLite is fragile. A crash or Railway restart = data loss. Can't take money on this. | High | |
+| 3 | ~~**Migrate off sql.js**~~ | Server runs on Postgres via `pg` + `node-pg-migrate`. Docker Compose for local dev, Railway-managed PG in prod. One-shot data migration script ships in `server/scripts/migrate-sqlite-to-pg.js`. | High | **Shipped (local)** — Railway cutover still pending |
 
 ### P1 — High impact, build before or shortly after launch
 | # | Feature | Why | Effort | Status |
