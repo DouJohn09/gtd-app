@@ -1,0 +1,21 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: cleartable_pg
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: cleartable
+      POSTGRES_PASSWORD: cleartable_dev
+      POSTGRES_DB: cleartable
+    ports:
+      - "5432:5432"
+    volumes:
+      - cleartable_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cleartable -d cleartable"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  cleartable_pgdata:
