@@ -146,18 +146,38 @@ export default function Calendar() {
   const handleEdit = (task) => { setEditingTask(task); setShowModal(true); };
 
   const handleDropTask = async (taskId, newDate, newTime = undefined) => {
-    try {
-      const updates = { due_date: newDate };
-      if (newTime !== undefined) {
-        updates.scheduled_time = newTime;
-        if (newTime && !scheduledTasks.find(t => t.id === taskId)?.duration) {
-          updates.duration = 60;
-        }
+    const updates = { due_date: newDate };
+    if (newTime !== undefined) {
+      updates.scheduled_time = newTime;
+      if (newTime && !scheduledTasks.find(t => t.id === taskId)?.duration) {
+        updates.duration = 60;
       }
+    }
+
+    // Optimistic update so the block snaps into place immediately. Without
+    // this the user waits a full network round-trip + refetch before the UI
+    // reflects the move, which reads as "nothing happened, refresh broken."
+    const fromScheduled = scheduledTasks.find(t => t.id === taskId);
+    const fromUnscheduled = unscheduledTasks.find(t => t.id === taskId);
+    const base = fromScheduled || fromUnscheduled;
+    if (base) {
+      const optimistic = { ...base, ...updates };
+      if (fromUnscheduled) {
+        setUnscheduledTasks(prev => prev.filter(t => t.id !== taskId));
+        setScheduledTasks(prev => [...prev.filter(t => t.id !== taskId), optimistic]);
+      } else {
+        setScheduledTasks(prev => prev.map(t => t.id === taskId ? optimistic : t));
+      }
+    }
+
+    try {
       await api.tasks.update(taskId, updates);
       addToast(newTime ? 'Task time-blocked' : 'Task rescheduled', 'success');
       fetchData();
-    } catch (err) { addToast(err.message, 'error'); }
+    } catch (err) {
+      addToast(err.message, 'error');
+      fetchData(); // revert to server truth on failure
+    }
   };
 
   const handleUpdateTask = async (taskId, updates) => {
