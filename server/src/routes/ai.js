@@ -85,8 +85,14 @@ router.post('/smart-capture', async (req, res) => {
       else console.warn(`Smart capture: AI suggested project "${ai.project_name}" but no match found. Available: ${projects.map(p => p.name).join(', ')}`);
     }
 
+    // Preserve the raw transcript in notes when the input is detailed enough
+    // that title compression is likely lossy. Short captures ("buy milk") would
+    // just duplicate the title, so skip those. URLs are already inside rawText
+    // when it's long, so only fall back to a URL-only notes value for shorts.
+    const rawWordCount = rawText.split(/\s+/).filter(Boolean).length;
     let notes = null;
-    if (urls.length) notes = urls.join('\n');
+    if (rawWordCount > 8 || rawText.length > 60) notes = rawText;
+    else if (urls.length) notes = urls.join('\n');
 
     // AI-assisted scheduling: find a free slot if requested
     let bookedSlot = null;

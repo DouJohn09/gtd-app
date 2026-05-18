@@ -145,7 +145,10 @@ FREE-SLOT INTENT RULES (auto-scheduling):
 - Do NOT set find_free_slot when an explicit time is given — that case is already handled by scheduled_time.
 
 OTHER RULES:
-- Clean the title: remove parsed date/time references and recurrence patterns but keep the core action.
+- Title rule: preserve the user's intent. Produce a clear, complete action statement — NOT a 2–3 word keyword summary. Keep the verb, the object, and any meaningful qualifier ("in the URL", "for the bookmark", "before Friday", etc.). Aim for natural phrasing (typically 5–15 words). Strip ONLY parsed dates/times/recurrence patterns and obvious filler ("um", "like", "I want to", "I need to"). Do NOT compress nouns, drop qualifiers, or paraphrase into vague keywords.
+- Examples of over-compression to AVOID:
+  - Input: "Work GTD app project: make URL or the bookmark in the URL not say GTD app." → BAD title: "URL bookmark name". GOOD title: "Rename the URL/bookmark so it doesn't say 'GTD app'".
+  - Input: "Ping Sarah next week about whether the Q3 forecast assumes the new pricing." → BAD title: "Sarah Q3 pricing". GOOD title: "Ask Sarah whether the Q3 forecast assumes the new pricing".
 - DO NOT invent action verbs. If the user typed a noun phrase ("birthday gift", "tax stuff", "groceries"), leave the title as a noun phrase. Inventing "Buy …" or "Handle …" disguises ambiguity that the user should resolve.
 - Detect "waiting for [person]" patterns → list: waiting_for, extract person name.
 - Detect vague/aspirational items ("someday", "maybe", "one day", "would be nice") → list: someday_maybe.
@@ -172,7 +175,7 @@ EXAMPLES (these decide list_confidence):
 
 Respond with JSON:
 {
-  "title": "cleaned action-oriented title without date references",
+  "title": "clear action-oriented title preserving user intent (typically 5–15 words). Strip only parsed dates/times/recurrence and filler.",
   "list": "inbox|next_actions|waiting_for|someday_maybe",
   "list_confidence": "high|medium|low",
   "context": "${contextOptions}|null",
