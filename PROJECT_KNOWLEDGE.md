@@ -628,6 +628,7 @@ Features to build, ordered by impact and launch-readiness.
 | 10 | **Recurring task flexibility** | Beyond current recurrence: "every 3rd weekday", "2 days after completion" (relative recurrence shipped, advanced patterns remaining). | Medium |
 | 11 | **Task dependencies (cross-project)** | "Task B blocked by Task A" beyond sequential projects. | Medium |
 | 12 | **Free AI provider backend** | Swap to Gemini/Groq for free-tier users to eliminate API costs at scale. | Medium |
+| 13 | **MCP server + flagship agent** | Niche but tweetable launch differentiator ("the GTD app with MCP"). Audience is r/ClaudeAI, HN, AI productivity X — small but high signal-to-size, and competitors won't ship this in 2026. Ship MCP as plumbing + 1–2 polished agents (e.g. weekly-review agent, morning-prep agent) as the headline. Start with local stdio (`npx @cleartable/mcp`, ~1–2 days), then optional remote HTTP at `mcp.cleartable.app`. Hard part: bearer-token auth (current API uses session cookies). | Medium |
 
 ### P3 — Future / after product-market fit
 | # | Feature | Why | Effort |
