@@ -29,9 +29,14 @@ export default function CommandCapture({ open, onClose }) {
             </button>
           </div>
         </div>
-        <QuickCapture onCapture={onClose} />
+        {/* No onCapture — the popup stays open so the user can fire multiple
+            captures in a row. AI runs in the background per capture; the
+            modal is dismissed explicitly via Esc, the X, or click-outside.
+            Binding it to AI-completion (as before) yanked the modal away
+            mid-typing when the prior capture's AI finished. */}
+        <QuickCapture autoFocus />
         <div className="mt-4 font-mono text-[11px] text-text-3">
-          tip · try <span className="text-text-2">"draft brief tomorrow at 2pm"</span>, <span className="text-text-2">"call sam friday"</span>, <span className="text-text-2">"buy groceries"</span>
+          tip · keep typing to capture more · <span className="text-text-2">esc</span> when done
         </div>
       </div>
     </div>
