@@ -5,6 +5,7 @@ import { useToast } from '../components/Toast';
 import HabitCard from '../components/HabitCard';
 import HabitModal, { SUGGESTED_HABITS } from '../components/HabitModal';
 import MonoLabel from '../components/ui/MonoLabel';
+import ConfirmModal from '../components/ui/ConfirmModal';
 
 const HEAT_TONES = [
   'rgba(255,255,255,0.04)',
@@ -21,6 +22,7 @@ export default function Habits() {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editingHabit, setEditingHabit] = useState(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
 
   const fetchData = async () => {
     setLoading(true);
@@ -65,7 +67,7 @@ export default function Habits() {
   };
 
   const handleDelete = async (id) => {
-    if (!confirm('Delete this habit and all its history?')) return;
+    setConfirmDeleteId(null);
     try { await api.habits.delete(id); addToast('Habit deleted', 'success'); fetchData(); }
     catch (err) { addToast(err.message, 'error'); }
   };
@@ -199,7 +201,7 @@ export default function Habits() {
                     habit={{ ...habit, streak: stats?.habits?.find(s => s.id === habit.id)?.streak || 0 }}
                     onToggle={handleToggle}
                     onEdit={(h) => { setEditingHabit(h); setShowModal(true); }}
-                    onDelete={handleDelete}
+                    onDelete={setConfirmDeleteId}
                   />
                 ))}
               </div>
@@ -280,6 +282,16 @@ export default function Habits() {
           onSave={handleSave}
           existingCategories={[...new Set(habits.map(h => h.category).filter(Boolean))]}
           existingHabitNames={habits.map(h => h.name)}
+        />
+      )}
+
+      {confirmDeleteId && (
+        <ConfirmModal
+          title="Delete this habit?"
+          message="The habit and all its history will be removed."
+          confirmLabel="Delete"
+          onConfirm={() => handleDelete(confirmDeleteId)}
+          onCancel={() => setConfirmDeleteId(null)}
         />
       )}
     </div>

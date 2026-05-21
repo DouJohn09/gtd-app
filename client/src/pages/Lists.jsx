@@ -8,6 +8,7 @@ import TaskModal from '../components/TaskModal';
 import SortDropdown, { sortTasks } from '../components/SortDropdown';
 import FilterDropdown, { useTaskFilters, applyFilters } from '../components/FilterDropdown';
 import MonoLabel from '../components/ui/MonoLabel';
+import ConfirmModal from '../components/ui/ConfirmModal';
 
 const LIST_CONFIG = {
   next_actions: {
@@ -51,6 +52,7 @@ export default function Lists() {
   const [loading, setLoading] = useState(true);
   const [editingTask, setEditingTask] = useState(null);
   const [showModal, setShowModal] = useState(false);
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
   const [sortBy, setSortBy] = useState(() => localStorage.getItem(`sort_list_${list}`) || 'priority');
   const [showDeferred, setShowDeferred] = useState(() => localStorage.getItem(`deferred_list_${list}`) === 'true');
   const [filterContext, setFilterContext] = useState(() => localStorage.getItem(`filter_context_list_${list}`) || '');
@@ -106,7 +108,7 @@ export default function Lists() {
     catch (err) { addToast(err.message, 'error'); }
   };
   const handleDelete = async (id) => {
-    if (!confirm('Delete this task?')) return;
+    setConfirmDeleteId(null);
     try { await api.tasks.delete(id); addToast('Deleted', 'success'); fetchData(); }
     catch (err) { addToast(err.message, 'error'); }
   };
@@ -210,7 +212,7 @@ export default function Lists() {
                   <div key={task.id} className="group relative">
                     <TaskCard task={task} onComplete={handleComplete} onEdit={handleEdit} />
                     <button
-                      onClick={() => handleDelete(task.id)}
+                      onClick={() => setConfirmDeleteId(task.id)}
                       className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 text-text-3 hover:text-rose-glow transition-all"
                       title="Delete"
                     >
@@ -228,7 +230,7 @@ export default function Lists() {
             <div key={task.id} className="group relative">
               <TaskCard task={task} onComplete={handleComplete} onEdit={handleEdit} />
               <button
-                onClick={() => handleDelete(task.id)}
+                onClick={() => setConfirmDeleteId(task.id)}
                 className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 text-text-3 hover:text-rose-glow transition-all"
                 title="Delete"
               >
@@ -256,7 +258,7 @@ export default function Lists() {
               <div key={task.id} className="group relative" style={{ opacity: 0.6 }}>
                 <TaskCard task={task} onComplete={handleComplete} onEdit={handleEdit} />
                 <button
-                  onClick={() => handleDelete(task.id)}
+                  onClick={() => setConfirmDeleteId(task.id)}
                   className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 text-text-3 hover:text-rose-glow transition-all"
                   title="Delete"
                 >
@@ -274,6 +276,15 @@ export default function Lists() {
           projects={projects}
           onClose={() => { setShowModal(false); setEditingTask(null); }}
           onSave={fetchData}
+        />
+      )}
+
+      {confirmDeleteId && (
+        <ConfirmModal
+          title="Delete this task?"
+          confirmLabel="Delete"
+          onConfirm={() => handleDelete(confirmDeleteId)}
+          onCancel={() => setConfirmDeleteId(null)}
         />
       )}
     </div>

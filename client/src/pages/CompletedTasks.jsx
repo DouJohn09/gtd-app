@@ -5,6 +5,7 @@ import { useToast } from '../components/Toast';
 import SortDropdown, { sortTasks } from '../components/SortDropdown';
 import FilterDropdown, { useTaskFilters, applyFilters } from '../components/FilterDropdown';
 import MonoLabel from '../components/ui/MonoLabel';
+import ConfirmModal from '../components/ui/ConfirmModal';
 
 function TaskRow({ task, onRestore, onDelete }) {
   return (
@@ -51,6 +52,7 @@ export default function CompletedTasks() {
   const [sortBy, setSortBy] = useState(() => localStorage.getItem('sort_completed') || 'completed_newest');
   const [filterContext, setFilterContext] = useState(() => localStorage.getItem('filter_context_completed') || '');
   const [filterProject, setFilterProject] = useState(() => localStorage.getItem('filter_project_completed') || '');
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
 
   useEffect(() => { localStorage.setItem('sort_completed', sortBy); }, [sortBy]);
   useEffect(() => { localStorage.setItem('filter_context_completed', filterContext); }, [filterContext]);
@@ -76,7 +78,7 @@ export default function CompletedTasks() {
   };
 
   const handleDelete = async (id) => {
-    if (!confirm('Permanently delete this task?')) return;
+    setConfirmDeleteId(null);
     try {
       await api.tasks.delete(id);
       addToast('Task deleted', 'success');
@@ -177,7 +179,7 @@ export default function CompletedTasks() {
               </div>
               <div className="space-y-2">
                 {dateTasks.map(task => (
-                  <TaskRow key={task.id} task={task} onRestore={handleRestore} onDelete={handleDelete} />
+                  <TaskRow key={task.id} task={task} onRestore={handleRestore} onDelete={setConfirmDeleteId} />
                 ))}
               </div>
             </div>
@@ -186,9 +188,19 @@ export default function CompletedTasks() {
       ) : (
         <div className="space-y-2">
           {sortedTasks.map(task => (
-            <TaskRow key={task.id} task={task} onRestore={handleRestore} onDelete={handleDelete} />
+            <TaskRow key={task.id} task={task} onRestore={handleRestore} onDelete={setConfirmDeleteId} />
           ))}
         </div>
+      )}
+
+      {confirmDeleteId && (
+        <ConfirmModal
+          title="Permanently delete this task?"
+          message="This cannot be undone."
+          confirmLabel="Delete"
+          onConfirm={() => handleDelete(confirmDeleteId)}
+          onCancel={() => setConfirmDeleteId(null)}
+        />
       )}
     </div>
   );
