@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ArrowRight, Sparkles, Loader2 } from 'lucide-react';
+import { ArrowRight, Sparkles } from 'lucide-react';
 import { api } from '../lib/api';
 import { useToast } from './Toast';
 
@@ -34,36 +34,42 @@ function formatBookedToast(bookedSlot) {
 
 export default function QuickCapture({ onCapture, placeholder = "Quick capture — what's on your mind?", autoFocus = false }) {
   const [title, setTitle] = useState('');
-  const [loading, setLoading] = useState(false);
   const [smartMode, setSmartMode] = useState(true);
   const { addToast } = useToast();
 
-  const handleSubmit = async (e) => {
+  // Fire-and-forget capture: clear the input the moment the user submits so
+  // they can keep typing the next idea while the AI classifies in the
+  // background. The toast lands when classification finishes; on failure we
+  // echo the original text so the user knows what to retype.
+  const handleSubmit = (e) => {
     e.preventDefault();
-    if (!title.trim()) return;
-    setLoading(true);
-    try {
-      if (smartMode) {
-        const routing = localStorage.getItem('smart_capture_routing') || 'auto_route';
-        const { ai, fallback, bookedSlot, slotSearchFailed, routedToInbox } = await api.ai.smartCapture(title.trim(), routing);
-        setTitle('');
-        if (fallback || !ai) addToast('Captured to inbox (AI unavailable)', 'info');
-        else if (bookedSlot) addToast(formatBookedToast(bookedSlot), 'success');
-        else if (slotSearchFailed) addToast('No free slot found — captured without booking', 'info');
-        else if (routedToInbox && routing === 'always_inbox') addToast(formatAiToast(ai), 'success');
-        else if (routedToInbox) addToast(`Added to Inbox · AI wasn't sure where`, 'info');
-        else addToast(formatAiToast(ai), 'success');
-      } else {
-        await api.tasks.create({ title: title.trim() });
-        setTitle('');
-        addToast('Captured to inbox', 'success');
+    const text = title.trim();
+    if (!text) return;
+    setTitle('');
+
+    (async () => {
+      try {
+        if (smartMode) {
+          const routing = localStorage.getItem('smart_capture_routing') || 'auto_route';
+          const { ai, fallback, bookedSlot, slotSearchFailed, routedToInbox } = await api.ai.smartCapture(text, routing);
+          if (fallback || !ai) addToast('Captured to inbox (AI unavailable)', 'info');
+          else if (bookedSlot) addToast(formatBookedToast(bookedSlot), 'success');
+          else if (slotSearchFailed) addToast('No free slot found — captured without booking', 'info');
+          else if (routedToInbox && routing === 'always_inbox') addToast(formatAiToast(ai), 'success');
+          else if (routedToInbox) addToast(`Added to Inbox · AI wasn't sure where`, 'info');
+          else addToast(formatAiToast(ai), 'success');
+        } else {
+          await api.tasks.create({ title: text });
+          addToast('Captured to inbox', 'success');
+        }
+        window.dispatchEvent(new Event('task-captured'));
+        onCapture?.();
+      } catch (error) {
+        console.error('Failed to capture:', error);
+        const snippet = text.length > 40 ? text.slice(0, 40) + '…' : text;
+        addToast(`Failed to capture "${snippet}"`, 'error');
       }
-      window.dispatchEvent(new Event('task-captured'));
-      onCapture?.();
-    } catch (error) {
-      console.error('Failed to capture:', error);
-      addToast(error.message || 'Failed to capture', 'error');
-    } finally { setLoading(false); }
+    })();
   };
 
   return (
@@ -75,7 +81,6 @@ export default function QuickCapture({ onCapture, placeholder = "Quick capture �
           onChange={(e) => setTitle(e.target.value)}
           placeholder={smartMode ? '"call mom tomorrow" · "buy groceries Friday"' : placeholder}
           className="gtd-input w-full pl-10 pr-3"
-          disabled={loading}
           autoFocus={autoFocus}
         />
         <button
@@ -94,20 +99,11 @@ export default function QuickCapture({ onCapture, placeholder = "Quick capture �
       </div>
       <button
         type="submit"
-        disabled={!title.trim() || loading}
+        disabled={!title.trim()}
         className="gtd-btn gtd-btn-primary inline-flex items-center gap-1.5 text-[12.5px] disabled:opacity-50"
       >
-        {loading ? (
-          <>
-            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-            {smartMode ? 'AI…' : 'Saving…'}
-          </>
-        ) : (
-          <>
-            Capture
-            <ArrowRight className="w-3.5 h-3.5" />
-          </>
-        )}
+        Capture
+        <ArrowRight className="w-3.5 h-3.5" />
       </button>
     </form>
   );
