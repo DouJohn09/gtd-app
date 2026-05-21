@@ -53,14 +53,22 @@ export default function Lists() {
   const [showModal, setShowModal] = useState(false);
   const [sortBy, setSortBy] = useState(() => localStorage.getItem(`sort_list_${list}`) || 'priority');
   const [showDeferred, setShowDeferred] = useState(() => localStorage.getItem(`deferred_list_${list}`) === 'true');
-  const [filterContext, setFilterContext] = useState('');
-  const [filterProject, setFilterProject] = useState('');
+  const [filterContext, setFilterContext] = useState(() => localStorage.getItem(`filter_context_list_${list}`) || '');
+  const [filterProject, setFilterProject] = useState(() => localStorage.getItem(`filter_project_list_${list}`) || '');
   const { addToast } = useToast();
 
-  useEffect(() => { setSortBy(localStorage.getItem(`sort_list_${list}`) || 'priority'); setFilterContext(''); setFilterProject(''); }, [list]);
+  // Per-list scoping for all view state — each list (next_actions, waiting_for,
+  // someday_maybe) keeps its own sort/filter/deferred-toggle settings.
+  useEffect(() => {
+    setSortBy(localStorage.getItem(`sort_list_${list}`) || 'priority');
+    setFilterContext(localStorage.getItem(`filter_context_list_${list}`) || '');
+    setFilterProject(localStorage.getItem(`filter_project_list_${list}`) || '');
+  }, [list]);
   useEffect(() => { localStorage.setItem(`sort_list_${list}`, sortBy); }, [sortBy, list]);
   useEffect(() => { setShowDeferred(localStorage.getItem(`deferred_list_${list}`) === 'true'); }, [list]);
   useEffect(() => { localStorage.setItem(`deferred_list_${list}`, showDeferred); }, [showDeferred, list]);
+  useEffect(() => { localStorage.setItem(`filter_context_list_${list}`, filterContext); }, [filterContext, list]);
+  useEffect(() => { localStorage.setItem(`filter_project_list_${list}`, filterProject); }, [filterProject, list]);
 
   const fetchData = async () => {
     setLoading(true);

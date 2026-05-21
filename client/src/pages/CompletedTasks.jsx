@@ -49,10 +49,12 @@ export default function CompletedTasks() {
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [sortBy, setSortBy] = useState(() => localStorage.getItem('sort_completed') || 'completed_newest');
-  const [filterContext, setFilterContext] = useState('');
-  const [filterProject, setFilterProject] = useState('');
+  const [filterContext, setFilterContext] = useState(() => localStorage.getItem('filter_context_completed') || '');
+  const [filterProject, setFilterProject] = useState(() => localStorage.getItem('filter_project_completed') || '');
 
   useEffect(() => { localStorage.setItem('sort_completed', sortBy); }, [sortBy]);
+  useEffect(() => { localStorage.setItem('filter_context_completed', filterContext); }, [filterContext]);
+  useEffect(() => { localStorage.setItem('filter_project_completed', filterProject); }, [filterProject]);
 
   const fetchData = async () => {
     try {

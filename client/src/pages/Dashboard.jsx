@@ -57,13 +57,16 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [editingTask, setEditingTask] = useState(null);
   const [showModal, setShowModal] = useState(false);
-  const [sortBy, setSortBy] = useState('priority');
-  const [filterContext, setFilterContext] = useState('');
-  const [filterProject, setFilterProject] = useState('');
+  const [sortBy, setSortBy] = useState(() => localStorage.getItem('sort_focus') || 'priority');
+  const [filterContext, setFilterContext] = useState(() => localStorage.getItem('filter_context_focus') || '');
+  const [filterProject, setFilterProject] = useState(() => localStorage.getItem('filter_project_focus') || '');
   const [hideOverdue, setHideOverdue] = useState(() => localStorage.getItem('hide_overdue_focus') === 'true');
   const { user } = useAuth();
 
   useEffect(() => { localStorage.setItem('hide_overdue_focus', hideOverdue); }, [hideOverdue]);
+  useEffect(() => { localStorage.setItem('sort_focus', sortBy); }, [sortBy]);
+  useEffect(() => { localStorage.setItem('filter_context_focus', filterContext); }, [filterContext]);
+  useEffect(() => { localStorage.setItem('filter_project_focus', filterProject); }, [filterProject]);
 
   const fetchData = async () => {
     try {

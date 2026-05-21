@@ -35,12 +35,14 @@ export default function Inbox() {
   const [showModal, setShowModal] = useState(false);
   const [sortBy, setSortBy] = useState(() => localStorage.getItem('sort_inbox') || 'date_added_newest');
   const [showDeferred, setShowDeferred] = useState(() => localStorage.getItem('deferred_inbox') === 'true');
-  const [filterContext, setFilterContext] = useState('');
-  const [filterProject, setFilterProject] = useState('');
+  const [filterContext, setFilterContext] = useState(() => localStorage.getItem('filter_context_inbox') || '');
+  const [filterProject, setFilterProject] = useState(() => localStorage.getItem('filter_project_inbox') || '');
   const { addToast } = useToast();
 
   useEffect(() => { localStorage.setItem('sort_inbox', sortBy); }, [sortBy]);
   useEffect(() => { localStorage.setItem('deferred_inbox', showDeferred); }, [showDeferred]);
+  useEffect(() => { localStorage.setItem('filter_context_inbox', filterContext); }, [filterContext]);
+  useEffect(() => { localStorage.setItem('filter_project_inbox', filterProject); }, [filterProject]);
 
   const fetchData = async () => {
     try {
