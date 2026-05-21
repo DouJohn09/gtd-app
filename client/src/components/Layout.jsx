@@ -138,8 +138,11 @@ export default function Layout() {
         </button>
       </header>
 
-      {/* Sidebar (desktop) */}
-      <aside className="hidden md:flex w-[248px] shrink-0 flex-col gap-1 px-4 py-6 relative z-20 border-r border-white/[0.05]">
+      {/* Sidebar (desktop) — sticky + viewport-height so the user card stays
+          pinned to the bottom of the screen on long pages. The inner <nav>
+          already has flex-1 overflow-y-auto, so it scrolls internally if
+          there are more nav entries than fit. */}
+      <aside className="hidden md:flex w-[248px] shrink-0 flex-col gap-1 px-4 py-6 relative z-20 border-r border-white/[0.05] md:sticky md:top-0 md:h-screen">
         <div className="flex items-center gap-2.5 px-2 mb-7">
           <div
             className="w-8 h-8 rounded-[10px] grid place-items-center"
