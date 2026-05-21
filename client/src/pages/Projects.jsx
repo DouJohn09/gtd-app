@@ -51,7 +51,12 @@ export default function Projects() {
     }
   };
 
-  useEffect(() => { fetchProjects(); }, []);
+  useEffect(() => {
+    fetchProjects();
+    const onCapture = () => fetchProjects();
+    window.addEventListener('task-captured', onCapture);
+    return () => window.removeEventListener('task-captured', onCapture);
+  }, []);
 
   const handleExpand = (projectId) => {
     if (expandedProject === projectId) {

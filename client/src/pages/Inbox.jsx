@@ -63,7 +63,12 @@ export default function Inbox() {
     }
   };
 
-  useEffect(() => { fetchData(); }, [showDeferred]);
+  useEffect(() => {
+    fetchData();
+    const onCapture = () => fetchData();
+    window.addEventListener('task-captured', onCapture);
+    return () => window.removeEventListener('task-captured', onCapture);
+  }, [showDeferred]);
 
   const handleComplete = async (id) => {
     try { await api.tasks.complete(id); addToast('Processed', 'success'); fetchData(); }

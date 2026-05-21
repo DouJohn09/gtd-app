@@ -84,7 +84,12 @@ export default function Lists() {
     }
   };
 
-  useEffect(() => { fetchData(); }, [list, showDeferred]);
+  useEffect(() => {
+    fetchData();
+    const onCapture = () => fetchData();
+    window.addEventListener('task-captured', onCapture);
+    return () => window.removeEventListener('task-captured', onCapture);
+  }, [list, showDeferred]);
 
   const toggleDeferred = () => setShowDeferred(prev => !prev);
 

@@ -72,6 +72,9 @@ export default function Calendar() {
   useEffect(() => {
     setLoading(true);
     fetchData();
+    const onCapture = () => fetchData();
+    window.addEventListener('task-captured', onCapture);
+    return () => window.removeEventListener('task-captured', onCapture);
   }, [fetchData]);
 
   const itemsByDate = useMemo(() => {
