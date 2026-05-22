@@ -17,6 +17,7 @@ import {
   getDateRangeForView,
   getMonthName,
   getShortMonthName,
+  formatCompletionToast,
 } from '../lib/dateUtils';
 
 const VIEW_TYPES = ['month', 'week', 'day'];
@@ -141,8 +142,8 @@ export default function Calendar() {
 
   const handleComplete = async (id) => {
     try {
-      await api.tasks.complete(id);
-      addToast('Task completed', 'success');
+      const updated = await api.tasks.complete(id);
+      addToast(formatCompletionToast(updated, 'Task completed'), 'success');
       fetchData();
     } catch (err) { addToast(err.message, 'error'); }
   };

@@ -11,6 +11,7 @@ import FilterDropdown, { useTaskFilters, applyFilters } from '../components/Filt
 import MonoLabel from '../components/ui/MonoLabel';
 import GlassCard from '../components/ui/GlassCard';
 import ConfirmModal from '../components/ui/ConfirmModal';
+import { formatCompletionToast } from '../lib/dateUtils';
 
 function isToday(iso) {
   if (!iso) return false;
@@ -75,8 +76,11 @@ export default function Inbox() {
   }, [showDeferred]);
 
   const handleComplete = async (id) => {
-    try { await api.tasks.complete(id); addToast('Processed', 'success'); fetchData(); }
-    catch (err) { addToast(err.message, 'error'); }
+    try {
+      const updated = await api.tasks.complete(id);
+      addToast(formatCompletionToast(updated, 'Processed'), 'success');
+      fetchData();
+    } catch (err) { addToast(err.message, 'error'); }
   };
   const handleEdit = (task) => { setEditingTask(task); setShowModal(true); };
   const handleDelete = async (id) => {

@@ -17,6 +17,17 @@ export function isOverdue(dateStr) {
   return dateStr < formatDateKey(new Date());
 }
 
+// When a recurring task is completed the server advances its due_date to the
+// next occurrence — surface that in the toast so the user knows another
+// instance is queued (otherwise the silent re-occurrence reads as a bug).
+// `defaultMessage` is what to show for non-recurring tasks.
+export function formatCompletionToast(task, defaultMessage = 'Task completed') {
+  if (!task?.recurrence_rule || !task?.due_date) return defaultMessage;
+  const d = new Date(task.due_date + 'T00:00:00');
+  const label = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  return `Done · next on ${label}`;
+}
+
 export function getMonthName(month) {
   const names = ['January', 'February', 'March', 'April', 'May', 'June',
     'July', 'August', 'September', 'October', 'November', 'December'];

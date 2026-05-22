@@ -6,6 +6,7 @@ import {
 import { api } from '../lib/api';
 import TaskModal from '../components/TaskModal';
 import { useToast } from '../components/Toast';
+import { formatCompletionToast } from '../lib/dateUtils';
 import GlassCard from '../components/ui/GlassCard';
 import Chip from '../components/ui/Chip';
 import MonoLabel from '../components/ui/MonoLabel';
@@ -135,7 +136,13 @@ export default function Projects() {
   };
 
   const handleCompleteTask = async (taskId) => {
-    await api.tasks.complete(taskId);
+    const updated = await api.tasks.complete(taskId);
+    // Surface only the recurring case — non-recurring completion is silent in
+    // Projects (the row collapses, that's the feedback). Matches Dashboard's
+    // pattern: toast just for the case where another instance was scheduled.
+    if (updated?.recurrence_rule && updated?.due_date) {
+      addToast(formatCompletionToast(updated), 'success');
+    }
     fetchProjects();
     if (expandedProject) fetchExpandedProject(expandedProject);
   };

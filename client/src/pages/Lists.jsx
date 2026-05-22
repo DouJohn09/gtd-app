@@ -9,6 +9,7 @@ import SortDropdown, { sortTasks } from '../components/SortDropdown';
 import FilterDropdown, { useTaskFilters, applyFilters } from '../components/FilterDropdown';
 import MonoLabel from '../components/ui/MonoLabel';
 import ConfirmModal from '../components/ui/ConfirmModal';
+import { formatCompletionToast } from '../lib/dateUtils';
 
 const LIST_CONFIG = {
   next_actions: {
@@ -104,8 +105,11 @@ export default function Lists() {
   const toggleDeferred = () => setShowDeferred(prev => !prev);
 
   const handleComplete = async (id) => {
-    try { await api.tasks.complete(id); addToast('Task completed', 'success'); fetchData(); }
-    catch (err) { addToast(err.message, 'error'); }
+    try {
+      const updated = await api.tasks.complete(id);
+      addToast(formatCompletionToast(updated, 'Task completed'), 'success');
+      fetchData();
+    } catch (err) { addToast(err.message, 'error'); }
   };
   const handleDelete = async (id) => {
     setConfirmDeleteId(null);

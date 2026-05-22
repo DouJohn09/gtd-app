@@ -6,7 +6,8 @@ import {
 } from 'lucide-react';
 import { api } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
-import { isOverdue } from '../lib/dateUtils';
+import { isOverdue, formatCompletionToast } from '../lib/dateUtils';
+import { useToast } from '../components/Toast';
 import TaskModal from '../components/TaskModal';
 import SortDropdown, { sortTasks } from '../components/SortDropdown';
 import FilterDropdown, { useTaskFilters, applyFilters } from '../components/FilterDropdown';
@@ -62,6 +63,7 @@ export default function Dashboard() {
   const [filterProject, setFilterProject] = useState(() => localStorage.getItem('filter_project_focus') || '');
   const [hideOverdue, setHideOverdue] = useState(() => localStorage.getItem('hide_overdue_focus') === 'true');
   const { user } = useAuth();
+  const { addToast } = useToast();
 
   useEffect(() => { localStorage.setItem('hide_overdue_focus', hideOverdue); }, [hideOverdue]);
   useEffect(() => { localStorage.setItem('sort_focus', sortBy); }, [sortBy]);
@@ -98,7 +100,14 @@ export default function Dashboard() {
     // Optimistic: flip the check immediately so the animation plays before refetch.
     setDailyFocus(prev => prev.map(t => t.id === id ? { ...t, completed: true } : t));
     try {
-      await api.tasks.complete(id);
+      const updated = await api.tasks.complete(id);
+      // Existing Dashboard UX is silent on completion — keep it that way for
+      // one-shots so the animation isn't drowned by toast noise. Surface a
+      // toast ONLY for recurring tasks, where the silent next-occurrence is
+      // exactly the trap we're trying to prevent.
+      if (updated?.recurrence_rule && updated?.due_date) {
+        addToast(formatCompletionToast(updated), 'success');
+      }
       setTimeout(fetchData, 380);
     } catch (e) {
       setDailyFocus(prev => prev.map(t => t.id === id ? { ...t, completed: false } : t));
