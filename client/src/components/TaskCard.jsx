@@ -178,7 +178,7 @@ export default function TaskCard({ task, onComplete, onEdit, showList = false, q
       </div>
 
       {/* Right tags */}
-      <div className="flex flex-col items-end gap-1 flex-shrink-0">
+      <div className="flex flex-col items-end gap-1 flex-shrink-0 group-hover:opacity-0 transition-opacity">
         {queued && (
           <span
             className="font-mono text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-md"
