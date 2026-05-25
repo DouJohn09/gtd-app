@@ -5,6 +5,7 @@ import { GoogleOAuthProvider } from '@react-oauth/google';
 import App from './App';
 import { AuthProvider } from './contexts/AuthContext';
 import { ToastProvider } from './components/Toast';
+import UpdatePrompt from './components/UpdatePrompt';
 import './index.css';
 
 function Root() {
@@ -34,6 +35,7 @@ function Root() {
         <AuthProvider>
           <ToastProvider>
             <App />
+            <UpdatePrompt />
           </ToastProvider>
         </AuthProvider>
       </BrowserRouter>

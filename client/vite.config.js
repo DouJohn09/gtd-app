@@ -18,10 +18,10 @@ export default defineConfig(({ command }) => {
     plugins: [
       react(),
       VitePWA({
-        // New SW versions install silently when the user reopens the app.
-        // Manual update prompts would be more correct but add UI churn for an
-        // app that may ship multiple times per day.
-        registerType: 'autoUpdate',
+        // 'prompt' lets the app show a glass "Reload to update" banner
+        // (client/src/components/UpdatePrompt.jsx) when a new SW is waiting,
+        // so users on long-running sessions don't keep seeing the old build.
+        registerType: 'prompt',
         // Vite copies anything under client/public/ to dist/, but vite-plugin-pwa
         // needs to know which of those are referenced from the manifest/HTML so
         // it can include them in the SW precache.
