@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { RotateCcw, Inbox, ListTodo, Clock, CloudSun, FolderKanban, ChevronDown, ChevronRight, CheckCircle2, ArrowRight, Flame, AlertTriangle, Sparkles, TrendingUp, Heart } from 'lucide-react';
+import { RotateCcw, Inbox, ListTodo, Clock, CloudSun, FolderKanban, ChevronDown, ChevronRight, CheckCircle2, Check, ArrowRight, Flame, AlertTriangle, Sparkles, TrendingUp, Heart } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { api } from '../lib/api';
 import { useToast } from '../components/Toast';
@@ -476,11 +476,28 @@ export default function WeeklyReview() {
                     <div className="mono-label" style={{ color: 'rgb(var(--amber-glow))' }}>stale_items</div>
                     <span className="font-mono text-[10.5px] text-text-3">{ai.stale_items.length}</span>
                   </div>
+                  <p className="text-[11px] text-text-3 -mt-1 mb-3">Click a suggested action to queue it — applies when you Complete the Review.</p>
                   <div className="space-y-2">
                     {ai.stale_items.map((item, i) => {
                       const tone = item.suggestion === 'delete' ? 'rose'
                         : item.suggestion === 'follow_up' ? 'violet'
                         : 'amber';
+                      const label = item.suggestion?.replace('_', ' ');
+                      // delete + move_to_someday map to the same queued marks Step 2 uses;
+                      // keep/follow_up have no list action, so they stay informational.
+                      const actionable = item.suggestion === 'delete' || item.suggestion === 'move_to_someday';
+                      const queued = item.suggestion === 'delete'
+                        ? markedDelete.has(item.id)
+                        : item.suggestion === 'move_to_someday'
+                        ? markedMove.get(item.id) === 'someday_maybe'
+                        : false;
+                      const applySuggestion = () => {
+                        if (item.suggestion === 'delete') toggleDelete(item.id);
+                        else if (item.suggestion === 'move_to_someday') moveTask(item.id, 'someday_maybe');
+                      };
+                      const badgeStyle = queued
+                        ? { background: `rgb(var(--${tone}) / 0.9)`, color: 'rgb(var(--bg))', boxShadow: `inset 0 0 0 1px rgb(var(--${tone}) / 0.6)` }
+                        : { background: `rgb(var(--${tone}) / 0.12)`, color: `rgb(var(--${tone}-glow))`, boxShadow: `inset 0 0 0 1px rgb(var(--${tone}) / 0.25)` };
                       return (
                         <div
                           key={i}
@@ -491,12 +508,24 @@ export default function WeeklyReview() {
                             <p className="text-[13px] font-medium text-text-1 truncate">{item.title}</p>
                             <p className="font-mono text-[10.5px] text-text-3 mt-0.5">{item.days_stale}d · {item.reason}</p>
                           </div>
-                          <span
-                            className="font-mono text-[10.5px] uppercase tracking-wider px-2 py-1 rounded-md whitespace-nowrap flex-shrink-0"
-                            style={{ background: `rgb(var(--${tone}) / 0.12)`, color: `rgb(var(--${tone}-glow))`, boxShadow: `inset 0 0 0 1px rgb(var(--${tone}) / 0.25)` }}
-                          >
-                            {item.suggestion?.replace('_', ' ')}
-                          </span>
+                          {actionable ? (
+                            <button
+                              onClick={applySuggestion}
+                              title={queued ? 'Queued — applies on Complete Review. Click to undo.' : `Queue: ${label} (applies on Complete Review)`}
+                              className="font-mono text-[10.5px] uppercase tracking-wider px-2 py-1 rounded-md whitespace-nowrap flex-shrink-0 inline-flex items-center gap-1 cursor-pointer transition-all hover:brightness-110"
+                              style={badgeStyle}
+                            >
+                              {queued && <Check className="w-2.5 h-2.5" strokeWidth={3} />}
+                              {label}
+                            </button>
+                          ) : (
+                            <span
+                              className="font-mono text-[10.5px] uppercase tracking-wider px-2 py-1 rounded-md whitespace-nowrap flex-shrink-0"
+                              style={badgeStyle}
+                            >
+                              {label}
+                            </span>
+                          )}
                         </div>
                       );
                     })}
