@@ -8,12 +8,14 @@ const openai = process.env.OPENAI_API_KEY
   ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
   : null;
 
-// maxRetries: 0 — we have our OWN fallback (to OpenAI in `complete`), so a Groq
-// rate-limit (429) or blip should drop straight to the fallback rather than burn
-// seconds on the SDK's exponential backoff. Failing fast is the right latency
-// trade when a reliable second provider is one line away.
+// maxRetries: 0 + timeout: 15s — we have our OWN fallback (to OpenAI in
+// `complete`), so a Groq rate-limit (429), blip, or throttle-STALL should drop
+// straight to the fallback rather than burn seconds on SDK backoff or hang on
+// the SDK's 10-minute default timeout. (A free-tier TPM stall can otherwise hold
+// the connection for minutes — observed in the heavy-ops eval.) 15s is a circuit
+// breaker well above the ~1–2s happy path, not an expected wait.
 const groq = process.env.GROQ_API_KEY
-  ? new OpenAI({ apiKey: process.env.GROQ_API_KEY, baseURL: 'https://api.groq.com/openai/v1', maxRetries: 0 })
+  ? new OpenAI({ apiKey: process.env.GROQ_API_KEY, baseURL: 'https://api.groq.com/openai/v1', maxRetries: 0, timeout: 15000 })
   : null;
 
 const PROVIDERS = { openai, groq };
@@ -22,15 +24,29 @@ const PROVIDERS = { openai, groq };
 // parse failure it falls back to `fallback`. Fallback is always OpenAI, so the
 // quality/reliability floor stays at gpt-4o(-mini) no matter how the free model
 // behaves — JSON-schema adherence is Llama's one known weak spot, and this is
-// the safety net for it. Tasks NOT listed here still call OpenAI directly (not
-// yet migrated, pending their per-task eval); migrating one is a two-line change
-// (route it here + swap its create() for complete()).
+// the safety net for it. Flip a task's primary to Groq once its eval passes
+// (see scripts/eval-*); the fallback keeps production safe meanwhile.
+const GROQ = 'llama-3.3-70b-versatile';
 const ROUTING = {
-  'smart-capture': {
-    primary:  { provider: 'groq',   model: 'llama-3.3-70b-versatile' },
-    fallback: { provider: 'openai', model: 'gpt-4o-mini' },
-  },
+  // Migrated to Groq (eval-verified parity, see scripts/eval-smart-capture.mjs + eval-heavy-ops.mjs):
+  'smart-capture':     { primary: { provider: 'groq',   model: GROQ },     fallback: { provider: 'openai', model: 'gpt-4o-mini' } },
+  'process-inbox':     { primary: { provider: 'groq',   model: GROQ },     fallback: { provider: 'openai', model: 'gpt-4o' } },
+  'import-notes':      { primary: { provider: 'groq',   model: GROQ },     fallback: { provider: 'openai', model: 'gpt-4o' } },
+  'find-duplicates':   { primary: { provider: 'groq',   model: GROQ },     fallback: { provider: 'openai', model: 'gpt-4o' } },
+  'url-extract':       { primary: { provider: 'groq',   model: GROQ },     fallback: { provider: 'openai', model: 'gpt-4o-mini' } },
+  // Kept on gpt-4o by default (low-frequency, high-judgment advisory ops). Routed
+  // through complete() so flipping to Groq is a one-line change after eval.
+  'daily-priorities':  { primary: { provider: 'openai', model: 'gpt-4o' }, fallback: null },
+  'analyze-task':      { primary: { provider: 'openai', model: 'gpt-4o' }, fallback: null },
+  'project-breakdown': { primary: { provider: 'openai', model: 'gpt-4o' }, fallback: null },
+  'weekly-review':     { primary: { provider: 'openai', model: 'gpt-4o' }, fallback: null },
 };
+
+// Test-only: force every complete() call onto one {provider, model}, bypassing
+// ROUTING, so scripts/eval-* can A/B models against the real functions. Never set
+// in production code.
+let _forceRoute = null;
+export function __setForceRoute(r) { _forceRoute = r; }
 
 // Unified chat completion with provider routing + automatic fallback. Returns
 // parsed JSON, or null if every available provider fails (the caller then does
@@ -38,7 +54,7 @@ const ROUTING = {
 // is treated as a provider failure and advances to the fallback provider.
 async function complete(task, params) {
   const route = ROUTING[task];
-  const attempts = [route?.primary, route?.fallback].filter(Boolean);
+  const attempts = _forceRoute ? [_forceRoute] : [route?.primary, route?.fallback].filter(Boolean);
   let lastErr = null;
   for (const { provider, model } of attempts) {
     const client = PROVIDERS[provider];
@@ -250,13 +266,11 @@ export async function smartCapture(rawText, userContexts, projects, today, dayNa
 }
 
 export async function analyzeTask(task, userContexts) {
-  if (!openai) return { error: 'OpenAI API key not configured' };
+  if (!openai && !groq) return { error: 'AI provider not configured' };
   const contextOptions = userContexts?.length
     ? userContexts.map(c => c.name || c).join('|')
     : '@home|@work|@errands|@computer|@phone|@anywhere';
-  try {
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4o',
+  return complete('analyze-task', {
       messages: [
         { role: 'system', content: getSystemPrompt(userContexts) },
         {
@@ -284,22 +298,14 @@ Respond with JSON:
       ],
       response_format: { type: 'json_object' }
     });
-
-    return JSON.parse(response.choices[0].message.content);
-  } catch (error) {
-    console.error('AI analysis error:', error);
-    return null;
-  }
 }
 
 export async function suggestProjectBreakdown(project, userContexts) {
-  if (!openai) return { error: 'OpenAI API key not configured' };
+  if (!openai && !groq) return { error: 'AI provider not configured' };
   const contextOptions = userContexts?.length
     ? userContexts.map(c => c.name || c).join('|')
     : '@home|@work|@errands|@computer|@phone|@anywhere';
-  try {
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4o',
+  return complete('project-breakdown', {
       messages: [
         { role: 'system', content: getSystemPrompt(userContexts) },
         {
@@ -329,24 +335,16 @@ Respond with JSON:
       ],
       response_format: { type: 'json_object' }
     });
-
-    return JSON.parse(response.choices[0].message.content);
-  } catch (error) {
-    console.error('AI project breakdown error:', error);
-    return null;
-  }
 }
 
 export async function processInbox(tasks, userContexts) {
-  if (!openai) return { error: 'OpenAI API key not configured' };
+  if (!openai && !groq) return { error: 'AI provider not configured' };
   const contextOptions = userContexts?.length
     ? userContexts.map(c => c.name || c).join('|')
     : '@home|@work|@errands|@computer|@phone|@anywhere';
-  try {
-    const taskList = tasks.map((t, i) => `${i + 1}. "${t.title}"${t.notes ? ` (Notes: ${t.notes})` : ''}`).join('\n');
+  const taskList = tasks.map((t, i) => `${i + 1}. "${t.title}"${t.notes ? ` (Notes: ${t.notes})` : ''}`).join('\n');
 
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4o',
+  return complete('process-inbox', {
       messages: [
         { role: 'system', content: getSystemPrompt(userContexts) },
         {
@@ -384,16 +382,10 @@ For each item, respond with JSON:
       ],
       response_format: { type: 'json_object' }
     });
-
-    return JSON.parse(response.choices[0].message.content);
-  } catch (error) {
-    console.error('AI inbox processing error:', error);
-    return null;
-  }
 }
 
 export async function importNotes(rawText, userContexts, projects = [], today, dayName) {
-  if (!openai) return { error: 'OpenAI API key not configured' };
+  if (!openai && !groq) return { error: 'AI provider not configured' };
   const contextOptions = userContexts?.length
     ? userContexts.map(c => c.name || c).join('|')
     : '@home|@work|@errands|@computer|@phone|@anywhere';
@@ -401,9 +393,7 @@ export async function importNotes(rawText, userContexts, projects = [], today, d
     ? projects.map(p => `- ${p.name}`).join('\n')
     : '(none)';
   const dateLine = today ? `Today is ${dayName}, ${today}. Resolve relative dates (e.g. "tomorrow", "Friday", "next week") to absolute YYYY-MM-DD.` : '';
-  try {
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4o',
+  return complete('import-notes', {
       messages: [
         { role: 'system', content: getSystemPrompt(userContexts) },
         {
@@ -464,23 +454,15 @@ Respond with JSON:
       ],
       response_format: { type: 'json_object' }
     });
-
-    return JSON.parse(response.choices[0].message.content);
-  } catch (error) {
-    console.error('AI import notes error:', error);
-    return null;
-  }
 }
 
 export async function getDailyPriorities(tasks, stats, userContexts) {
-  if (!openai) return { error: 'OpenAI API key not configured' };
-  try {
+  if (!openai && !groq) return { error: 'AI provider not configured' };
     const taskList = tasks.map((t, i) => 
       `${i + 1}. "${t.title}" [${t.context || 'no context'}] ${t.project_name ? `(Project: ${t.project_name})` : ''} Energy: ${t.energy_level || 'unknown'}, Time: ${t.time_estimate || 'unknown'}min`
     ).join('\n');
     
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4o',
+    return complete('daily-priorities', {
       messages: [
         { role: 'system', content: getSystemPrompt(userContexts) },
         {
@@ -516,23 +498,15 @@ Respond with JSON:
       ],
       response_format: { type: 'json_object' }
     });
-
-    return JSON.parse(response.choices[0].message.content);
-  } catch (error) {
-    console.error('AI daily priorities error:', error);
-    return null;
-  }
 }
 
 export async function findDuplicates(tasks, userContexts) {
-  if (!openai) return { error: 'OpenAI API key not configured' };
-  try {
+  if (!openai && !groq) return { error: 'AI provider not configured' };
     const taskList = tasks.map(t =>
       `[ID:${t.id}] "${t.title}"${t.notes ? ` (Notes: ${t.notes})` : ''} [List: ${t.list}]${t.context ? ` [Context: ${t.context}]` : ''}`
     ).join('\n');
 
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4o',
+    return complete('find-duplicates', {
       messages: [
         { role: 'system', content: getSystemPrompt(userContexts) },
         {
@@ -561,17 +535,10 @@ If no duplicates exist, return an empty duplicate_groups array.`
       ],
       response_format: { type: 'json_object' }
     });
-
-    return JSON.parse(response.choices[0].message.content);
-  } catch (error) {
-    console.error('AI find duplicates error:', error);
-    return null;
-  }
 }
 
 export async function weeklyReviewAnalysis(data, userContexts) {
-  if (!openai) return { error: 'OpenAI API key not configured' };
-  try {
+  if (!openai && !groq) return { error: 'AI provider not configured' };
     const nextActionsList = data.nextActions.slice(0, 30).map(t => {
       const age = Math.floor((Date.now() - new Date(t.created_at).getTime()) / (1000 * 60 * 60 * 24));
       return `[ID:${t.id}] "${t.title}" [Context: ${t.context || 'none'}]${t.project_name ? ` [Project: ${t.project_name}]` : ''}${t.due_date ? ` [Due: ${t.due_date}]` : ''} (${age} days old)`;
@@ -595,8 +562,7 @@ export async function weeklyReviewAnalysis(data, userContexts) {
       `"${h.name}" — ${h.completionRate}% completion, ${h.streak} day streak`
     ).join('\n') || 'No habits tracked';
 
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4o',
+    return complete('weekly-review', {
       messages: [
         { role: 'system', content: getSystemPrompt(userContexts) },
         {
@@ -647,12 +613,6 @@ Respond with JSON:
       ],
       response_format: { type: 'json_object' }
     });
-
-    return JSON.parse(response.choices[0].message.content);
-  } catch (error) {
-    console.error('AI weekly review error:', error);
-    return null;
-  }
 }
 
 function extractMeta(html, property, attr = 'property') {
@@ -668,7 +628,7 @@ function extractMeta(html, property, attr = 'property') {
 }
 
 export async function extractUrlMetadata(url) {
-  if (!openai) return null;
+  if (!openai && !groq) return null;
 
   let pageTitle = '';
   let ogTitle = '';
@@ -705,9 +665,7 @@ export async function extractUrlMetadata(url) {
     // page fetch failed — AI will work with just the URL
   }
 
-  try {
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
+  return complete('url-extract', {
       messages: [
         {
           role: 'system',
@@ -730,10 +688,4 @@ ${extraMeta}`.trim()
       response_format: { type: 'json_object' },
       max_tokens: 200,
     });
-
-    return JSON.parse(response.choices[0].message.content);
-  } catch (error) {
-    console.error('AI URL extraction error:', error);
-    return null;
-  }
 }
