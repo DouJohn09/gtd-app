@@ -540,16 +540,29 @@ export default function WeeklyReview() {
                     <div className="mono-label" style={{ color: 'rgb(var(--violet-glow))' }}>projects_attention</div>
                   </div>
                   <div className="space-y-2">
-                    {ai.projects_needing_attention.map((p, i) => (
-                      <div
-                        key={i}
-                        className="p-3 rounded-xl"
-                        style={{ background: 'rgba(255,255,255,0.02)', boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.05)' }}
-                      >
-                        <p className="text-[13px] font-medium text-text-1">{p.name}</p>
-                        <p className="text-[12px] text-text-2 mt-0.5">{p.suggestion}</p>
-                      </div>
-                    ))}
+                    {ai.projects_needing_attention.map((p, i) => {
+                      const proj = reviewData.projects?.find(rp => rp.name === p.name);
+                      return (
+                        <div
+                          key={i}
+                          className="flex items-start justify-between gap-3 p-3 rounded-xl"
+                          style={{ background: 'rgba(255,255,255,0.02)', boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.05)' }}
+                        >
+                          <div className="min-w-0">
+                            <p className="text-[13px] font-medium text-text-1">{p.name}</p>
+                            <p className="text-[12px] text-text-2 mt-0.5">{p.suggestion}</p>
+                          </div>
+                          <Link
+                            to={proj ? `/projects?project=${proj.id}` : '/projects'}
+                            title="Open this project"
+                            className="font-mono text-[10.5px] uppercase tracking-wider px-2 py-1 rounded-md whitespace-nowrap flex-shrink-0 inline-flex items-center gap-1 no-underline cursor-pointer transition-all hover:brightness-110"
+                            style={{ background: 'rgb(var(--violet) / 0.12)', color: 'rgb(var(--violet-glow))', boxShadow: 'inset 0 0 0 1px rgb(var(--violet) / 0.25)' }}
+                          >
+                            open <ArrowRight className="w-2.5 h-2.5" />
+                          </Link>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               )}
@@ -560,21 +573,38 @@ export default function WeeklyReview() {
                     <Clock className="w-3.5 h-3.5" style={{ color: 'rgb(var(--rose-glow))' }} />
                     <div className="mono-label" style={{ color: 'rgb(var(--rose-glow))' }}>follow_ups</div>
                   </div>
+                  <p className="text-[11px] text-text-3 -mt-1 mb-3">Waited too long? Take it back to Next Actions — queues, applies on Complete Review.</p>
                   <div className="space-y-2">
-                    {ai.waiting_for_followups.map((item, i) => (
-                      <div
-                        key={i}
-                        className="p-3 rounded-xl"
-                        style={{ background: 'rgba(255,255,255,0.02)', boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.05)' }}
-                      >
-                        <p className="text-[13px] font-medium text-text-1">{item.title}</p>
-                        <p className="text-[12px] text-text-2 mt-0.5">
-                          {item.waiting_for_person && <span className="font-mono text-[11px] text-rose-glow">{item.waiting_for_person}</span>}
-                          {item.waiting_for_person && ' · '}
-                          {item.suggestion}
-                        </p>
-                      </div>
-                    ))}
+                    {ai.waiting_for_followups.map((item, i) => {
+                      const queued = markedMove.get(item.id) === 'next_actions';
+                      return (
+                        <div
+                          key={i}
+                          className="flex items-start justify-between gap-3 p-3 rounded-xl"
+                          style={{ background: 'rgba(255,255,255,0.02)', boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.05)' }}
+                        >
+                          <div className="min-w-0">
+                            <p className="text-[13px] font-medium text-text-1">{item.title}</p>
+                            <p className="text-[12px] text-text-2 mt-0.5">
+                              {item.waiting_for_person && <span className="font-mono text-[11px] text-rose-glow">{item.waiting_for_person}</span>}
+                              {item.waiting_for_person && ' · '}
+                              {item.suggestion}
+                            </p>
+                          </div>
+                          <button
+                            onClick={() => moveTask(item.id, 'next_actions')}
+                            title={queued ? 'Queued — applies on Complete Review. Click to undo.' : 'Queue: take back to Next Actions (applies on Complete Review)'}
+                            className="font-mono text-[10.5px] uppercase tracking-wider px-2 py-1 rounded-md whitespace-nowrap flex-shrink-0 inline-flex items-center gap-1 cursor-pointer transition-all hover:brightness-110"
+                            style={queued
+                              ? { background: 'rgb(var(--mint) / 0.9)', color: 'rgb(var(--bg))', boxShadow: 'inset 0 0 0 1px rgb(var(--mint) / 0.6)' }
+                              : { background: 'rgb(var(--mint) / 0.12)', color: 'rgb(var(--mint-glow))', boxShadow: 'inset 0 0 0 1px rgb(var(--mint) / 0.25)' }}
+                          >
+                            {queued && <Check className="w-2.5 h-2.5" strokeWidth={3} />}
+                            take back
+                          </button>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               )}

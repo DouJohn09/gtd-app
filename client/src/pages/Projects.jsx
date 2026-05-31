@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   FolderKanban, Plus, Sparkles, ChevronRight, ChevronUp, ChevronDown,
   Trash2, ArrowRightLeft, Clock, X, Check, Pencil,
@@ -31,6 +32,7 @@ export default function Projects() {
   const [editingProject, setEditingProject] = useState(null);
   const [editForm, setEditForm] = useState({ name: '', description: '', outcome: '', execution_mode: 'parallel' });
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const fetchProjects = async () => {
     try {
@@ -58,6 +60,19 @@ export default function Projects() {
     window.addEventListener('task-captured', onCapture);
     return () => window.removeEventListener('task-captured', onCapture);
   }, []);
+
+  // Deep link from elsewhere (e.g. Weekly Review): /projects?project=<id> opens
+  // that project expanded. Consume the param after so a later refetch (or the
+  // user collapsing it) doesn't keep re-expanding it.
+  useEffect(() => {
+    const pid = Number(searchParams.get('project'));
+    if (pid && projects.some(p => p.id === pid)) {
+      setExpandedProject(pid);
+      setExpandedData(null);
+      fetchExpandedProject(pid);
+      setSearchParams({}, { replace: true });
+    }
+  }, [projects]);
 
   const handleExpand = (projectId) => {
     if (expandedProject === projectId) {
