@@ -26,10 +26,6 @@ function parseNotes(notes) {
   return { text, urls };
 }
 
-function hostname(url) {
-  try { return new URL(url).hostname.replace('www.', ''); } catch { return 'link'; }
-}
-
 function formatScheduledTime(time) {
   if (!time) return '';
   const [h, m] = time.split(':').map(Number);
@@ -38,7 +34,20 @@ function formatScheduledTime(time) {
   return m === 0 ? `${h12}${ampm}` : `${h12}:${String(m).padStart(2, '0')}${ampm}`;
 }
 
-// Render a string with any inline URLs turned into clickable links. Used for the
+// Friendly site name for a URL: the registrable domain label, no subdomain/TLD.
+// e.g. https://app.fireflies.ai/ -> "fireflies", https://github.com/x -> "github".
+function siteLabel(url) {
+  try {
+    const host = new URL(url).hostname.replace(/^www\./, '');
+    const parts = host.split('.');
+    return parts.length >= 2 ? parts[parts.length - 2] : host;
+  } catch {
+    return 'link';
+  }
+}
+
+// Render a string with any inline URLs turned into clickable links, shown as the
+// friendly site label (e.g. "fireflies") rather than the raw URL. Used for the
 // title, where a URL may live in the text itself (e.g. "Check https://…"). The
 // link stops propagation so clicking it opens the URL instead of the task modal.
 const URL_SPLIT = /(https?:\/\/[^\s]+)/g;
@@ -53,10 +62,11 @@ function linkify(text) {
         href={href}
         target="_blank"
         rel="noopener noreferrer"
+        title={href}
         onClick={(e) => e.stopPropagation()}
         className="text-mint-glow underline decoration-mint/40 hover:decoration-mint [overflow-wrap:anywhere]"
       >
-        {part}
+        {siteLabel(href)}
       </a>
     );
   });
@@ -146,11 +156,12 @@ export default function TaskCard({ task, onComplete, onEdit, showList = false, q
               target="_blank"
               rel="noopener noreferrer"
               onClick={e => e.stopPropagation()}
+              title={url}
               className="gtd-badge relative z-10 inline-flex items-center gap-1 no-underline cursor-pointer transition-all hover:brightness-125 hover:scale-105"
               style={{ background: 'rgb(var(--mint) / 0.10)', color: 'rgb(var(--mint-glow))', boxShadow: 'inset 0 0 0 1px rgb(var(--mint) / 0.20)' }}
             >
               <ExternalLink className="w-2.5 h-2.5" />
-              {hostname(url)}
+              {siteLabel(url)}
             </a>
           ))}
 
