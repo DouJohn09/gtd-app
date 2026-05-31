@@ -4,6 +4,8 @@ import { pool } from '../db/pool.js';
 import { processInbox, getDailyPriorities, importNotes, findDuplicates, weeklyReviewAnalysis, smartCapture } from '../services/ai.js';
 import { syncTaskToCalendar } from '../services/googleCalendar.js';
 import { findFreeSlot } from '../services/scheduling.js';
+import { consume, getStatus } from '../services/aiUsage.js';
+import { enforceAiLimit } from '../middleware/aiLimit.js';
 
 async function getUserContexts(userId) {
   const { rows } = await pool.query(
@@ -52,13 +54,19 @@ router.post('/smart-capture', async (req, res) => {
     const now = new Date();
     const today = now.toISOString().split('T')[0];
     const dayName = now.toLocaleDateString('en-US', { weekday: 'long' });
-    const ai = await smartCapture(rawText, contexts, projects, today, dayName, history);
+    // Soft throttle: when the user is over their daily AI budget, skip the
+    // OpenAI call entirely and fall back to raw capture rather than hard-blocking.
+    // The task still lands in the inbox as plain text — just without enrichment.
+    const budget = await consume(req.user.id);
+    const ai = budget.allowed
+      ? await smartCapture(rawText, contexts, projects, today, dayName, history)
+      : null;
 
     if (!ai) {
       const taskData = { title: rawText };
       if (urls.length) taskData.notes = urls.join('\n');
       const task = await TaskModel.create(taskData, req.user.id);
-      return res.json({ task, ai: null, fallback: true });
+      return res.json({ task, ai: null, fallback: true, throttled: !budget.allowed });
     }
 
     // Confidence-gated routing: trust AI's list when confident, fall back to
@@ -142,7 +150,15 @@ router.post('/smart-capture', async (req, res) => {
   }
 });
 
-router.post('/process-inbox', async (req, res) => {
+router.get('/usage', async (req, res) => {
+  try {
+    res.json(await getStatus(req.user.id));
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.post('/process-inbox', enforceAiLimit, async (req, res) => {
   try {
     const inboxTasks = await TaskModel.getAll('inbox', req.user.id);
     if (inboxTasks.length === 0) {
@@ -188,7 +204,7 @@ router.post('/apply-inbox-processing', async (req, res) => {
   }
 });
 
-router.post('/daily-priorities', async (req, res) => {
+router.post('/daily-priorities', enforceAiLimit, async (req, res) => {
   try {
     const [nextActions, stats] = await Promise.all([
       TaskModel.getAll('next_actions', req.user.id),
@@ -216,7 +232,7 @@ router.post('/daily-priorities', async (req, res) => {
   }
 });
 
-router.post('/import-notes', async (req, res) => {
+router.post('/import-notes', enforceAiLimit, async (req, res) => {
   try {
     const { text } = req.body;
     if (!text || !text.trim()) {
@@ -304,7 +320,7 @@ router.post('/apply-daily-focus', async (req, res) => {
   }
 });
 
-router.post('/find-duplicates', async (req, res) => {
+router.post('/find-duplicates', enforceAiLimit, async (req, res) => {
   try {
     const lists = await Promise.all(
       ['inbox', 'next_actions', 'waiting_for', 'someday_maybe'].map(list =>
@@ -386,7 +402,7 @@ async function getHabitStats(userId) {
   };
 }
 
-router.post('/weekly-review', async (req, res) => {
+router.post('/weekly-review', enforceAiLimit, async (req, res) => {
   try {
     const userId = req.user.id;
     const [stats, inboxItems, nextActions, waitingFor, somedayMaybe, projects, staleItems, lastReview, streak, habitStats, userContexts] = await Promise.all([
