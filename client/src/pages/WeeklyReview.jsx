@@ -5,6 +5,7 @@ import { api } from '../lib/api';
 import { useToast } from '../components/Toast';
 import QuickCapture from '../components/QuickCapture';
 import TaskCard from '../components/TaskCard';
+import TaskModal from '../components/TaskModal';
 import MonoLabel from '../components/ui/MonoLabel';
 
 const STEPS = [
@@ -100,6 +101,19 @@ export default function WeeklyReview() {
   const [completing, setCompleting] = useState(false);
   const [done, setDone] = useState(false);
   const [resultStreak, setResultStreak] = useState(0);
+  const [editingTask, setEditingTask] = useState(null);
+
+  // Patch a single task in place after an edit, so opening details mid-review
+  // doesn't trigger a full refetch (which would re-run the AI analysis and wipe
+  // the user's in-progress triage marks).
+  const handleTaskSaved = (updated) => {
+    if (!updated?.id) return;
+    setReviewData(prev => {
+      if (!prev) return prev;
+      const patch = (arr) => arr?.map(t => (t.id === updated.id ? { ...t, ...updated } : t));
+      return { ...prev, nextActions: patch(prev.nextActions), waitingFor: patch(prev.waitingFor), somedayMaybe: patch(prev.somedayMaybe) };
+    });
+  };
 
   useEffect(() => {
     const fetchReview = async () => {
@@ -159,7 +173,7 @@ export default function WeeklyReview() {
     const actioned = isTaskActioned(task.id);
     return (
       <div className={`relative ${actioned ? 'opacity-70' : ''}`}>
-        <TaskCard task={task} showList />
+        <TaskCard task={task} showList onEdit={setEditingTask} />
         <div className="flex flex-wrap gap-1 mt-1.5 ml-9">
           <ActionPill
             active={markedComplete.has(task.id)}
@@ -681,6 +695,15 @@ export default function WeeklyReview() {
             </>
           )}
         </div>
+      )}
+
+      {editingTask && (
+        <TaskModal
+          task={editingTask}
+          projects={reviewData.projects || []}
+          onClose={() => setEditingTask(null)}
+          onSave={handleTaskSaved}
+        />
       )}
     </div>
   );

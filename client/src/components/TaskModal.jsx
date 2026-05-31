@@ -144,14 +144,15 @@ export default function TaskModal({ task, projects, onClose, onSave }) {
         recurrence_days: form.recurrence_rule === 'custom' ? (form.recurrence_days || null) : null,
         recurrence_type: form.recurrence_rule ? form.recurrence_type : null,
       };
+      let saved;
       if (task?.id) {
-        await api.tasks.update(task.id, data);
+        saved = await api.tasks.update(task.id, data);
         addToast('Task updated', 'success');
       } else {
-        await api.tasks.create(data);
+        saved = await api.tasks.create(data);
         addToast('Task created', 'success');
       }
-      onSave?.();
+      onSave?.(saved);
       onClose();
     } catch (err) {
       console.error('Failed to save task:', err);
