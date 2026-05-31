@@ -8,15 +8,22 @@ const ENERGY_TONES = {
 
 function parseNotes(notes) {
   if (!notes) return { text: '', urls: [] };
-  const lines = notes.split('\n');
-  const urls = [];
-  const textLines = [];
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (/^https?:\/\/[^\s]+$/i.test(trimmed)) urls.push(trimmed);
-    else textLines.push(line);
-  }
-  return { text: textLines.join('\n').trim(), urls };
+  const urlRe = /https?:\/\/[^\s]+/gi;
+  // Extract every URL — inline or on its own line. Strip trailing sentence
+  // punctuation that the greedy match swallows (e.g. "see https://x.com.") so
+  // the link isn't broken, and de-dupe.
+  const stripTrailing = (u) => u.replace(/[.,;:!?)\]}>'"]+$/, '');
+  const urls = [...new Set((notes.match(urlRe) || []).map(stripTrailing))];
+  // Remove URLs from the displayed preview (they're surfaced as clickable
+  // badges), then tidy the whitespace inline removal leaves behind.
+  const text = notes
+    .replace(urlRe, '')
+    .split('\n')
+    .map(line => line.replace(/[ \t]{2,}/g, ' ').trim())
+    .filter(Boolean)
+    .join('\n')
+    .trim();
+  return { text, urls };
 }
 
 function hostname(url) {
