@@ -38,6 +38,30 @@ function formatScheduledTime(time) {
   return m === 0 ? `${h12}${ampm}` : `${h12}:${String(m).padStart(2, '0')}${ampm}`;
 }
 
+// Render a string with any inline URLs turned into clickable links. Used for the
+// title, where a URL may live in the text itself (e.g. "Check https://…"). The
+// link stops propagation so clicking it opens the URL instead of the task modal.
+const URL_SPLIT = /(https?:\/\/[^\s]+)/g;
+function linkify(text) {
+  if (!text) return text;
+  return text.split(URL_SPLIT).map((part, i) => {
+    if (!/^https?:\/\//i.test(part)) return part;
+    const href = part.replace(/[.,;:!?)\]}>'"]+$/, '');
+    return (
+      <a
+        key={i}
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        onClick={(e) => e.stopPropagation()}
+        className="text-mint-glow underline decoration-mint/40 hover:decoration-mint [overflow-wrap:anywhere]"
+      >
+        {part}
+      </a>
+    );
+  });
+}
+
 export default function TaskCard({ task, onComplete, onEdit, showList = false, queued = false }) {
   const isCompleted = task.list === 'completed';
   const focus = !!task.is_daily_focus && !queued && !isCompleted;
@@ -79,12 +103,15 @@ export default function TaskCard({ task, onComplete, onEdit, showList = false, q
 
       {/* Body */}
       <div className="flex-1 min-w-0">
-        <button
+        <div
           onClick={() => onEdit?.(task)}
-          className={`block w-full text-left text-[14px] font-medium leading-snug transition-colors hover:text-violet-glow [overflow-wrap:anywhere] ${isCompleted ? 'line-through text-text-3' : 'text-text-1'}`}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onEdit?.(task); } }}
+          className={`block w-full text-left text-[14px] font-medium leading-snug transition-colors hover:text-violet-glow [overflow-wrap:anywhere] cursor-pointer ${isCompleted ? 'line-through text-text-3' : 'text-text-1'}`}
         >
-          {task.title}
-        </button>
+          {linkify(task.title)}
+        </div>
 
         {notesText && (
           <p className="text-[12px] text-text-3 mt-1 line-clamp-2 leading-relaxed [overflow-wrap:anywhere]">{notesText}</p>
