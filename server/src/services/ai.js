@@ -1,10 +1,58 @@
 import OpenAI from 'openai';
 
-let openai = null;
-if (process.env.OPENAI_API_KEY) {
-  openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY
-  });
+// Provider clients. OpenAI is the paid/reliable baseline; Groq is the fast,
+// free, privacy-safe (Groq does not train on API data) provider for the
+// high-frequency, latency-sensitive calls. Either may be absent — routing
+// below degrades gracefully when a key isn't configured.
+const openai = process.env.OPENAI_API_KEY
+  ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+  : null;
+
+// maxRetries: 0 — we have our OWN fallback (to OpenAI in `complete`), so a Groq
+// rate-limit (429) or blip should drop straight to the fallback rather than burn
+// seconds on the SDK's exponential backoff. Failing fast is the right latency
+// trade when a reliable second provider is one line away.
+const groq = process.env.GROQ_API_KEY
+  ? new OpenAI({ apiKey: process.env.GROQ_API_KEY, baseURL: 'https://api.groq.com/openai/v1', maxRetries: 0 })
+  : null;
+
+const PROVIDERS = { openai, groq };
+
+// Per-task model routing. Each task tries `primary`; on ANY error OR a JSON
+// parse failure it falls back to `fallback`. Fallback is always OpenAI, so the
+// quality/reliability floor stays at gpt-4o(-mini) no matter how the free model
+// behaves — JSON-schema adherence is Llama's one known weak spot, and this is
+// the safety net for it. Tasks NOT listed here still call OpenAI directly (not
+// yet migrated, pending their per-task eval); migrating one is a two-line change
+// (route it here + swap its create() for complete()).
+const ROUTING = {
+  'smart-capture': {
+    primary:  { provider: 'groq',   model: 'llama-3.3-70b-versatile' },
+    fallback: { provider: 'openai', model: 'gpt-4o-mini' },
+  },
+};
+
+// Unified chat completion with provider routing + automatic fallback. Returns
+// parsed JSON, or null if every available provider fails (the caller then does
+// its own fallback — e.g. Smart Capture saves the raw text). A JSON.parse failure
+// is treated as a provider failure and advances to the fallback provider.
+async function complete(task, params) {
+  const route = ROUTING[task];
+  const attempts = [route?.primary, route?.fallback].filter(Boolean);
+  let lastErr = null;
+  for (const { provider, model } of attempts) {
+    const client = PROVIDERS[provider];
+    if (!client) continue;
+    try {
+      const res = await client.chat.completions.create({ ...params, model });
+      return JSON.parse(res.choices[0].message.content);
+    } catch (err) {
+      lastErr = err;
+      console.error(`AI[${task}] ${provider}/${model} failed: ${err.message}`);
+    }
+  }
+  if (lastErr) console.error(`AI[${task}] all providers exhausted.`);
+  return null;
 }
 
 function getSystemPrompt(userContexts) {
@@ -34,8 +82,7 @@ When analyzing tasks:
 Always respond in JSON format as specified in each request.`;
 }
 
-export async function smartCapture(rawText, userContexts, projects, today, dayName, history = []) {
-  if (!openai) return null;
+export function buildSmartCaptureMessages(rawText, userContexts, projects, today, dayName, history = []) {
   const contextOptions = userContexts?.length
     ? userContexts.map(c => c.name || c).join('|')
     : '@home|@work|@errands|@computer|@phone|@anywhere';
@@ -52,14 +99,11 @@ ${history.map(h => `- "${h.title}" → context: ${h.context}${h.list ? `, list: 
 Treat these as the strongest hints about how THIS user actually organizes tasks. If a new input is similar to one of these, copy the classification choice.
 `
     : '';
-  try {
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: [
-        { role: 'system', content: getSystemPrompt(userContexts) },
-        {
-          role: 'user',
-          content: `You are a smart task capture assistant. Today is ${dayName}, ${today}.
+  return [
+    { role: 'system', content: getSystemPrompt(userContexts) },
+    {
+      role: 'user',
+      content: `You are a smart task capture assistant. Today is ${dayName}, ${today}.
 
 Parse this raw input into a structured GTD task. Extract any dates, people, contexts, and classify it.
 
@@ -195,16 +239,14 @@ Respond with JSON:
   "recurrence_days": "mon,wed,fri or null",
   "reasoning": "brief explanation of what was detected and why"
 }`
-        }
-      ],
-      response_format: { type: 'json_object' }
-    });
+    }
+  ];
+}
 
-    return JSON.parse(response.choices[0].message.content);
-  } catch (error) {
-    console.error('Smart capture AI error:', error);
-    return null;
-  }
+export async function smartCapture(rawText, userContexts, projects, today, dayName, history = []) {
+  if (!groq && !openai) return null;
+  const messages = buildSmartCaptureMessages(rawText, userContexts, projects, today, dayName, history);
+  return complete('smart-capture', { messages, response_format: { type: 'json_object' } });
 }
 
 export async function analyzeTask(task, userContexts) {
