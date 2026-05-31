@@ -12,13 +12,14 @@ A personal productivity application inspired by David Allen's Getting Things Don
 - **Projects**: Multi-step outcomes with linked tasks
 - **Waiting For**: Track delegated items
 - **Someday/Maybe**: Ideas for the future
-- **AI Assistant**: OpenAI-powered task categorization and prioritization
+- **AI Assistant**: Groq + OpenAI-powered task categorization and prioritization (Groq Llama-3.3-70B for fast capture, OpenAI as fallback + advisory)
 
 ## Setup
 
 ### Prerequisites
 - Node.js 18+
-- OpenAI API key (for AI features)
+- OpenAI API key (for AI features + fallback)
+- Groq API key (optional — primary for Smart Capture; falls back to OpenAI if unset). Free, no card, at console.groq.com
 
 ### Installation
 
@@ -37,7 +38,9 @@ npm install
 3. **Set up environment variables:**
 ```bash
 export OPENAI_API_KEY=your_api_key_here
+export GROQ_API_KEY=your_groq_key_here   # optional; primary for Smart Capture
 ```
+See `server/.env.example` for the full list (DATABASE_URL, Google OAuth, AI usage caps, etc.).
 
 ### Running the App
 
@@ -65,8 +68,10 @@ npm run dev
 
 ## AI Features
 
+- **Smart Capture**: Fast natural-language parse of every quick capture (Groq Llama-3.3-70B)
 - **Process Inbox**: AI categorizes inbox items into appropriate GTD lists
 - **Daily Focus**: AI suggests which tasks should be your priority today
 - **Project Breakdown**: AI suggests next actions for your projects
+- **Weekly Review**: AI analyzes system health and flags stale items
 
-Note: AI features require a valid OpenAI API key set in the `OPENAI_API_KEY` environment variable.
+Note: AI requires `OPENAI_API_KEY` (used as the fallback for every call, and primary for advisory ops). `GROQ_API_KEY` is optional but recommended — it's the fast/free primary for Smart Capture and the objective ops; without it those transparently fall back to OpenAI. All AI calls are usage-metered (see `PROJECT_KNOWLEDGE.md` Build Backlog #4).
