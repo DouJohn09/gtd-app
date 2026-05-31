@@ -610,6 +610,7 @@ Cross-cutting effort to make AI suggestions more trustworthy. Insight from FEATU
 4. **Confidence calibration check** — Track how often "high" suggestions get edited vs "low" ones. If high gets edited often, the prompt is overconfident — tune.
 5. **Onboarding: seed default life-domain contexts** — New users start with an empty contexts table, so Smart Capture has no life-domain contexts to prefer and falls back to activity-type. Seed Personal / Work / Family / Home (or let the user pick from a recommended set) during first-run onboarding so the life-domain preference rule actually fires from day one. Cold-start fix for few-shot history.
 6. **Spread few-shot to Process Inbox + Import Notes** — Currently history is injected only into Smart Capture. The same pattern should help the bulk-processing flows once they move to single-item calls (#2 above).
+7. **Extract URLs from the title into notes (Smart Capture)** — Smart Capture currently keeps a pasted URL inside the action title (e.g. "Check https://app.fireflies.ai/"), so titles get cluttered with raw links. Prompt should strip the URL out of the title (clean action like "Check Fireflies") and let the URL live in notes, where it renders as a tidy clickable badge. Inline URLs are now clickable everywhere (title + notes) as a display fix (commit 53/title-linkify), so this is GTD-cleanliness polish, not a blocker. Needs prompt re-verification + an eval case so titles aren't over-trimmed.
 
 ---
 
