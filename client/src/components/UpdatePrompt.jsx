@@ -1,11 +1,27 @@
 import { useRegisterSW } from 'virtual:pwa-register/react';
 import { RefreshCw, X } from 'lucide-react';
 
+// How often to actively re-check for a new build on long-lived sessions.
+const UPDATE_CHECK_INTERVAL = 30 * 60 * 1000; // 30 min
+
 export default function UpdatePrompt() {
   const {
     needRefresh: [needRefresh, setNeedRefresh],
     updateServiceWorker,
-  } = useRegisterSW();
+  } = useRegisterSW({
+    // Without this, the SW only checks for a new build at initial registration,
+    // so always-open / installed-PWA sessions (esp. mobile) sit on a stale build
+    // indefinitely and never see this banner. Re-check when the tab regains
+    // focus / becomes visible (covers reopening the PWA) and on a periodic timer.
+    onRegisteredSW(_swUrl, r) {
+      if (!r) return;
+      const check = () => { if (document.visibilityState === 'visible') r.update(); };
+      document.addEventListener('visibilitychange', check);
+      window.addEventListener('focus', check);
+      setInterval(check, UPDATE_CHECK_INTERVAL);
+      r.update(); // also check once right after registration
+    },
+  });
 
   if (!needRefresh) return null;
 

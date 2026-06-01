@@ -67,9 +67,19 @@ if (process.env.NODE_ENV === 'production') {
   const landingPath = join(__dirname, '../../landing-page');
   const clientDistPath = join(__dirname, '../../client/dist');
 
-  // App lives at /app/*
-  app.use('/app', express.static(clientDistPath));
+  // App lives at /app/*. The service worker, the SPA entry HTML, and the web
+  // manifest must NEVER be held in a stale cache — they're how the PWA discovers
+  // a new build (index.html points at the content-hashed bundle; sw.js drives the
+  // update). Force revalidation on those; the hashed assets keep default
+  // (effectively immutable) caching.
+  const noCacheFiles = /(?:sw\.js|workbox-[^/]+\.js|index\.html|manifest\.webmanifest|registerSW\.js)$/;
+  app.use('/app', express.static(clientDistPath, {
+    setHeaders: (res, filePath) => {
+      if (noCacheFiles.test(filePath)) res.setHeader('Cache-Control', 'no-cache');
+    },
+  }));
   app.get('/app/*', (req, res) => {
+    res.set('Cache-Control', 'no-cache');
     res.sendFile(join(clientDistPath, 'index.html'));
   });
 
