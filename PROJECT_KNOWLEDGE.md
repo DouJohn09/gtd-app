@@ -614,6 +614,15 @@ Cross-cutting effort to make AI suggestions more trustworthy. Insight from FEATU
 
 ---
 
+## Known Issues (unresolved)
+
+- **🐛 [OPEN] Mobile: tapping a task does NOT open its detail (TaskModal).** Reported 2026-06-01 on **Android Chrome**. In the Weekly Review (where opening detail is the primary interaction) tapping a task does nothing; the action pills (done/someday/delete) and the new Get-Creative buttons work fine. User confirmed it on a fresh online Chrome load (not the PWA), so it is **not** a stale-service-worker cache, and the live bundle was verified to contain the latest code.
+  - **Ruled out:** stale cache (fresh load reproduces); `TaskModal` throwing (it defaults every field via `|| ''`, can't crash on review task objects); the deploy pipeline (prod bundle confirmed current).
+  - **Tried, did NOT fix:** reverting `TaskCard` title from `<div role="button">` back to a real `<button>` (commit `052ea68`) — the hypothesis was that the `<button>`→`<div>` change in `3e3a183` made the title an unreliable touch target. Still broken after redeploy + clean reload.
+  - **Next steps:** reproduce on an emulated Android viewport — needs the browser-automation tool installed (`sudo npm i -g agent-browser`, requires user OK) OR have the user capture the Chrome DevTools **console** (red errors?) and check whether `onEdit`/`setEditingTask` fires on tap at all. Hypotheses to test: (a) the tap fires but the modal mounts and is immediately dismissed by a touch "click-through" hitting the backdrop's `onClose`; (b) an overlay/stacking issue hides or intercepts the modal on mobile; (c) the title tap genuinely isn't firing. Local repro harness: mint a JWT with the server's `JWT_SECRET` for a user with tasks, inject into `localStorage.token`, load the Vite dev app (`/api` is proxied to :3001), emulate Android.
+
+---
+
 ## Build Backlog (Prioritized)
 
 Features to build, ordered by impact and launch-readiness.
