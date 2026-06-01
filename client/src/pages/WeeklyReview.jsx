@@ -7,6 +7,7 @@ import QuickCapture from '../components/QuickCapture';
 import TaskCard from '../components/TaskCard';
 import TaskModal from '../components/TaskModal';
 import MonoLabel from '../components/ui/MonoLabel';
+import { linkify } from '../lib/linkify.jsx';
 
 const STEPS = [
   { num: 1, label: 'Get Clear',   tone: 'amber' },
@@ -505,7 +506,7 @@ export default function WeeklyReview() {
                           style={{ background: 'rgba(255,255,255,0.02)', boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.05)' }}
                         >
                           <div className="min-w-0">
-                            <p className="text-[13px] font-medium text-text-1 truncate">{item.title}</p>
+                            <p className="text-[13px] font-medium text-text-1 truncate">{linkify(item.title)}</p>
                             <p className="font-mono text-[10.5px] text-text-3 mt-0.5">{item.days_stale}d · {item.reason}</p>
                           </div>
                           {actionable ? (
@@ -584,7 +585,7 @@ export default function WeeklyReview() {
                           style={{ background: 'rgba(255,255,255,0.02)', boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.05)' }}
                         >
                           <div className="min-w-0">
-                            <p className="text-[13px] font-medium text-text-1">{item.title}</p>
+                            <p className="text-[13px] font-medium text-text-1">{linkify(item.title)}</p>
                             <p className="text-[12px] text-text-2 mt-0.5">
                               {item.waiting_for_person && <span className="font-mono text-[11px] text-rose-glow">{item.waiting_for_person}</span>}
                               {item.waiting_for_person && ' · '}

@@ -6,6 +6,7 @@ import SortDropdown, { sortTasks } from '../components/SortDropdown';
 import FilterDropdown, { useTaskFilters, applyFilters } from '../components/FilterDropdown';
 import MonoLabel from '../components/ui/MonoLabel';
 import ConfirmModal from '../components/ui/ConfirmModal';
+import { linkify } from '../lib/linkify.jsx';
 
 function TaskRow({ task, onRestore, onDelete }) {
   return (
@@ -20,7 +21,7 @@ function TaskRow({ task, onRestore, onDelete }) {
         <Check className="w-3.5 h-3.5 text-bg" strokeWidth={3} />
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-[13.5px] text-text-2 line-through truncate">{task.title}</p>
+        <p className="text-[13.5px] text-text-2 line-through truncate">{linkify(task.title)}</p>
         {task.context && (
           <span className="font-mono text-[10.5px] text-text-3">@{task.context}</span>
         )}

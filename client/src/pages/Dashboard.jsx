@@ -7,6 +7,7 @@ import {
 import { api } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import { isOverdue, formatCompletionToast } from '../lib/dateUtils';
+import { linkify } from '../lib/linkify.jsx';
 import { useToast } from '../components/Toast';
 import TaskModal from '../components/TaskModal';
 import SortDropdown, { sortTasks } from '../components/SortDropdown';
@@ -324,7 +325,7 @@ function FocusRow({ task, first, onToggle, onEdit }) {
       <FreshCheck checked={isDone} onChange={onToggle} className="mt-0.5" />
       <button onClick={onEdit} className="flex-1 min-w-0 text-left">
         <div className={`text-[14.5px] leading-snug [overflow-wrap:anywhere] ${isDone ? 'line-through opacity-50' : ''}`}>
-          {task.title}
+          {linkify(task.title)}
         </div>
         <div className="mt-2 flex flex-wrap items-center gap-2">
           {task.list && (

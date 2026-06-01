@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Sparkles, Inbox, Target, CheckCircle2, ArrowRight, FileText, Upload, Copy, Trash2, Check, Pencil, X } from 'lucide-react';
 import { api } from '../lib/api';
 import MonoLabel from '../components/ui/MonoLabel';
+import { linkify } from '../lib/linkify.jsx';
 
 const LIST_OPTIONS = [
   { value: 'inbox', label: 'inbox' },
@@ -460,7 +461,7 @@ export default function AIAssistant() {
                       </span>
                       <div className="min-w-0 flex-1">
                         <div className={`text-[13px] font-medium text-text-1 ${kept ? '' : 'line-through'}`}>
-                          {prioritiesResult.tasks[item.task_index - 1]?.title}
+                          {linkify(prioritiesResult.tasks[item.task_index - 1]?.title)}
                         </div>
                         {kept && conf && (
                           <span
@@ -576,7 +577,7 @@ export default function AIAssistant() {
                               dupSelected.has(task.id) ? 'line-through text-text-3' : 'text-text-1'
                             }`}
                           >
-                            {task.title}
+                            {linkify(task.title)}
                           </span>
                           {!dupSelected.has(task.id) && (
                             <span
@@ -724,7 +725,7 @@ export default function AIAssistant() {
                           placeholder="Title"
                         />
                       ) : (
-                        <span className="text-[13.5px] font-medium text-text-1">{item.title}</span>
+                        <span className="text-[13.5px] font-medium text-text-1">{linkify(item.title)}</span>
                       )}
                       {!editing && item.notes && (
                         <p className="text-[11.5px] text-text-3 mt-0.5">{item.notes}</p>

@@ -1,4 +1,5 @@
 import { Check, Clock, Zap, Tag, FolderOpen, User, ExternalLink, Repeat, CalendarClock } from 'lucide-react';
+import { siteLabel, linkify } from '../lib/linkify.jsx';
 
 const ENERGY_TONES = {
   low: 'mint',
@@ -32,44 +33,6 @@ function formatScheduledTime(time) {
   const ampm = h < 12 ? 'am' : 'pm';
   const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
   return m === 0 ? `${h12}${ampm}` : `${h12}:${String(m).padStart(2, '0')}${ampm}`;
-}
-
-// Friendly site name for a URL: the registrable domain label, no subdomain/TLD.
-// e.g. https://app.fireflies.ai/ -> "fireflies", https://github.com/x -> "github".
-function siteLabel(url) {
-  try {
-    const host = new URL(url).hostname.replace(/^www\./, '');
-    const parts = host.split('.');
-    return parts.length >= 2 ? parts[parts.length - 2] : host;
-  } catch {
-    return 'link';
-  }
-}
-
-// Render a string with any inline URLs turned into clickable links, shown as the
-// friendly site label (e.g. "fireflies") rather than the raw URL. Used for the
-// title, where a URL may live in the text itself (e.g. "Check https://…"). The
-// link stops propagation so clicking it opens the URL instead of the task modal.
-const URL_SPLIT = /(https?:\/\/[^\s]+)/g;
-function linkify(text) {
-  if (!text) return text;
-  return text.split(URL_SPLIT).map((part, i) => {
-    if (!/^https?:\/\//i.test(part)) return part;
-    const href = part.replace(/[.,;:!?)\]}>'"]+$/, '');
-    // A <span> (not <a>) so it's valid inside the title <button>; opens via
-    // window.open and stops propagation so it doesn't also trigger the task open.
-    return (
-      <span
-        key={i}
-        role="link"
-        title={href}
-        onClick={(e) => { e.stopPropagation(); window.open(href, '_blank', 'noopener,noreferrer'); }}
-        className="text-mint-glow underline decoration-mint/40 hover:decoration-mint cursor-pointer [overflow-wrap:anywhere]"
-      >
-        {siteLabel(href)}
-      </span>
-    );
-  });
 }
 
 export default function TaskCard({ task, onComplete, onEdit, showList = false, queued = false }) {

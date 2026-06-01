@@ -13,6 +13,7 @@ import Chip from '../components/ui/Chip';
 import MonoLabel from '../components/ui/MonoLabel';
 import FreshCheck from '../components/ui/FreshCheck';
 import ConfirmModal from '../components/ui/ConfirmModal';
+import { linkify } from '../lib/linkify.jsx';
 
 const TONE_CYCLE = ['violet', 'mint', 'amber', 'rose'];
 const toneFor = (id) => TONE_CYCLE[(Number(id) || 0) % TONE_CYCLE.length];
@@ -588,7 +589,7 @@ function ProjectTaskList({ project, expandedData, onComplete, onEdit, onMove }) 
               <button onClick={() => onEdit(task)} className="flex-1 min-w-0 text-left">
                 <div className={`text-[14px] leading-snug [overflow-wrap:anywhere] ${isOptDone ? 'line-through opacity-50' : ''}`}>
                   {isQueued && <span className="font-mono text-[10.5px] text-text-3 mr-2">queued</span>}
-                  {task.title}
+                  {linkify(task.title)}
                 </div>
                 <div className="mt-1.5 flex flex-wrap items-center gap-2">
                   {task.context && <Chip tone="violet">@{task.context}</Chip>}
