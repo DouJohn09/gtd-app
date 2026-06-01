@@ -323,7 +323,7 @@ function FocusRow({ task, first, onToggle, onEdit }) {
       className={`group flex items-start gap-4 py-4 ${first ? '' : 'border-t border-white/[0.05]'}`}
     >
       <FreshCheck checked={isDone} onChange={onToggle} className="mt-0.5" />
-      <button onClick={onEdit} className="flex-1 min-w-0 text-left">
+      <button onClick={onEdit} className="flex-1 min-w-0 text-left select-none [touch-action:manipulation]">
         <div className={`text-[14.5px] leading-snug [overflow-wrap:anywhere] ${isDone ? 'line-through opacity-50' : ''}`}>
           {linkify(task.title)}
         </div>

@@ -79,7 +79,7 @@ export default function TaskCard({ task, onComplete, onEdit, showList = false, q
         <button
           type="button"
           onClick={() => onEdit?.(task)}
-          className={`block w-full text-left text-[14px] font-medium leading-snug transition-colors hover:text-violet-glow [overflow-wrap:anywhere] ${isCompleted ? 'line-through text-text-3' : 'text-text-1'}`}
+          className={`block w-full text-left text-[14px] font-medium leading-snug transition-colors hover:text-violet-glow [overflow-wrap:anywhere] select-none [touch-action:manipulation] ${isCompleted ? 'line-through text-text-3' : 'text-text-1'}`}
         >
           {linkify(task.title)}
         </button>
