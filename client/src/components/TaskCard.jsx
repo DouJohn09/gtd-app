@@ -56,18 +56,18 @@ function linkify(text) {
   return text.split(URL_SPLIT).map((part, i) => {
     if (!/^https?:\/\//i.test(part)) return part;
     const href = part.replace(/[.,;:!?)\]}>'"]+$/, '');
+    // A <span> (not <a>) so it's valid inside the title <button>; opens via
+    // window.open and stops propagation so it doesn't also trigger the task open.
     return (
-      <a
+      <span
         key={i}
-        href={href}
-        target="_blank"
-        rel="noopener noreferrer"
+        role="link"
         title={href}
-        onClick={(e) => e.stopPropagation()}
-        className="text-mint-glow underline decoration-mint/40 hover:decoration-mint [overflow-wrap:anywhere]"
+        onClick={(e) => { e.stopPropagation(); window.open(href, '_blank', 'noopener,noreferrer'); }}
+        className="text-mint-glow underline decoration-mint/40 hover:decoration-mint cursor-pointer [overflow-wrap:anywhere]"
       >
         {siteLabel(href)}
-      </a>
+      </span>
     );
   });
 }
@@ -113,15 +113,13 @@ export default function TaskCard({ task, onComplete, onEdit, showList = false, q
 
       {/* Body */}
       <div className="flex-1 min-w-0">
-        <div
+        <button
+          type="button"
           onClick={() => onEdit?.(task)}
-          role="button"
-          tabIndex={0}
-          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onEdit?.(task); } }}
-          className={`block w-full text-left text-[14px] font-medium leading-snug transition-colors hover:text-violet-glow [overflow-wrap:anywhere] cursor-pointer ${isCompleted ? 'line-through text-text-3' : 'text-text-1'}`}
+          className={`block w-full text-left text-[14px] font-medium leading-snug transition-colors hover:text-violet-glow [overflow-wrap:anywhere] ${isCompleted ? 'line-through text-text-3' : 'text-text-1'}`}
         >
           {linkify(task.title)}
-        </div>
+        </button>
 
         {notesText && (
           <p className="text-[12px] text-text-3 mt-1 line-clamp-2 leading-relaxed [overflow-wrap:anywhere]">{notesText}</p>
