@@ -210,7 +210,7 @@ OTHER RULES:
   - Input: "Work GTD app project: make URL or the bookmark in the URL not say GTD app." → BAD title: "URL bookmark name". GOOD title: "Rename the URL/bookmark so it doesn't say 'GTD app'".
   - Input: "Ping Sarah next week about whether the Q3 forecast assumes the new pricing." → BAD title: "Sarah Q3 pricing". GOOD title: "Ask Sarah whether the Q3 forecast assumes the new pricing".
 - DO NOT invent action verbs. If the user typed a noun phrase ("birthday gift", "tax stuff", "groceries"), leave the title as a noun phrase. Inventing "Buy …" or "Handle …" disguises ambiguity that the user should resolve.
-- Detect "waiting for [person]" patterns → list: waiting_for, extract person name.
+- Detect GENUINE delegation/blocking only → list: waiting_for, set waiting_for_person to the name. This requires explicit "waiting for X", "waiting on X", "X needs to…", "delegated to X", "X owes me…", "until X sends/replies/responds". Do NOT set waiting_for_person for mere attribution or mentions — e.g. "from Christian", "task from the meeting", "Sarah said…", "re: John", "per Alex". A name appearing in the text is NOT delegation. If you are not confident the user is blocked on that person, leave waiting_for_person null and do NOT use the waiting_for list.
 - Detect vague/aspirational items ("someday", "maybe", "one day", "would be nice") → list: someday_maybe.
 - Default to next_actions if the task is clearly actionable.
 - Only use inbox if the input is genuinely ambiguous or needs clarification.
@@ -248,7 +248,7 @@ Respond with JSON:
   "duration": "minutes as number or null",
   "find_free_slot": "boolean — true if user wants the server to find an open slot",
   "is_daily_focus": boolean,
-  "waiting_for_person": "person name or null",
+  "waiting_for_person": "name ONLY when the task is genuinely blocked on/delegated to that person (explicit 'waiting for/on X', 'X needs to', 'delegated to X'). null for mere attribution/mentions like 'from X' or 'X said'.",
   "project_name": "exact project name from list or null",
   "recurrence_rule": "daily|weekly|monthly|yearly|weekdays|custom|null",
   "recurrence_interval": number or null,
@@ -430,7 +430,7 @@ Respond with JSON:
       "context": "${contextOptions}|null",
       "project_name": "exact name from list above, or null",
       "due_date": "YYYY-MM-DD or null",
-      "waiting_for_person": "name of person if recommended_list is waiting_for, else null",
+      "waiting_for_person": "name ONLY when genuinely blocked on/delegated to that person (explicit 'waiting for/on X', 'X needs to', 'delegated to X') AND recommended_list is waiting_for. null for mere attribution/mentions like 'from X' or 'X said'.",
       "is_daily_focus": boolean (true only if clearly urgent/today),
       "priority": 1-5,
       "energy_level": "low|medium|high|null",

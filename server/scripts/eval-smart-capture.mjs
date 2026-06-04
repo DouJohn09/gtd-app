@@ -52,11 +52,19 @@ const CASES = [
   { input: 'groceries', expect: { confidence: ['low'] } },
   { input: 'follow up', expect: { confidence: ['low'] } },
   // --- life-domain context preference ---
-  { input: 'email Sarah about the Q3 budget', expect: { context: ['Work'] } },
+  { input: 'email Sarah about the Q3 budget', expect: { context: ['Work'], waiting_for_person: 'null' } },
   { input: 'pick up dry cleaning', expect: { context: ['Errands', 'Personal'] } },
   // --- list routing ---
-  { input: 'waiting for John to send the signed contract', expect: { list: 'waiting_for', waiting_for_person: 'John' } },
   { input: 'maybe learn to play guitar someday', expect: { list: 'someday_maybe' } },
+  // --- waiting_for TRUE positives (genuine delegation/blocking) ---
+  { input: 'waiting for John to send the signed contract', expect: { list: 'waiting_for', waiting_for_person: 'John' } },
+  { input: 'waiting on Priya to approve the budget', expect: { list: 'waiting_for', waiting_for_person: 'Priya' } },
+  { input: 'need Mark to send me the API keys before I can deploy', expect: { list: 'waiting_for', waiting_for_person: 'Mark' } },
+  { input: 'delegated the slides to Tom', expect: { list: 'waiting_for', waiting_for_person: 'Tom' } },
+  // --- waiting_for FALSE-positive guards (attribution/mention is NOT delegation) ---
+  { input: 'update the deck from Christian', expect: { list: 'next_actions', waiting_for_person: 'null' } },
+  { input: 'task from the standup: refactor the auth module', expect: { waiting_for_person: 'null' } },
+  { input: 'Sarah said the staging API is down, look into it', expect: { waiting_for_person: 'null' } },
   // --- scheduling intent ---
   { input: 'find me 30 minutes tomorrow to review the deck', expect: { find_free_slot: true, due: d(1) } },
   { input: 'lunch with Alex at noon tomorrow', expect: { scheduled_time: '12:00', due: d(1) } },
@@ -82,7 +90,11 @@ function check(expect, ai) {
   }
   if (expect.find_free_slot !== undefined) out.push({ f: 'free_slot', ok: !!ai.find_free_slot === expect.find_free_slot, got: ai.find_free_slot, want: expect.find_free_slot });
   if (expect.scheduled_time !== undefined) out.push({ f: 'sched_time', ok: ai.scheduled_time === expect.scheduled_time, got: ai.scheduled_time, want: expect.scheduled_time });
-  if (expect.waiting_for_person !== undefined) out.push({ f: 'waiting_for', ok: (ai.waiting_for_person || '').toLowerCase().includes(expect.waiting_for_person.toLowerCase()), got: ai.waiting_for_person, want: expect.waiting_for_person });
+  if (expect.waiting_for_person !== undefined) {
+    const got = (ai.waiting_for_person || '').toLowerCase();
+    const ok = expect.waiting_for_person === 'null' ? !got : got.includes(expect.waiting_for_person.toLowerCase());
+    out.push({ f: 'waiting_for', ok, got: ai.waiting_for_person, want: expect.waiting_for_person });
+  }
   return out;
 }
 
