@@ -10,7 +10,8 @@ router.get('/', async (req, res) => {
     const projects = await ProjectModel.getAll(req.user.id);
     res.json(projects);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error(error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -22,7 +23,8 @@ router.get('/:id', async (req, res) => {
     }
     res.json(project);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error(error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -31,7 +33,8 @@ router.post('/', async (req, res) => {
     const project = await ProjectModel.create(req.body, req.user.id);
     res.status(201).json(project);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error(error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -43,7 +46,8 @@ router.put('/:id', async (req, res) => {
     }
     res.json(project);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error(error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -52,7 +56,8 @@ router.delete('/:id', async (req, res) => {
     await ProjectModel.delete(req.params.id, req.user.id);
     res.status(204).send();
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error(error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -69,7 +74,8 @@ router.post('/:id/breakdown', async (req, res) => {
     const breakdown = await suggestProjectBreakdown(project, userContexts);
     res.json(breakdown);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error(error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -91,7 +97,8 @@ router.post('/:id/apply-breakdown', async (req, res) => {
 
     res.json(createdTasks);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error(error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -104,7 +111,8 @@ router.post('/:id/reorder', async (req, res) => {
     const tasks = await TaskModel.reorderTasks(req.params.id, taskIds, req.user.id);
     res.json(tasks);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error(error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 

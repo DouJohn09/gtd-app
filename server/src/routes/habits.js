@@ -34,7 +34,8 @@ router.get('/', async (req, res) => {
 
     res.json(result);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error(error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -110,7 +111,8 @@ router.get('/stats', async (req, res) => {
 
     res.json({ habits: habitStats, heatmap });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error(error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -140,7 +142,8 @@ router.post('/', async (req, res) => {
     habit.completed_today = false;
     res.status(201).json(habit);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error(error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -178,7 +181,8 @@ router.put('/:id', async (req, res) => {
     habit.target_days = habit.target_days ? JSON.parse(habit.target_days) : null;
     res.json(habit);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error(error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -192,7 +196,8 @@ router.delete('/:id', async (req, res) => {
     );
     res.status(204).send();
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error(error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -217,7 +222,8 @@ router.post('/:id/toggle', async (req, res) => {
       res.json({ completed: true, date });
     }
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error(error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 

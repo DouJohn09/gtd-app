@@ -11,7 +11,8 @@ router.get('/', async (req, res) => {
     );
     res.json(rows);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error(error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -36,7 +37,7 @@ router.post('/', async (req, res) => {
     if (error.code === '23505') {
       return res.status(409).json({ error: 'Context already exists' });
     }
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -48,7 +49,8 @@ router.delete('/:id', async (req, res) => {
     );
     res.status(204).send();
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error(error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 

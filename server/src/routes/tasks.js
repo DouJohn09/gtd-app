@@ -12,7 +12,8 @@ router.get('/', async (req, res) => {
     const tasks = await TaskModel.getAll(list || null, req.user.id);
     res.json(tasks);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error(error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -23,7 +24,8 @@ router.get('/deferred', async (req, res) => {
     const tasks = await TaskModel.getDeferred(list, req.user.id);
     res.json(tasks);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error(error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -32,7 +34,8 @@ router.get('/stats', async (req, res) => {
     const stats = await TaskModel.getStats(req.user.id);
     res.json(stats);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error(error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -41,7 +44,8 @@ router.get('/daily-focus', async (req, res) => {
     const tasks = await TaskModel.getDailyFocus(req.user.id);
     res.json(tasks);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error(error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -63,7 +67,8 @@ router.get('/calendar', async (req, res) => {
 
     res.json({ scheduled, unscheduled, googleEvents });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error(error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -75,7 +80,8 @@ router.get('/:id', async (req, res) => {
     }
     res.json(task);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error(error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -85,7 +91,8 @@ router.post('/', async (req, res) => {
     res.status(201).json(task);
     syncTaskToCalendar(req.user.id, task, req.clientTimezone).catch(err => console.error('syncTaskToCalendar (create):', err));
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error(error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -98,7 +105,8 @@ router.put('/:id', async (req, res) => {
     res.json(task);
     syncTaskToCalendar(req.user.id, task, req.clientTimezone).catch(err => console.error('syncTaskToCalendar (update):', err));
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error(error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -113,7 +121,8 @@ router.delete('/:id', async (req, res) => {
       deleteTaskFromCalendar(req.user.id, eventId).catch(err => console.error('deleteTaskFromCalendar:', err));
     }
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error(error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -130,7 +139,8 @@ router.post('/:id/complete', async (req, res) => {
       syncTaskToCalendar(req.user.id, task, req.clientTimezone).catch(err => console.error('syncTaskToCalendar (complete recurring):', err));
     }
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error(error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -147,7 +157,8 @@ router.post('/:id/analyze', async (req, res) => {
     const analysis = await analyzeTask(task, userContexts);
     res.json(analysis);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error(error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 

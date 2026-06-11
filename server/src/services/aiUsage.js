@@ -48,22 +48,30 @@ async function increment(userId, weight) {
 }
 
 // Charge `weight` AI calls against today's budget. Increments only when allowed,
-// so a throttled request never inflates the counter. The read-then-write isn't
-// transactional, so two concurrent calls at the boundary could both pass — fine
-// for a soft cost valve (worst case: a user squeaks 1–2 calls over the cap).
+// so a throttled request never inflates the counter. Check-and-increment happens
+// in a single statement: the upsert's WHERE clause only lets the increment
+// through while under the cap, so concurrent requests at the boundary can't
+// both slip past. No row returned = over budget.
 export async function consume(userId, weight = 1) {
   const limit = await limitFor(userId);
-  const used = await getUsageToday(userId);
   const unlimited = limit <= 0;
-  const allowed = unlimited || used < limit;
-  if (allowed) await increment(userId, weight);
-  const newUsed = allowed ? used + weight : used;
+  const { rows } = await pool.query(
+    `INSERT INTO ai_usage (user_id, usage_date, count)
+     VALUES ($1, $2, $3)
+     ON CONFLICT (user_id, usage_date)
+     DO UPDATE SET count = ai_usage.count + EXCLUDED.count
+     WHERE $4::boolean OR ai_usage.count < $5::int
+     RETURNING count`,
+    [userId, today(), weight, unlimited, limit]
+  );
+  const allowed = rows.length > 0;
+  const used = allowed ? rows[0].count : await getUsageToday(userId);
   return {
     allowed,
-    used: newUsed,
+    used,
     limit: unlimited ? null : limit,
     unlimited,
-    remaining: unlimited ? null : Math.max(0, limit - newUsed),
+    remaining: unlimited ? null : Math.max(0, limit - used),
   };
 }
 

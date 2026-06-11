@@ -1,4 +1,6 @@
 import OpenAI from 'openai';
+import { lookup } from 'node:dns/promises';
+import net from 'node:net';
 
 // Provider clients. OpenAI is the paid/reliable baseline; Groq is the fast,
 // free, privacy-safe (Groq does not train on API data) provider for the
@@ -627,6 +629,48 @@ function extractMeta(html, property, attr = 'property') {
   return '';
 }
 
+// SSRF guard: the URL is user-supplied and this server runs on Railway, so a
+// fetch must never reach loopback, LAN, link-local (cloud metadata at
+// 169.254.169.254), or other non-routable ranges — directly or via redirect.
+function isPrivateIp(ip) {
+  if (net.isIP(ip) === 6) {
+    const v6 = ip.toLowerCase();
+    if (v6 === '::' || v6 === '::1') return true;
+    if (/^(fc|fd|fe[89ab])/.test(v6)) return true; // ULA fc00::/7, link-local fe80::/10
+    const mapped = v6.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/);
+    return mapped ? isPrivateIp(mapped[1]) : false;
+  }
+  const parts = ip.split('.').map(Number);
+  if (parts.length !== 4 || parts.some(Number.isNaN)) return true;
+  const [a, b] = parts;
+  return a === 0 || a === 10 || a === 127
+    || (a === 100 && b >= 64 && b <= 127)   // CGNAT
+    || (a === 169 && b === 254)             // link-local / cloud metadata
+    || (a === 172 && b >= 16 && b <= 31)
+    || (a === 192 && b === 168)
+    || (a === 198 && (b === 18 || b === 19)); // benchmarking
+}
+
+async function assertPublicUrl(rawUrl) {
+  const parsed = new URL(rawUrl); // throws on garbage
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    throw new Error('Only http(s) URLs are allowed');
+  }
+  const host = parsed.hostname.replace(/^\[|\]$/g, ''); // strip IPv6 brackets
+  const addrs = net.isIP(host)
+    ? [{ address: host }]
+    : await lookup(host, { all: true });
+  if (addrs.some(({ address }) => isPrivateIp(address))) {
+    throw new Error('URL resolves to a non-public address');
+  }
+}
+
+const FETCH_HEADERS = {
+  'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
+  'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+  'Accept-Language': 'en-US,en;q=0.9',
+};
+
 export async function extractUrlMetadata(url) {
   if (!openai && !groq) return null;
 
@@ -640,16 +684,24 @@ export async function extractUrlMetadata(url) {
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 8000);
-    const res = await fetch(url, {
-      signal: controller.signal,
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.9',
-      },
-    });
+    // Redirects are followed manually so every hop gets the same SSRF check —
+    // a public URL 302ing to an internal address must not be fetched.
+    let res;
+    let currentUrl = url;
+    for (let hop = 0; hop < 4; hop++) {
+      await assertPublicUrl(currentUrl);
+      res = await fetch(currentUrl, {
+        signal: controller.signal,
+        redirect: 'manual',
+        headers: FETCH_HEADERS,
+      });
+      const location = res.headers.get('location');
+      if (![301, 302, 303, 307, 308].includes(res.status) || !location) break;
+      currentUrl = new URL(location, currentUrl).toString();
+    }
     clearTimeout(timeout);
-    const html = await res.text();
+    // Cap how much HTML we hold/parse — a hostile page shouldn't OOM the server.
+    const html = (await res.text()).slice(0, 500_000);
 
     pageTitle = html.match(/<title[^>]*>([^<]+)<\/title>/i)?.[1]?.trim() || '';
     ogTitle = extractMeta(html, 'og:title');

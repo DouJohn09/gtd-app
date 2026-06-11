@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import rateLimit from 'express-rate-limit';
 import { OAuth2Client } from 'google-auth-library';
 import jwt from 'jsonwebtoken';
 import { pool } from '../db/pool.js';
@@ -8,7 +9,18 @@ import { exchangeCodeForTokens, revokeCalendarAccess, isCalendarConnected } from
 const router = Router();
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
-router.post('/google', async (req, res) => {
+// Login attempts only — /me is hit on every app load and must stay unthrottled
+// (shared NAT / office IPs would lock legit users out). 20 per 15min per IP is
+// far above any honest login pattern. Needs `trust proxy` (set in index.js) so
+// req.ip is the real client behind Railway's proxy.
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+router.post('/google', loginLimiter, async (req, res) => {
   try {
     const { credential } = req.body;
 
@@ -106,7 +118,8 @@ router.get('/google-calendar/status', requireAuth, async (req, res) => {
     const connected = await isCalendarConnected(req.user.id);
     res.json({ connected });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error(error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -142,7 +155,7 @@ router.delete('/google-calendar', requireAuth, async (req, res) => {
     res.json({ connected: false });
   } catch (error) {
     console.error('Google Calendar disconnect error:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 

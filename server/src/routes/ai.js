@@ -146,7 +146,7 @@ router.post('/smart-capture', async (req, res) => {
     syncTaskToCalendar(req.user.id, task, req.clientTimezone).catch(err => console.error('syncTaskToCalendar (smart-capture):', err));
   } catch (error) {
     console.error('Smart capture error:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -154,7 +154,8 @@ router.get('/usage', async (req, res) => {
   try {
     res.json(await getStatus(req.user.id));
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error(error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -174,7 +175,8 @@ router.post('/process-inbox', enforceAiLimit, async (req, res) => {
     result.tasks = inboxTasks;
     res.json(result);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error(error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -200,7 +202,8 @@ router.post('/apply-inbox-processing', async (req, res) => {
 
     res.json(updatedTasks);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error(error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -228,7 +231,8 @@ router.post('/daily-priorities', enforceAiLimit, async (req, res) => {
     result.tasks = nextActions;
     res.json(result);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error(error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -265,7 +269,8 @@ router.post('/import-notes', enforceAiLimit, async (req, res) => {
 
     res.json(result);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error(error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -294,7 +299,8 @@ router.post('/apply-import', async (req, res) => {
 
     res.json({ count: created.length, tasks: created });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error(error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -316,7 +322,8 @@ router.post('/apply-daily-focus', async (req, res) => {
 
     res.json(updatedTasks);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error(error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -341,7 +348,8 @@ router.post('/find-duplicates', enforceAiLimit, async (req, res) => {
 
     res.json(result);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error(error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -355,7 +363,8 @@ router.post('/apply-duplicates', async (req, res) => {
     await Promise.all(taskIds.map(id => TaskModel.delete(id, req.user.id)));
     res.json({ count: taskIds.length });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error(error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -434,7 +443,8 @@ router.post('/weekly-review', enforceAiLimit, async (req, res) => {
       aiAnalysis: aiAnalysis || { error: 'AI analysis unavailable' },
     });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error(error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -460,7 +470,8 @@ router.post('/complete-review', async (req, res) => {
     const streak = await WeeklyReviewModel.getStreak(userId);
     res.json({ review, streak });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error(error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 

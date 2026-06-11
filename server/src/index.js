@@ -1,6 +1,7 @@
 import './env.js';
 import express from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { pingDb } from './db/pool.js';
@@ -20,8 +21,27 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-app.use(cors());
-app.use(express.json({ limit: '10mb' }));
+// Railway terminates TLS at a single proxy layer; needed so req.ip (rate
+// limiting) reflects the client, not the proxy.
+app.set('trust proxy', 1);
+
+// CSP is off until we can craft a policy that doesn't break Google Identity
+// Services + the landing page's inline scripts; COOP must allow popups or the
+// Google sign-in popup can't talk back to the opener.
+app.use(helmet({
+  contentSecurityPolicy: false,
+  crossOriginEmbedderPolicy: false,
+  crossOriginOpenerPolicy: { policy: 'same-origin-allow-popups' },
+}));
+
+// Prod is same-origin (Express serves the client), so CORS only needs to admit
+// local Vite dev servers. Override with CORS_ORIGINS (comma-separated) if needed.
+const corsOrigins = (process.env.CORS_ORIGINS ||
+  'https://cleartable.app,http://localhost:5173,http://localhost:5174,http://localhost:5175,http://localhost:5176'
+).split(',').map(s => s.trim()).filter(Boolean);
+app.use(cors({ origin: corsOrigins }));
+
+app.use(express.json({ limit: '1mb' }));
 
 app.use((req, _res, next) => {
   const tz = req.get('X-Client-Timezone');
