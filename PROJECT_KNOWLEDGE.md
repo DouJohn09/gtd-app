@@ -481,6 +481,33 @@ One 1,500-word post per week, targeting GTD-intent keywords ("how to do a weekly
 | Week 5+ | Hacker News "Show HN" | Technical story: solo dev, modern stack, honest about constraints. |
 | Week 6+ | Ongoing | Weekly blog post, daily Twitter, Reddit answer cadence. Iterate on product based on user feedback. |
 
+### Demand-Validation & Promotion Research (verified 2026-06-08)
+
+Deep-research pass (24 sources, 25 claims adversarially verified — 16 confirmed, 9 refuted). Only verified findings below.
+
+**Demand-signal hierarchy (high confidence).** Strongest → weakest: (1) **real money / refundable commitment** — pre-sell annual Pro via Stripe or a refundable "founder's offer" pre-order; benchmark: *a paid list of 2,000 (with a $5 deposit) beats a free list of 10,000*, refund rates ~3–5%; (2) paid waitlist; (3) fake-door landing page + paid ads (a tier *below* real money — "clicks aren't customers"); (4) wish-posts / free signups (weakest alone). **Action for Cleartable:** the existing free `waitlist` table is the weakest tier — the highest-signal upgrade is a **refundable discounted founder's pre-sale** on the annual Pro plan (rides on the P0 Stripe work, doubles as validation + early revenue).
+
+**Free venues that survived verification:** Waitlister / LaunchList (permanent free tier to 100 subs; LaunchList paid from $19 one-time) · Product Hunt · Hacker News Show HN · Uneed, Launching Next, TinyLaunch, MicroLaunch, DevHunt, Smol Launch (free tiers; optional $30–99 skip-queue). **Product Hunt reality (medium):** big 24h spike (3k–10k+ visits top products, up to ~30k for #1) that **decays to ~zero within 48h** — launch-day coordination >> the listing.
+
+**Reddit as a demand-mining tool (high):** search exact phrases to surface unmet demand — `"I wish there was an app..."`, `"is there an app that..."`, `"I'd pay $X for..."`, `"why doesn't X exist..."`. Sobering: a study of 9,300+ "I wish there was an app" posts found **productivity is the most-requested *and* most-crowded category** — differentiation (AI Smart Capture, MCP) matters more than the category. r/SideProject (~628K) confirmed for early users/feedback — *show the building journey, a bare link = spam*.
+
+**Don't use for forward-looking demand:** Indie Hackers `/ideas` is retrospective (Stripe-verified-revenue only). The IH *forum* is still a fine free venue (revenue-milestone posts get 5–10x engagement).
+
+**Micro-influencer rates (10K–100K, 2026, high):** IG feed ~$150–500/post (Reels 2–3x) · TikTok ~$200–800/video · YouTube integration ~$500+. ⚠️ These are *lifestyle* baselines — **tech/SaaS/productivity charge 2–3x more** at equal follower count. Cheap entry models: free-early-access-for-review, affiliate. Vet for bought followers / low engagement / vague deliverables.
+
+**Second pass — subreddits + creators (verified 2026-06-08, 23 sources, 16/25 claims confirmed):**
+- **⚠️ Reddit hid public member counts (Sept 2025)** — subreddit pages now show a 7-day "Visitors" metric (28-day rolling avg); raw member counts are mod-only. *Every* member figure below is a third-party-tracker estimate (Hive Index / GummySearch), not Reddit-native. (high)
+- **r/SideProject (~739K) is the clear launch-friendly target** — self-promotion and "I built this" app posts are its *core function*; a solo GTD maker with a build story + feedback ask is welcomed, not removed. Only norms: no bare links, no rapid reposts. (high)
+- **r/SaaS ~716K** (not the ~180K blogs claimed) (high); **r/productivity ~4.2M** (medium — 3.2M still cited by some 2026 blogs).
+- **Best verified creator — Tool Finder / Keep Productive (Francesco D'Alessio):** 450K+ YouTube subs, reviews/compares 1,000+ task apps (live "Todoist vs TickTick (2026)", "16 Best Todoist Alternatives", "Best GTD Task Management Apps" pages), and **openly sells placements: $39 one-off tool listing, $299/mo Platinum** (homepage pin + newsletter ad + rotated ads). Directly actionable. ⚠️ economics lean toward *paid* placement of *known* tools — unverified whether they'd feature a brand-new non-paying app for free. (high)
+- **Secondary creator — Scott Friesen / Simpletivity:** YouTube, does multi-app comparisons (TickTick vs Todoist, Notion, ClickUp) despite a "consolidate your tools" homepage. Sponsorship-readiness not separately verified. (medium)
+
+**⚠️ Refuted — do NOT re-trust (killed in verification, mostly SEO blogs):** Pass-1 productivity-subreddit counts/rules (r/productivity 1.2M/3.2M, r/SaaS ~180K & "affiliate-ban", r/microsaas ~85K/28K, r/indiehackers ~120K/175K); the "self-promo only in a weekly megathread" restriction for r/SaaS & r/SideProject; all BetaList traffic/pricing figures; Carl Pullein as a target (standardized on Todoist — he's the *archetype*, not a fit).
+
+**Still OPEN (env couldn't reach reddit.com directly; GAP-2 under-delivered):** (1) actual rules/sizes for r/gtd, r/microsaas, r/EntrepreneurRideAlong, r/androidapps/iosapps, Notion/Obsidian tool communities — and which *ban* app promotion; (2) the remaining ~6 GTD creators (individual YouTubers/newsletters/X) who review multiple apps and take pitches — only 2 cleared verification; (3) whether Tool Finder / Friesen would cover a non-paying new app. Verify subreddit rules from the live sidebar before posting.
+
+**NOTE:** the Launch Sequence table above still says "Use the lifetime deal as PH-launch incentive," which contradicts the no-lifetime [[monetization]] decision — fix when revising the sequence.
+
 ### Pricing Strategy
 
 Given subscription fatigue and Todoist's backlash ($48 → $60/yr):
