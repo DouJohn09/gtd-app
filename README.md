@@ -18,6 +18,7 @@ A personal productivity application inspired by David Allen's Getting Things Don
 
 ### Prerequisites
 - Node.js 18+
+- Docker (for local PostgreSQL via Docker Compose)
 - OpenAI API key (for AI features + fallback)
 - Groq API key (optional — primary for Smart Capture; falls back to OpenAI if unset). Free, no card, at console.groq.com
 
@@ -41,6 +42,13 @@ export OPENAI_API_KEY=your_api_key_here
 export GROQ_API_KEY=your_groq_key_here   # optional; primary for Smart Capture
 ```
 See `server/.env.example` for the full list (DATABASE_URL, Google OAuth, AI usage caps, etc.).
+
+4. **Set up the database (first run only):**
+```bash
+docker compose up -d db     # starts local PostgreSQL (from repo root)
+cd server
+npm run db:migrate          # applies the schema
+```
 
 ### Running the App
 

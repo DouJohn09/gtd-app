@@ -404,8 +404,8 @@ The product launched internally as "GTD Flow" but pivoted to **Cleartable** befo
 
 The goal is **a few hundred to a few thousand paid users — side-income scale, not unicorn scale.** Concretely:
 
-- **6 months:** 50-200 paid users, $3-10K MRR equivalent. Achievable if P0 infra ships, landing page is live, demo video exists, and Reddit launch happens authentically.
-- **12-18 months:** 500-2,000 paid users, $30-60K ARR. Achievable with sustained founder presence, content cadence, and product iteration.
+- **6 months:** 50-200 paid users (~$1.5-6K ARR at $30/yr founder pricing). Achievable if P0 infra ships, landing page is live, demo video exists, and Reddit launch happens authentically.
+- **12-18 months:** 500-2,000 paid users (~$18-72K ARR at $36/yr list). Achievable with sustained founder presence, content cadence, and product iteration.
 - **Honest constraint:** This is **not** "ship and the cash rolls in." It's a part-time job that pays like a side income. Productivity apps see 30-50% annual churn even when users love them, so growth requires continuous distribution effort, not just a launch spike.
 
 ### Positioning — Niche acquisition, broad utility
@@ -431,19 +431,19 @@ Two deal-breakers for GTD practitioners — **both shipped:**
 1. ~~**Recurring tasks**~~ — Daily/weekdays/weekly/monthly/yearly/custom with absolute or relative recurrence. **Done.**
 2. ~~**Start/defer dates**~~ — Tasks hidden until start date, toggle chip to reveal deferred tasks. **Done.**
 
-Three infrastructure items that **block** taking money:
+Three infrastructure items that **blocked** taking money — Postgres and PWA shipped, landing page live; only the demo video remains:
 
-1. **Migrate off sql.js to persistent Postgres** — Single biggest pre-launch risk. In-memory SQLite means a crash or Railway restart can lose data. The first data-loss incident kills reputation permanently in a community as chatty as r/gtd.
-2. **PWA support** — Installable web app eliminates the "no mobile app" objection without building native.
-3. **Landing page at cleartable.app + demo video** — Needed before any traffic-driving post.
+1. ~~**Migrate off sql.js to persistent Postgres**~~ — ✅ Shipped 2026-05-17 (Railway-managed PG; production data recovered).
+2. ~~**PWA support**~~ — ✅ Shipped 2026-05-31 (installable, update banner).
+3. **Landing page at cleartable.app** ✅ (live 2026-05-17) **+ demo video** (still to record) — video needed before any traffic-driving post.
 
 ### Pre-Launch Checklist (in execution order)
 
 1. **Cleartable.app domain** — ✅ Acquired May 2026 ($12.98/yr first year, $17.98/yr renewal). WhoisGuard enabled.
-2. **Coming-soon landing page** with email capture (Carrd, Framer, or Vercel). Hero, value prop, "join the waitlist" CTA. Live within 1 week of domain purchase. This starts capturing warm leads before the product is publicly available.
-3. **Migrate off sql.js to Postgres on Railway.** P0. No paid signups before this is done.
-4. **PWA support** (manifest, service worker, install prompt). Eliminates the mobile objection.
-5. **Record 75-90s demo video** per `DEMO.md` storyboard. Embed on landing page.
+2. ~~**Coming-soon landing page**~~ — ✅ Live at cleartable.app/ with waitlist email capture (own `/api/waitlist` into PG, 2026-05-17).
+3. ~~**Migrate off sql.js to Postgres on Railway.**~~ — ✅ Shipped 2026-05-17 (incl. production data recovery).
+4. ~~**PWA support**~~ — ✅ Shipped 2026-05-31 (manifest, service worker, install prompt, update banner).
+5. **Record 75-90s demo video** per `DEMO.md` storyboard (60s cut: `DEMO_60S.md`). Embed on landing page.
 6. **Stripe + paywall integration** for Pro tier. Free + Pro feature gates wired in.
 7. **Soft launch on r/gtd** — only after items 1-6 are live. See Launch Sequence below.
 
@@ -477,7 +477,7 @@ One 1,500-word post per week, targeting GTD-intent keywords ("how to do a weekly
 | Week 0 | Blog post #1 | "How to do a weekly review that actually sticks." SEO-targeted. Linked from cleartable.app footer. |
 | Week 1-2 | r/gtd soft launch (80K) | Problem-first post. "I built a GTD app because OmniFocus doesn't work on Windows and FacileThings felt dated." Authentic, no hype. |
 | Week 3 | r/productivity (3.7M) + r/ProductivityApps (30K) | Lead with AI Smart Capture + calendar time-blocking. Calm-positioning, not feature dump. |
-| Week 4 | Product Hunt | "AI-powered calm GTD app." Use the lifetime deal as PH-launch incentive. |
+| Week 4 | Product Hunt | "AI-powered calm GTD app." Use the founder's annual deal ($30/yr, going to $36) as PH-launch incentive. |
 | Week 5+ | Hacker News "Show HN" | Technical story: solo dev, modern stack, honest about constraints. |
 | Week 6+ | Ongoing | Weekly blog post, daily Twitter, Reddit answer cadence. Iterate on product based on user feedback. |
 
@@ -489,7 +489,7 @@ Deep-research pass (24 sources, 25 claims adversarially verified — 16 confirme
 
 **Free venues that survived verification:** Waitlister / LaunchList (permanent free tier to 100 subs; LaunchList paid from $19 one-time) · Product Hunt · Hacker News Show HN · Uneed, Launching Next, TinyLaunch, MicroLaunch, DevHunt, Smol Launch (free tiers; optional $30–99 skip-queue). **Product Hunt reality (medium):** big 24h spike (3k–10k+ visits top products, up to ~30k for #1) that **decays to ~zero within 48h** — launch-day coordination >> the listing.
 
-**Reddit as a demand-mining tool (high):** search exact phrases to surface unmet demand — `"I wish there was an app..."`, `"is there an app that..."`, `"I'd pay $X for..."`, `"why doesn't X exist..."`. Sobering: a study of 9,300+ "I wish there was an app" posts found **productivity is the most-requested *and* most-crowded category** — differentiation (AI Smart Capture, MCP) matters more than the category. r/SideProject (~628K) confirmed for early users/feedback — *show the building journey, a bare link = spam*.
+**Reddit as a demand-mining tool (high):** search exact phrases to surface unmet demand — `"I wish there was an app..."`, `"is there an app that..."`, `"I'd pay $X for..."`, `"why doesn't X exist..."`. Sobering: a study of 9,300+ "I wish there was an app" posts found **productivity is the most-requested *and* most-crowded category** — differentiation (AI Smart Capture, MCP) matters more than the category. r/SideProject (~739K per second-pass verification below) confirmed for early users/feedback — *show the building journey, a bare link = spam*.
 
 **Don't use for forward-looking demand:** Indie Hackers `/ideas` is retrospective (Stripe-verified-revenue only). The IH *forum* is still a fine free venue (revenue-milestone posts get 5–10x engagement).
 
@@ -506,21 +506,19 @@ Deep-research pass (24 sources, 25 claims adversarially verified — 16 confirme
 
 **Still OPEN (env couldn't reach reddit.com directly; GAP-2 under-delivered):** (1) actual rules/sizes for r/gtd, r/microsaas, r/EntrepreneurRideAlong, r/androidapps/iosapps, Notion/Obsidian tool communities — and which *ban* app promotion; (2) the remaining ~6 GTD creators (individual YouTubers/newsletters/X) who review multiple apps and take pitches — only 2 cleared verification; (3) whether Tool Finder / Friesen would cover a non-paying new app. Verify subreddit rules from the live sidebar before posting.
 
-**NOTE:** the Launch Sequence table above still says "Use the lifetime deal as PH-launch incentive," which contradicts the no-lifetime [[monetization]] decision — fix when revising the sequence.
-
 ### Pricing Strategy
 
-Given subscription fatigue and Todoist's backlash ($48 → $60/yr):
+Pricing is set against subscription fatigue and Todoist's backlash ($48 → $60/yr). **No lifetime deal** (decided 2026-05-31) — lifetime buyers are deal-hunters, not recurring-revenue validators, and lifetime + recurring AI cost is structurally unsound. The launch deal is a **refundable founder's annual pre-sale** instead:
 
 | Tier | Price | What |
 |------|-------|------|
-| Free | $0 | Core GTD (inbox, lists, projects, contexts, manual capture). Heavy AI usage rate-limited. |
-| Pro | $3/mo or $30/yr | Unlimited AI (Smart Capture, Process Inbox, Daily Focus, Find Duplicates, Weekly Review AI), calendar sync, habits, analytics |
-| Lifetime | $80 one-time | Everything forever (limited-time launch offer; first 100 buyers) |
+| Free | $0 | Core GTD (inbox, projects, contexts, recurring, defer, calendar) · saved filters · **8 projects** · **1 custom list** · **3 habits** · AI capture with a low soft daily cap → raw manual fallback |
+| Pro | **$4/mo or $36/yr** | Unlimited projects / custom lists / habits · analytics dashboard · much higher AI soft cap |
+| Founder's pre-sale | **$30/yr** (refundable, launch window only) | Pro annual at a discount — doubles as demand validation + early revenue, rides on the P0 Stripe work |
 
-**Why these numbers work:** $30/yr undercuts Todoist Pro ($60/yr) and TickTick Pro ($36/yr) while still requiring real commitment. Lifetime at $80 generates upfront cash for OpenAI API costs and gives launch communities a deal they share. Things 3 proved the lifetime model works.
+**Why these numbers work:** $36/yr matches TickTick Pro and undercuts Todoist Pro ($60/yr); the $30 founder price gives launch communities a real, honest deal ("$30 founder annual, going to $36") instead of a low list price discounted further. Pre-sale revenue covers AI/API costs and is the strongest willingness-to-pay signal (see demand-signal hierarchy above).
 
-**AI cost discipline:** Smart Capture and Process Inbox call OpenAI on every use. A heavy free user could cost more than they generate. Free tier must enforce daily AI call limits (e.g., 20/day) and push heavy AI usage behind the paywall. Track per-user cost monthly; it's the single biggest margin lever.
+**AI cost discipline:** Smart Capture and the objective ops run on Groq's free tier with OpenAI as fallback (advisory ops stay on gpt-4o), so marginal AI cost is already low. Free tier still enforces a soft daily AI cap (metering shipped, enforcement currently OFF for calibration — flip on before launch) and degrades to raw capture rather than erroring. Track per-user cost monthly; it's the single biggest margin lever.
 
 ### Growth Channels (No Budget)
 
@@ -536,7 +534,7 @@ Given subscription fatigue and Todoist's backlash ($48 → $60/yr):
 - **Don't build collaboration yet.** Solo GTD users are the beachhead. Family/team is a different market with different feature priorities.
 - **Don't build native mobile apps.** PWA first. Native only after revenue justifies it.
 - **Don't compete on AI hype.** Position AI as friction-reducing, not "AI does everything." Users explicitly distrust the auto-everything pitch (per research).
-- **Don't launch free-only.** Need signal on willingness to pay from day one. Lifetime deal at launch generates that signal.
+- **Don't launch free-only.** Need signal on willingness to pay from day one. The refundable founder's annual pre-sale ($30/yr) generates that signal.
 - **Don't optimize for follower count.** Optimize for DMs and replies. "Does your app support X?" is worth a hundred likes.
 - **Don't bikeshed the brand.** Cleartable is the name. Move on to product and distribution work.
 
@@ -544,12 +542,12 @@ Given subscription fatigue and Todoist's backlash ($48 → $60/yr):
 
 1. ~~Ship recurring tasks + start dates~~ **Done**
 2. ~~Domain registered (cleartable.app)~~ **Done**
-3. Stand up coming-soon landing page with email capture (Carrd or Framer; this week)
-4. Migrate off sql.js to Postgres (next; blocker for paid)
-5. PWA support
-6. Record 75-90s demo video (per DEMO.md)
-7. Stripe paywall + Free/Pro/Lifetime tiers
-8. Soft launch on r/gtd with $30/yr Pro and $80 lifetime offer
+3. ~~Stand up landing page with email capture (cleartable.app + /api/waitlist)~~ **Done**
+4. ~~Migrate off sql.js to Postgres~~ **Done**
+5. ~~PWA support~~ **Done**
+6. Record 75-90s demo video (per DEMO.md / DEMO_60S.md)
+7. Stripe paywall + Free/Pro tiers (no lifetime; MoR-vs-Stripe decision first)
+8. Soft launch on r/gtd with $36/yr Pro and $30/yr refundable founder's pre-sale
 9. Expand to r/productivity + Product Hunt + HN over weeks 3-5
 10. Sustained Reddit + Twitter + blog cadence; iterate based on feedback
 
@@ -666,7 +664,7 @@ Features to build, ordered by impact and launch-readiness.
 | 4 | **AI usage metering + soft-throttle** | The "can't be negative" guarantee, and a prerequisite for #5. Per-user **daily** AI-call counter in Postgres (`ai_usage` table, one row per user/UTC-day); every AI call goes through `services/aiUsage.js`. Smart Capture over budget → degrades to **raw capture** (`throttled:true`); explicit AI actions (process-inbox, daily-priorities, import-notes, find-duplicates, weekly-review, custom-list extract-url) use `middleware/aiLimit.js` → **429 `daily_ai_limit`**. `GET /api/ai/usage` exposes `{tier,used,limit,remaining}`. **Enforcement ships OFF** — `AI_DAILY_LIMIT_FREE`/`_PRO` env, 0/unset = unlimited; counts in prod first so we calibrate the cap before turning it on. Tier resolver is a stub returning `free` until #5 adds `is_pro`. Fails open. | Medium | **Shipped** |
 | 5 | **Payments / paywall (Stripe)** | Users currently have **no way to pay** — strategy exists (tiers in launch plan) but zero payment code in the repo. Stripe Checkout + `is_pro` flag + Free/Pro gating. **No lifetime deal** — chasing willingness-to-pay signal, so launch a **discounted annual Pro** plan instead (lifetime buyers are deal-hunters, not recurring-revenue validators, and lifetime + recurring AI cost is structurally unsound). Tier split below. Merchant-of-record (Lemon Squeezy/Paddle) vs raw Stripe still TBD given EU/CZ VAT. | High | |
 
-**Free / Pro tier split** (decided 2026-05-31):
+**Free / Pro tier split** (decided 2026-05-31; pricing decided 2026-06-11: **$4/mo · $36/yr list, $30/yr refundable founder's pre-sale at launch** — see Pricing Strategy):
 - **Free:** core GTD (inbox, projects, contexts, recurring, defer, calendar) · saved filters · **8 projects** · **1 custom list** (tease) · **3 habits** (tease) · AI capture with a low soft daily cap → raw manual fallback.
 - **Pro:** unlimited projects / custom lists / habits · **analytics dashboard** (#8, hard-walled — purely retrospective, no activation cost) · much higher AI soft cap.
 - Gating principle: **wall "looking-back" features (analytics), capacity-gate "coming-back" features (habits, lists)** so free users taste the value and hit the ceiling as commitment grows. Saved filters stay free (basic refinement of core). #12 (free AI provider) makes even the Pro cap cheap and is what makes the economics safe.
