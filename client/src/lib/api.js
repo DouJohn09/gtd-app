@@ -29,15 +29,22 @@ async function fetchApi(endpoint, options = {}) {
 
   if (!response.ok) {
     let errorMessage = `API error: ${response.statusText}`;
+    let errorData = {};
     try {
-      const errorData = await response.json();
+      errorData = await response.json();
       if (errorData.error) {
         errorMessage = errorData.error;
       }
     } catch (e) {
       // ignore JSON parse error
     }
-    throw new Error(errorMessage);
+    // Surface status + server error code so callers can branch (e.g. a 402
+    // `limit_reached` can trigger an upgrade prompt instead of a generic error).
+    const err = new Error(errorMessage);
+    err.status = response.status;
+    err.code = errorData.code;
+    err.data = errorData;
+    throw err;
   }
 
   if (response.status === 204) {
@@ -154,5 +161,14 @@ export const api = {
   import: {
     preview: (filename, content) => fetchApi('/import/preview', { method: 'POST', body: JSON.stringify({ filename, content }) }),
     commit: (format, payload) => fetchApi('/import/commit', { method: 'POST', body: JSON.stringify({ format, payload }) }),
+  },
+
+  // Public client config (Google client id + Paddle client token/env/prices).
+  config: () => fetchApi('/config'),
+
+  billing: {
+    status: () => fetchApi('/billing/status'),
+    checkout: (plan) => fetchApi('/billing/checkout', { method: 'POST', body: JSON.stringify({ plan }) }),
+    portal: () => fetchApi('/billing/portal'),
   },
 };

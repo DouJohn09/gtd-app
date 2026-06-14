@@ -5,6 +5,7 @@ import jwt from 'jsonwebtoken';
 import { pool } from '../db/pool.js';
 import { requireAuth } from '../middleware/auth.js';
 import { exchangeCodeForTokens, revokeCalendarAccess, isCalendarConnected } from '../services/googleCalendar.js';
+import { isProActive } from '../services/billing.js';
 
 const router = Router();
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
@@ -96,7 +97,8 @@ router.get('/me', async (req, res) => {
     const { rows } = await pool.query(
       `SELECT id, email, name, picture,
               (google_calendar_refresh_token IS NOT NULL OR google_calendar_access_token IS NOT NULL) AS google_calendar_connected,
-              google_calendar_scopes
+              google_calendar_scopes,
+              plan, subscription_status, current_period_end
        FROM users WHERE id = $1`,
       [payload.userId]
     );
@@ -106,6 +108,9 @@ router.get('/me', async (req, res) => {
     user.google_calendar_connected = !!user.google_calendar_connected;
     user.google_calendar_write = (user.google_calendar_scopes || '').includes('https://www.googleapis.com/auth/calendar');
     delete user.google_calendar_scopes;
+    // Derived entitlement the client gates on. Keep current_period_end so the UI
+    // can show "Pro until <date>" for canceled/past-due subscriptions.
+    user.plan = isProActive(user) ? 'pro' : 'free';
     return res.json({ user });
   } catch {
     return res.status(401).json({ error: 'Invalid token' });

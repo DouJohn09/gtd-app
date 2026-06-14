@@ -4,6 +4,7 @@ import { api } from '../lib/api';
 import { useToast } from '../components/Toast';
 import MonoLabel from '../components/ui/MonoLabel';
 import ConfirmModal from '../components/ui/ConfirmModal';
+import BillingSection from '../components/BillingSection';
 
 export default function Settings() {
   const { addToast } = useToast();
@@ -122,7 +123,9 @@ export default function Settings() {
         <p className="text-text-3 text-sm">Account, data, and preferences.</p>
       </header>
 
-      <section className="glass rounded-2xl p-6">
+      <BillingSection />
+
+      <section className="glass rounded-2xl p-6 mt-6">
         <MonoLabel className="mb-2">data</MonoLabel>
         <h2 className="font-display text-xl mb-1">Export your data</h2>
         <p className="text-text-3 text-sm mb-5 leading-relaxed">

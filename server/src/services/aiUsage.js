@@ -1,4 +1,5 @@
 import { pool } from '../db/pool.js';
+import { getUserPlan } from './billing.js';
 
 // Daily AI-call caps per tier. 0 / unset = UNLIMITED (enforcement off). We keep
 // enforcement off by default so this layer can ship to production as a pure
@@ -17,11 +18,11 @@ function today() {
   return new Date().toISOString().split('T')[0];
 }
 
-// Tier resolution is a stub until billing (#5) adds users.is_pro — everyone is
-// 'free' today. When #5 lands, read the flag here and the caps below apply
-// automatically; nothing else in this module changes.
-export async function getTier(_userId) {
-  return 'free';
+// Tier resolution reads the user's live plan (billing #5): a Pro subscription
+// derived from Paddle's synced state, else 'free'. The caps below then apply
+// automatically — nothing else in this module changed.
+export async function getTier(userId) {
+  return getUserPlan(userId);
 }
 
 async function limitFor(userId) {

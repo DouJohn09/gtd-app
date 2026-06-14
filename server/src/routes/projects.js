@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { ProjectModel, TaskModel } from '../db/models.js';
 import { pool } from '../db/pool.js';
 import { suggestProjectBreakdown } from '../services/ai.js';
+import { assertWithinLimit, LimitError } from '../services/billing.js';
 
 const router = Router();
 
@@ -30,9 +31,13 @@ router.get('/:id', async (req, res) => {
 
 router.post('/', async (req, res) => {
   try {
+    await assertWithinLimit(req.user.id, 'projects');
     const project = await ProjectModel.create(req.body, req.user.id);
     res.status(201).json(project);
   } catch (error) {
+    if (error instanceof LimitError) {
+      return res.status(402).json({ error: error.message, code: error.code, resource: error.resource, limit: error.limit });
+    }
     console.error(error);
     res.status(500).json({ error: 'Internal server error' });
   }

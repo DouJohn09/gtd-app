@@ -9,6 +9,7 @@
     "pwa:icons": "node scripts/generate-pwa-icons.js"
   },
   "dependencies": {
+    "@paddle/paddle-js": "^1.6.4",
     "@react-oauth/google": "^0.13.5",
     "lucide-react": "^0.344.0",
     "react": "^18.2.0",

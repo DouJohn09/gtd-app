@@ -16,6 +16,7 @@ import exportRouter from './routes/export.js';
 import importRouter from './routes/import.js';
 import customListsRouter from './routes/customLists.js';
 import waitlistRouter from './routes/waitlist.js';
+import billingRouter, { paddleWebhookHandler } from './routes/billing.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -41,6 +42,11 @@ const corsOrigins = (process.env.CORS_ORIGINS ||
 ).split(',').map(s => s.trim()).filter(Boolean);
 app.use(cors({ origin: corsOrigins }));
 
+// The Paddle webhook must see the exact raw bytes to verify its signature, so
+// it's registered with express.raw BEFORE the global JSON parser. Public route
+// (Paddle calls it); the signature is the auth.
+app.post('/api/billing/webhook', express.raw({ type: 'application/json' }), paddleWebhookHandler);
+
 app.use(express.json({ limit: '1mb' }));
 
 app.use((req, _res, next) => {
@@ -64,14 +70,28 @@ app.use('/api/habits', requireAuth, habitsRouter);
 app.use('/api/export', requireAuth, exportRouter);
 app.use('/api/import', requireAuth, importRouter);
 app.use('/api/custom-lists', requireAuth, customListsRouter);
+app.use('/api/billing', requireAuth, billingRouter);
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// Expose Google Client ID to frontend (safe — this is a public value)
+// Expose public client config to the frontend (all safe-to-publish values):
+// Google client id, plus the Paddle client-side token, environment, and the
+// price ids the upgrade UI offers.
 app.get('/api/config', (req, res) => {
-  res.json({ googleClientId: process.env.GOOGLE_CLIENT_ID });
+  res.json({
+    googleClientId: process.env.GOOGLE_CLIENT_ID,
+    paddle: {
+      clientToken: process.env.PADDLE_CLIENT_TOKEN || null,
+      environment: process.env.PADDLE_ENV || 'sandbox',
+      prices: {
+        monthly: process.env.PADDLE_PRICE_PRO_MONTHLY || null,
+        yearly: process.env.PADDLE_PRICE_PRO_YEARLY || null,
+        founder: process.env.PADDLE_PRICE_FOUNDER || null,
+      },
+    },
+  });
 });
 
 // Static + SPA routing in production:

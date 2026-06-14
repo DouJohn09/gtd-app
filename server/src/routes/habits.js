@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { pool } from '../db/pool.js';
+import { assertWithinLimit, LimitError } from '../services/billing.js';
 
 const router = Router();
 
@@ -123,6 +124,7 @@ router.post('/', async (req, res) => {
     if (!name?.trim()) {
       return res.status(400).json({ error: 'Habit name is required' });
     }
+    await assertWithinLimit(req.user.id, 'habits');
 
     const { rows } = await pool.query(
       `INSERT INTO habits (name, description, frequency, target_days, category, color, user_id)
@@ -142,6 +144,9 @@ router.post('/', async (req, res) => {
     habit.completed_today = false;
     res.status(201).json(habit);
   } catch (error) {
+    if (error instanceof LimitError) {
+      return res.status(402).json({ error: error.message, code: error.code, resource: error.resource, limit: error.limit });
+    }
     console.error(error);
     res.status(500).json({ error: 'Internal server error' });
   }

@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { CustomListModel, ListItemModel } from '../db/models.js';
 import { extractUrlMetadata } from '../services/ai.js';
 import { enforceAiLimit } from '../middleware/aiLimit.js';
+import { assertWithinLimit, LimitError } from '../services/billing.js';
 
 const router = Router();
 
@@ -32,8 +33,14 @@ router.get('/:id', async (req, res) => {
 router.post('/', async (req, res) => {
   try {
     if (!req.body.name?.trim()) return res.status(400).json({ error: 'Name is required' });
+    await assertWithinLimit(req.user.id, 'custom_lists');
     res.status(201).json(await CustomListModel.create(req.body, req.user.id));
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Internal server error' }); }
+  } catch (err) {
+    if (err instanceof LimitError) {
+      return res.status(402).json({ error: err.message, code: err.code, resource: err.resource, limit: err.limit });
+    }
+    console.error(err); res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
 router.put('/:id', async (req, res) => {
