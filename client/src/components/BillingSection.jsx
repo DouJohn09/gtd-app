@@ -8,8 +8,8 @@ import MonoLabel from './ui/MonoLabel';
 
 // Plans offered in-app. Keys match the server's price mapping in routes/billing.js.
 const PLANS = [
-  { key: 'yearly', label: 'Pro · Annual', price: '$36', cadence: '/year', sub: 'Best value · under Todoist Pro', highlight: true },
-  { key: 'monthly', label: 'Pro · Monthly', price: '$4', cadence: '/month', sub: 'Cancel anytime' },
+  { key: 'yearly', label: 'Pro · Annual', price: '$36', cadence: '/year', sub: '~3 months free vs monthly', badge: 'Save 25%', highlight: true },
+  { key: 'monthly', label: 'Pro · Monthly', price: '$4', cadence: '/month', sub: 'Flexible · cancel anytime' },
   { key: 'founder', label: 'Founder', price: '$30', cadence: '/year', sub: 'First 30 buyers · refundable 30 days' },
 ];
 
@@ -144,6 +144,14 @@ export default function BillingSection() {
                 <div className="flex items-center gap-1.5 mb-1">
                   {plan.key === 'founder' && <Sparkles className="w-3.5 h-3.5" style={{ color: 'rgb(var(--violet-glow))' }} />}
                   <span className="text-[12px] font-medium text-text-1">{plan.label}</span>
+                  {plan.badge && (
+                    <span
+                      className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full"
+                      style={{ background: 'rgb(var(--mint) / 0.15)', color: 'rgb(var(--mint))' }}
+                    >
+                      {plan.badge}
+                    </span>
+                  )}
                 </div>
                 <div className="font-display text-2xl text-text-1">
                   {plan.price}
