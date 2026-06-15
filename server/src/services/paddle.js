@@ -51,7 +51,11 @@ export async function createCheckoutTransaction({ priceId, userId, customerId })
 // so a canceled/past-due user keeps Pro until the period they paid for ends.
 async function syncSubscription(sub) {
   const userId = sub.customData?.user_id ?? sub.customData?.userId ?? null;
-  const status = sub.status; // active | trialing | past_due | paused | canceled
+  // Paddle keeps status='active' after a cancel, attaching a scheduledChange
+  // that takes effect at period end. Treat that as 'canceled' so isProActive
+  // keeps Pro until current_period_end and the UI shows the "set to cancel" state.
+  let status = sub.status; // active | trialing | past_due | paused | canceled
+  if (sub.scheduledChange?.action === 'cancel') status = 'canceled';
   const periodEnd = sub.currentBillingPeriod?.endsAt ?? null;
 
   if (userId) {
