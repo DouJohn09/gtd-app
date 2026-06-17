@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Cleartable — Clear your table. Clear your mind.</title>
+  <title>Cleartable — Calm, AI-Powered Task Manager</title>
   <meta name="description" content="A calm, AI-powered task manager built on the principles of Getting Things Done. Capture everything, let AI clarify, review weekly. Never feel behind." />
   <link rel="canonical" href="https://cleartable.app/" />
 
@@ -33,6 +33,94 @@
 
   <!-- Favicon: stylized "ct" sparkle mark -->
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='14' fill='%237C3AED'/><path d='M32 14l3.2 9.8a3.4 3.4 0 002.2 2.2L47 29l-9.8 3.2a3.4 3.4 0 00-2.2 2.2L32 44l-3.2-9.8a3.4 3.4 0 00-2.2-2.2L17 29l9.8-3.2a3.4 3.4 0 002.2-2.2L32 14z' fill='%23fff'/></svg>" />
+
+  <!-- Structured data (JSON-LD) for rich results. FAQ answers mirror the
+       visible FAQ section verbatim, as Google requires for FAQPage markup. -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "Organization",
+        "@id": "https://cleartable.app/#organization",
+        "name": "Cleartable",
+        "url": "https://cleartable.app/",
+        "description": "Cleartable is a calm, AI-powered task manager inspired by the Getting Things Done methodology."
+      },
+      {
+        "@type": "WebApplication",
+        "@id": "https://cleartable.app/#app",
+        "name": "Cleartable",
+        "url": "https://cleartable.app/",
+        "description": "A calm, AI-powered task manager built on the principles of Getting Things Done. Capture everything, let AI clarify, review weekly.",
+        "applicationCategory": "ProductivityApplication",
+        "operatingSystem": "Web, iOS, Android",
+        "browserRequirements": "Requires a modern web browser. Installable as a PWA.",
+        "publisher": { "@id": "https://cleartable.app/#organization" },
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "USD",
+          "description": "Free plan available. Pro is $4/month or $36/year."
+        }
+      },
+      {
+        "@type": "FAQPage",
+        "@id": "https://cleartable.app/#faq",
+        "mainEntity": [
+          {
+            "@type": "Question",
+            "name": "Does it work on mobile?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Yes — Cleartable is a web app that works on any device with a browser. A PWA (installable home-screen app, offline support) is shipping before public launch, so no app store wait."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Do I need to know GTD to use it?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Not at all. The structure (Inbox, Next Actions, Projects, Someday/Maybe) is intuitive even without studying David Allen's book. GTD practitioners get a system built around their methodology; everyone else gets a calm task manager that just works."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Is my data private?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Yes. Your tasks are stored privately, never sold, and never used to train external AI models. AI features call our providers (Groq and OpenAI) on demand only — per their API policies, your input isn't used for training. You can export everything anytime. See our Privacy Policy."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Can I cancel or get a refund?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Anytime. Cancel from Settings and you keep Pro until your period ends — no charge after that. New subscriptions are refundable for 14 days, and the founder pre-sale is fully refundable within its launch window. Details in our Refund Policy."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Can I export my data?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Always. Full JSON backup and Todoist-compatible CSV export are built in. Your data is yours — leave anytime, no lock-in."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Why not just use Todoist or Things?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Todoist treats GTD as an afterthought (no defer dates, no review mode). Things is Apple-only and has no AI. OmniFocus is Apple-only and costs $10/month. Cleartable is cross-platform, GTD-native, and AI-powered — and Pro comes in under Todoist Pro."
+            }
+          }
+        ]
+      }
+    ]
+  }
+  </script>
 </head>
 <body>
 
