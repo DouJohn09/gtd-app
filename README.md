@@ -1,4 +1,4 @@
-# Cleartable — The Calm GTD App
+# Cleartable — The Calm Task App
 
 A personal productivity application inspired by David Allen's Getting Things Done methodology, with AI-powered task processing.
 

@@ -1,0 +1,9 @@
+# Cleartable — robots.txt
+# The public marketing site is crawlable. The app and API are not:
+# /app is a private beta (Google-OAuth gated) and /api is the backend.
+
+User-agent: *
+Disallow: /app/
+Disallow: /api/
+
+Sitemap: https://cleartable.app/sitemap.xml

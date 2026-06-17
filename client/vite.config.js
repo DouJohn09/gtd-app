@@ -32,7 +32,7 @@ export default defineConfig(({ command }) => {
         manifest: {
           name: 'Cleartable',
           short_name: 'Cleartable',
-          description: 'The calm GTD app — capture, clarify, review.',
+          description: 'The calm task app — capture, clarify, review.',
           // Theme + bg colors match the in-app dark aesthetic so the iOS/Android
           // splash screen doesn't flash white before the app loads.
           theme_color: '#0b0b13',
