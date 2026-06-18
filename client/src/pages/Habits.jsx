@@ -198,7 +198,11 @@ export default function Habits() {
                 {categoryHabits.map(habit => (
                   <HabitCard
                     key={habit.id}
-                    habit={{ ...habit, streak: stats?.habits?.find(s => s.id === habit.id)?.streak || 0 }}
+                    habit={{
+                      ...habit,
+                      streak: stats?.habits?.find(s => s.id === habit.id)?.streak || 0,
+                      streakUnit: stats?.habits?.find(s => s.id === habit.id)?.streakUnit || 'day',
+                    }}
                     onToggle={handleToggle}
                     onEdit={(h) => { setEditingHabit(h); setShowModal(true); }}
                     onDelete={setConfirmDeleteId}
@@ -232,7 +236,7 @@ export default function Habits() {
                           {h.completionRate}<span className="text-[16px] text-text-3 ml-0.5">%</span>
                         </div>
                         <div className="font-mono text-[10.5px] text-text-3 mt-1">
-                          {h.completedLast30}/{h.expectedLast30} days
+                          {h.completedLast30}/{h.expectedLast30} {h.streakUnit === 'week' ? 'this mo' : 'days'}
                         </div>
                       </div>
                       {h.streak > 0 && (
@@ -241,7 +245,7 @@ export default function Habits() {
                           style={{ background: 'rgb(var(--amber) / 0.12)', boxShadow: 'inset 0 0 0 1px rgb(var(--amber) / 0.25)' }}
                         >
                           <Flame className="w-3 h-3" style={{ color: 'rgb(var(--amber-glow))' }} />
-                          <span className="font-mono text-[11px]" style={{ color: 'rgb(var(--amber-glow))' }}>{h.streak}</span>
+                          <span className="font-mono text-[11px]" style={{ color: 'rgb(var(--amber-glow))' }}>{h.streak}{h.streakUnit === 'week' ? 'w' : ''}</span>
                         </div>
                       )}
                     </div>

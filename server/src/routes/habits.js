@@ -43,10 +43,12 @@ router.get('/', async (req, res) => {
 // GET /api/habits/stats - streaks, completion rates, heatmap data
 router.get('/stats', async (req, res) => {
   try {
-    // Get all logs for the past 90 days
-    const ninetyDaysAgo = new Date();
-    ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
-    const startDate = ninetyDaysAgo.toISOString().split('T')[0];
+    // Fetch a full year of logs so streaks compute accurately. The heatmap
+    // still only renders the last 90 days client-side, and completion rate
+    // uses the last 30 — extra rows are harmless and habit_logs is small.
+    const windowStart = new Date();
+    windowStart.setDate(windowStart.getDate() - 365);
+    const startDate = windowStart.toISOString().split('T')[0];
 
     const [{ rows: habits }, { rows: allLogs }] = await Promise.all([
       pool.query(
@@ -62,35 +64,11 @@ router.get('/stats', async (req, res) => {
     const today = new Date().toISOString().split('T')[0];
     const habitStats = habits.map(habit => {
       const logs = allLogs.filter(l => l.habit_id === habit.id);
-      const completedDates = new Set(logs.map(l => l.completed_date));
+      const completedSet = new Set(logs.map(l => l.completed_date));
 
-      // Calculate current streak
-      let streak = 0;
-      const d = new Date(today);
-      while (true) {
-        const dateStr = d.toISOString().split('T')[0];
-        if (completedDates.has(dateStr)) {
-          streak++;
-          d.setDate(d.getDate() - 1);
-        } else if (dateStr === today) {
-          d.setDate(d.getDate() - 1);
-        } else {
-          break;
-        }
-      }
-
-      // Completion rate (last 30 days)
-      let expectedDays = 0;
-      let completedDays = 0;
-      for (let i = 0; i < 30; i++) {
-        const checkDate = new Date();
-        checkDate.setDate(checkDate.getDate() - i);
-        const dateStr = checkDate.toISOString().split('T')[0];
-        if (isDueOn(habit, checkDate)) {
-          expectedDays++;
-          if (completedDates.has(dateStr)) completedDays++;
-        }
-      }
+      const { streak, unit: streakUnit } = computeStreak(habit, completedSet, today);
+      const { completionRate, completedLast30, expectedLast30 } =
+        computeCompletion(habit, completedSet, today, 30);
 
       return {
         id: habit.id,
@@ -98,9 +76,10 @@ router.get('/stats', async (req, res) => {
         category: habit.category,
         color: habit.color,
         streak,
-        completionRate: expectedDays > 0 ? Math.round((completedDays / expectedDays) * 100) : 0,
-        completedLast30: completedDays,
-        expectedLast30: expectedDays,
+        streakUnit,
+        completionRate,
+        completedLast30,
+        expectedLast30,
       };
     });
 
@@ -232,16 +211,134 @@ router.post('/:id/toggle', async (req, res) => {
   }
 });
 
-// Helper: check if a habit is due on a given date
-function isDueOn(habit, date) {
-  if (habit.frequency === 'daily') return true;
-  if (habit.frequency === 'specific_days') {
-    const days = habit.target_days ? (typeof habit.target_days === 'string' ? JSON.parse(habit.target_days) : habit.target_days) : [];
-    const dayNames = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
-    return days.includes(dayNames[date.getDay()]);
+// ---------------------------------------------------------------------------
+// Stats helpers (schedule-aware). Exported for unit testing.
+//
+// Streaks and completion rate must respect each habit's schedule. The previous
+// implementation counted consecutive *calendar* days, so a 3×/week or
+// specific-days habit could never hold a streak — any non-scheduled day with no
+// log broke the chain. These helpers skip non-scheduled days and treat weekly
+// (X-times-per-week) habits as a per-week target.
+//
+// All date math is UTC on 'YYYY-MM-DD' strings, matching how DATE columns are
+// returned (db/pool.js) and how `today` is computed in the handlers.
+// ---------------------------------------------------------------------------
+
+const DAY_NAMES = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+
+function addDaysStr(dateStr, delta) {
+  const d = new Date(dateStr + 'T00:00:00Z');
+  d.setUTCDate(d.getUTCDate() + delta);
+  return d.toISOString().slice(0, 10);
+}
+
+function dowUTC(dateStr) {
+  return new Date(dateStr + 'T00:00:00Z').getUTCDay(); // 0=Sun … 6=Sat
+}
+
+function parseTargetDays(habit) {
+  const t = habit.target_days;
+  if (!t) return [];
+  return typeof t === 'string' ? JSON.parse(t) : t;
+}
+
+// Weekly target = X times per week (the modal stores it as target_days[0]).
+function weeklyTarget(habit) {
+  return Math.max(1, parseInt(parseTargetDays(habit)[0], 10) || 1);
+}
+
+// Monday-based start of the week containing dateStr.
+function startOfWeekStr(dateStr) {
+  const dow = dowUTC(dateStr);
+  const sinceMonday = dow === 0 ? 6 : dow - 1;
+  return addDaysStr(dateStr, -sinceMonday);
+}
+
+function countCompletedInWeek(completedSet, weekStartStr) {
+  let n = 0;
+  for (let i = 0; i < 7; i++) {
+    if (completedSet.has(addDaysStr(weekStartStr, i))) n++;
   }
-  // For weekly frequency, it's always "due" — the target is X times per week
-  return true;
+  return n;
+}
+
+// Is this habit scheduled on the given date? Daily/specific_days only; weekly
+// habits have no fixed days and are handled per-week elsewhere.
+export function isDueOn(habit, dateStr) {
+  if (habit.frequency === 'specific_days') {
+    return parseTargetDays(habit).includes(DAY_NAMES[dowUTC(dateStr)]);
+  }
+  return habit.frequency === 'daily';
+}
+
+// Current streak. daily/specific_days → consecutive *scheduled* days completed
+// (non-scheduled days skipped; an unfinished today doesn't break it). weekly →
+// consecutive weeks that met the X-times target. Returns the count and its unit
+// ('day' | 'week') so the UI can label "5 d" vs "5 wk".
+export function computeStreak(habit, completedSet, todayStr) {
+  if (habit.frequency === 'weekly') {
+    const target = weeklyTarget(habit);
+    const currentWeek = startOfWeekStr(todayStr);
+    let streak = 0;
+    let week = currentWeek;
+    for (let guard = 0; guard < 104; guard++) {
+      if (countCompletedInWeek(completedSet, week) >= target) {
+        streak++;
+      } else if (week !== currentWeek) {
+        break; // the current week may still be in progress, so it never breaks
+      }
+      week = addDaysStr(week, -7);
+    }
+    return { streak, unit: 'week' };
+  }
+
+  let streak = 0;
+  let cursor = todayStr;
+  // Bounded loop: also prevents an infinite loop for a specific_days habit with
+  // no target days (isDueOn always false).
+  for (let guard = 0; guard < 366; guard++) {
+    if (isDueOn(habit, cursor)) {
+      if (completedSet.has(cursor)) streak++;
+      else if (cursor !== todayStr) break; // a missed past due-day ends the streak
+      // else: due today but not done yet — don't penalize, keep looking back
+    }
+    cursor = addDaysStr(cursor, -1);
+  }
+  return { streak, unit: 'day' };
+}
+
+// Completion rate over the last `windowDays`. daily/specific_days count
+// scheduled days; weekly counts logged completions against the pro-rated weekly
+// target. Rate clamped to 0–100.
+export function computeCompletion(habit, completedSet, todayStr, windowDays = 30) {
+  if (habit.frequency === 'weekly') {
+    const target = weeklyTarget(habit);
+    let completed = 0;
+    for (let i = 0; i < windowDays; i++) {
+      if (completedSet.has(addDaysStr(todayStr, -i))) completed++;
+    }
+    const expected = Math.max(1, Math.round((windowDays / 7) * target));
+    return {
+      completionRate: Math.min(100, Math.round((completed / expected) * 100)),
+      completedLast30: completed,
+      expectedLast30: expected,
+    };
+  }
+
+  let expected = 0;
+  let completed = 0;
+  for (let i = 0; i < windowDays; i++) {
+    const ds = addDaysStr(todayStr, -i);
+    if (isDueOn(habit, ds)) {
+      expected++;
+      if (completedSet.has(ds)) completed++;
+    }
+  }
+  return {
+    completionRate: expected > 0 ? Math.round((completed / expected) * 100) : 0,
+    completedLast30: completed,
+    expectedLast30: expected,
+  };
 }
 
 export default router;

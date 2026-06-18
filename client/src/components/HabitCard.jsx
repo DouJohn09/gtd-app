@@ -64,7 +64,7 @@ export default function HabitCard({ habit, onToggle, onEdit, onDelete }) {
           style={{ background: 'rgb(var(--amber) / 0.10)', boxShadow: 'inset 0 0 0 1px rgb(var(--amber) / 0.22)' }}
         >
           <Flame className="w-3 h-3" style={{ color: 'rgb(var(--amber-glow))' }} />
-          <span className="font-mono text-[11px]" style={{ color: 'rgb(var(--amber-glow))' }}>{habit.streak}</span>
+          <span className="font-mono text-[11px]" style={{ color: 'rgb(var(--amber-glow))' }}>{habit.streak}{habit.streakUnit === 'week' ? 'w' : ''}</span>
         </div>
       )}
 
