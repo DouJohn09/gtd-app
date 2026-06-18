@@ -72,7 +72,7 @@ export default function TaskModal({ task, projects, onClose, onSave }) {
         notes: task.notes || '',
         list: task.list || 'inbox',
         context: task.context || '',
-        project_id: task.project_id || '',
+        project_id: task.project_id ? String(task.project_id) : '',
         waiting_for_person: task.waiting_for_person || '',
         due_date: task.due_date || '',
         start_date: task.start_date || '',
