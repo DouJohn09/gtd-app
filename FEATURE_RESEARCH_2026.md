@@ -99,7 +99,19 @@ The app must make adding a task nearly instantaneous — keyboard shortcuts, nat
 #### 7. Built-in Habit Tracking
 Users want habit tracking alongside their task lists rather than in a separate app. TickTick is the only major todo app with robust built-in habit tracking. Consistently cited as why users choose TickTick over Todoist.
 
-**Cleartable status:** Implemented
+**Cleartable status:** Implemented — pre-launch overhaul scoped 2026-06-17 (see below).
+
+##### Habits Overhaul Research (2026-06-17)
+Two adversarial deep-research passes (competitor-feature survey + user-voice/demand) plus a code gap-audit of Cleartable's Habits. Verified findings (claims that survived 3-vote adversarial verification):
+- **Table stakes:** flexible scheduling (daily / weekly / X×week / specific-days / interval), streaks + completion stats, reminders, binary check-off. **Near-parity:** measurable/quantitative habits (numeric targets/units — Loop, Marvin "Ask Me", Lunatask "many-times", TickTick "Goal"), calendar/heatmap views, negative/quit habits.
+- **Task-apps-with-habits:** TickTick ships the most complete *native* tracker but is "consistently judged less flexible than dedicated apps," and it's **Premium-gated** (validates Habits-as-Pro). Todoist has **no** native tracker (extension only).
+- **Strongest demand signal (market revealed-preference):** an entire **paid app category exists solely to REMOVE streaks** (Streak-Free, SetHabits, Mostly, Finch, Not Boring Habits). Broken-streak guilt is a real, monetized, ADHD-underserved pain point; pause/skip/vacation (e.g. Habitica "Rest in the Inn") is an established, expected feature.
+- **⚠️ Overclaims REFUTED under verification (do not lean on these):** "broken-streak guilt is THE single biggest / dominant abandonment driver," "users quit entirely after one slip," and specific ADHD-abandonment stats — all overstated/single-blog-sourced. Crucially, **AI auto-scheduling of habits is INCONCLUSIVE** — both "users want it" and "users distrust it (AI calendar anxiety)" claims were refuted.
+- **Methodology caveat:** both passes are blog/vendor-heavy, not raw Reddit/App-Store mining (search tools can't reliably reach those). Strongest evidence is market revealed-preference, not quantified user voice. A future direct review-mining pass would harden the ranking.
+- **Cleartable code gaps (audit):** binary-only check-off (`habit_logs` has no value column → no measurable habits), no reminders, no skip/freeze, no quit habits, no notes-per-log, no interval scheduling, no AI/calendar habit features; **streak & completion-rate math ignore non-daily schedules (correctness bug).**
+- **Differentiation gap:** AI-scheduled calendar habits — only Reclaim.ai does it, and it's a calendar tool, not a calm task+habit suite. Real gap, but demand unproven → build **optional/suggestive**, validate first.
+- **Priority:** **P0** fix streak bug + measurable habits + reminders/clearer stats · **P1** skip/freeze days + flexible X-of-7 goals + forgiving non-resetting streaks (on-brand, low-risk, confirmed demand) · **P2** quit habits, notes, interval · **bets** AI + calendar (validate-first).
+- **Anti-features to AVOID:** punishing streak resets/guilt mechanics, aggressive RPG gamification (Habitica HP-loss), forced AI auto-scheduling with no override.
 
 #### 8. Weekly Review Workflow
 The weekly review is "where GTD lives or dies." OmniFocus is the only major app that bakes this into the interface. Users of other apps consistently request structured review modes that walk them through stale projects, overdue items, and inbox processing.
@@ -146,7 +158,7 @@ Users want rich notes, daily journaling, and reference material alongside tasks.
 #### 16. Gamification, Streaks & Rewards
 Streaks, XP points, avatar progression, accountability mechanisms. Habitica pioneered full RPG mechanics. Users with ADHD especially value dopamine-driven feedback loops. Poorly designed gamification can backfire.
 
-**Cleartable status:** Partial (habit streaks exist, no task gamification)
+**Cleartable status:** Partial (habit streaks exist, no task gamification). Note: 2026-06-17 habits research flags **punishing streak-resets and aggressive RPG gamification as ANTI-features** for a calm-positioned app — favor light, *forgiving* (non-resetting) streaks + flexible weekly goals. See Habits Overhaul Research under #7.
 
 #### 17. Energy/Capacity-Aware Scheduling
 Scheduling tasks based on energy levels and cognitive capacity. Integration with wearables for biometric data. Described as "table stakes for serious productivity tools by 2026."
