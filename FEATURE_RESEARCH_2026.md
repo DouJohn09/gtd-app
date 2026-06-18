@@ -112,6 +112,7 @@ Two adversarial deep-research passes (competitor-feature survey + user-voice/dem
 - **Differentiation gap:** AI-scheduled calendar habits — only Reclaim.ai does it, and it's a calendar tool, not a calm task+habit suite. Real gap, but demand unproven → build **optional/suggestive**, validate first.
 - **Priority:** **P0** fix streak bug + measurable habits + reminders/clearer stats · **P1** skip/freeze days + flexible X-of-7 goals + forgiving non-resetting streaks (on-brand, low-risk, confirmed demand) · **P2** quit habits, notes, interval · **bets** AI + calendar (validate-first).
 - **Anti-features to AVOID:** punishing streak resets/guilt mechanics, aggressive RPG gamification (Habitica HP-loss), forced AI auto-scheduling with no override.
+- **Build status (2026-06-18):** streak/completion-rate bug **fixed & live** (`5c43802` — schedule-aware streaks/rate, weekly streaks in weeks, +12 tests `npm run test:habits`). **⏭ Next slice (design locked, build pending):** P1 anti-guilt — per-day **skip/rest days** (`habit_logs.status`, neutral in streak+rate) + **de-emphasized forgiving streaks** (lead with completion %/heatmap; reset = gentle "fresh start") + flexible-weekly framing. Decisions: no auto-grace; vacation-range mode deferred to P2.
 
 #### 8. Weekly Review Workflow
 The weekly review is "where GTD lives or dies." OmniFocus is the only major app that bakes this into the interface. Users of other apps consistently request structured review modes that walk them through stale projects, overdue items, and inbox processing.
