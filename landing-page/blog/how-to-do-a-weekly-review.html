@@ -26,7 +26,9 @@
   <meta name="theme-color" content="#15151E" />
 
   <link rel="preconnect" href="https://api.fontshare.com" crossorigin />
-  <link rel="stylesheet" href="https://api.fontshare.com/v2/css?f[]=instrument-serif@400i,400&f[]=geist-mono@400,500&f[]=satoshi@400,500,700&display=swap" />
+  <!-- Fonts loaded non-render-blocking; noscript fallback preserves them without JS -->
+  <link rel="stylesheet" href="https://api.fontshare.com/v2/css?f[]=instrument-serif@400i,400&f[]=geist-mono@400,500&f[]=satoshi@400,500,700&display=swap" media="print" onload="this.media='all'" />
+  <noscript><link rel="stylesheet" href="https://api.fontshare.com/v2/css?f[]=instrument-serif@400i,400&f[]=geist-mono@400,500&f[]=satoshi@400,500,700&display=swap" /></noscript>
   <link rel="stylesheet" href="/style.css" />
   <link rel="stylesheet" href="/blog.css" />
 

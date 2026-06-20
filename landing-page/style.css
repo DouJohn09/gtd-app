@@ -12,7 +12,7 @@
 
   --text-1: #F5F5F7;
   --text-2: #A1A1AA;
-  --text-3: #6B6B75;
+  --text-3: #8A8A94; /* ~5.3:1 on --bg #15151E — meets WCAG AA (was #6B6B75 @ 3.44:1) */
 
   --violet: #A78BFA;
   --violet-deep: #7C3AED;
@@ -840,7 +840,10 @@ footer .left {
 
 footer .left a {
   color: var(--text-2);
-  text-decoration: none;
+  /* Underline so links are distinguishable from surrounding text without relying on color (WCAG 1.4.1). */
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
 }
 
 footer .left a:hover { color: var(--violet); }
