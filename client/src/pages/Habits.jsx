@@ -1,9 +1,10 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Target, Plus, Flame, TrendingUp, Sparkles, Shield } from 'lucide-react';
+import { Target, Plus, Flame, TrendingUp, Sparkles, Shield, Palmtree } from 'lucide-react';
 import { api } from '../lib/api';
 import { useToast } from '../components/Toast';
 import HabitCard from '../components/HabitCard';
 import HabitModal, { SUGGESTED_HABITS } from '../components/HabitModal';
+import RestDaysModal from '../components/RestDaysModal';
 import MonoLabel from '../components/ui/MonoLabel';
 import ConfirmModal from '../components/ui/ConfirmModal';
 
@@ -23,6 +24,7 @@ export default function Habits() {
   const [showModal, setShowModal] = useState(false);
   const [editingHabit, setEditingHabit] = useState(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+  const [showRestDays, setShowRestDays] = useState(false);
 
   const fetchData = async () => {
     setLoading(true);
@@ -136,12 +138,21 @@ export default function Habits() {
             </p>
           )}
         </div>
-        <button
-          onClick={() => { setEditingHabit(null); setShowModal(true); }}
-          className="gtd-btn gtd-btn-primary inline-flex items-center gap-1.5 text-[12.5px]"
-        >
-          <Plus className="w-3.5 h-3.5" /> New Habit
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowRestDays(true)}
+            className="gtd-btn gtd-btn-secondary inline-flex items-center gap-1.5 text-[12.5px]"
+            title="Mark a date range as rest days"
+          >
+            <Palmtree className="w-3.5 h-3.5" /> Rest days
+          </button>
+          <button
+            onClick={() => { setEditingHabit(null); setShowModal(true); }}
+            className="gtd-btn gtd-btn-primary inline-flex items-center gap-1.5 text-[12.5px]"
+          >
+            <Plus className="w-3.5 h-3.5" /> New Habit
+          </button>
+        </div>
       </div>
 
       {habits.length === 0 ? (
@@ -327,6 +338,13 @@ export default function Habits() {
           confirmLabel="Delete"
           onConfirm={() => handleDelete(confirmDeleteId)}
           onCancel={() => setConfirmDeleteId(null)}
+        />
+      )}
+
+      {showRestDays && (
+        <RestDaysModal
+          onClose={() => setShowRestDays(false)}
+          onDone={(msg) => { addToast(msg, 'success'); fetchData(); }}
         />
       )}
     </div>

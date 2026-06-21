@@ -108,6 +108,60 @@ router.get('/stats', async (req, res) => {
   }
 });
 
+// Rest-day ranges ("vacation"): mark a span of days as a deliberate rest for all
+// active BUILD habits, so streaks/completion stay neutral while you're away. This
+// just bulk-creates 'skipped' logs (the same neutral state as a per-day rest) —
+// no new schema. Registered before the /:id routes so DELETE /rest-days doesn't
+// match DELETE /:id.
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+const validRange = (from, to) =>
+  ISO_DATE.test(from || '') && ISO_DATE.test(to || '') && from <= to &&
+  (Date.parse(to) - Date.parse(from)) / 86400000 <= 366;
+
+// POST /api/habits/rest-days { from, to } - set the range as rest days.
+router.post('/rest-days', async (req, res) => {
+  try {
+    const { from, to } = req.body;
+    if (!validRange(from, to)) return res.status(400).json({ error: 'Invalid date range' });
+
+    // ON CONFLICT DO NOTHING preserves any existing done/slip/rest logs in the
+    // range — only untouched days become rest days.
+    const { rowCount } = await pool.query(
+      `INSERT INTO habit_logs (habit_id, completed_date, user_id, status)
+       SELECT h.id, d::date, $1, 'skipped'
+       FROM habits h
+       CROSS JOIN generate_series($2::date, $3::date, interval '1 day') d
+       WHERE h.user_id = $1 AND h.active = true AND h.type = 'build'
+       ON CONFLICT (habit_id, completed_date) DO NOTHING`,
+      [req.user.id, from, to]
+    );
+    res.json({ ok: true, created: rowCount });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// DELETE /api/habits/rest-days { from, to } - clear rest days in the range
+// (only 'skipped' logs; done/slip logs are left intact).
+router.delete('/rest-days', async (req, res) => {
+  try {
+    const { from, to } = req.body;
+    if (!validRange(from, to)) return res.status(400).json({ error: 'Invalid date range' });
+
+    const { rowCount } = await pool.query(
+      `DELETE FROM habit_logs
+       WHERE user_id = $1 AND status = 'skipped'
+         AND completed_date BETWEEN $2::date AND $3::date`,
+      [req.user.id, from, to]
+    );
+    res.json({ ok: true, removed: rowCount });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // GET /api/habits/:id/logs - this habit's logged days + status, for the calendar.
 router.get('/:id/logs', async (req, res) => {
   try {
