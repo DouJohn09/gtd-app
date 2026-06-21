@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { X, ChevronLeft, ChevronRight, Check, Minus } from 'lucide-react';
 import { api } from '../lib/api';
 
@@ -103,7 +104,11 @@ export default function HabitCalendar({ habit, onToggle, onClose }) {
     return { boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.06)', color: 'rgb(var(--text-2))' };
   };
 
-  return (
+  // Portal to <body>: this modal is rendered from inside a .glass HabitCard, and
+  // an ancestor with backdrop-filter (like transform/filter) becomes the containing
+  // block for position:fixed descendants — which collapsed the overlay onto the
+  // card instead of the viewport. Portaling out of the card fixes the positioning.
+  return createPortal(
     <div
       className="fixed inset-0 z-50 flex items-start justify-center p-4 sm:p-8 overflow-y-auto"
       style={{ background: 'rgba(8,8,14,0.55)', backdropFilter: 'blur(8px)' }}
@@ -212,6 +217,7 @@ export default function HabitCalendar({ habit, onToggle, onClose }) {
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
