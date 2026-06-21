@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Target, Plus, Flame, TrendingUp, Sparkles } from 'lucide-react';
+import { Target, Plus, Flame, TrendingUp, Sparkles, Shield } from 'lucide-react';
 import { api } from '../lib/api';
 import { useToast } from '../components/Toast';
 import HabitCard from '../components/HabitCard';
@@ -47,7 +47,10 @@ export default function Habits() {
           h.id === habitId ? { ...h, today_status: result.status, completed_today: result.status === 'done' } : h
         ));
       }
-      const verb = result.status === 'done' ? 'logged' : result.status === 'skipped' ? 'set to rest' : 'cleared';
+      const verb = result.status === 'done' ? 'logged'
+        : result.status === 'skipped' ? 'set to rest'
+        : result.status === 'slip' ? 'marked as a slip'
+        : 'cleared';
       addToast(date ? `Habit ${verb} for ${date}` : undefined);
       const statsData = await api.habits.getStats();
       setStats(statsData);
@@ -83,14 +86,17 @@ export default function Habits() {
     return groups;
   }, [habits]);
 
-  // Rest days are resolved for the day, not misses — exclude them from the
-  // denominator so resting never reads as "behind". All-done-or-resting = a calm
-  // perfect day even if some were rested.
-  const completedCount = habits.filter(h => (h.today_status || (h.completed_today ? 'done' : 'none')) === 'done').length;
-  const skippedCount = habits.filter(h => h.today_status === 'skipped').length;
+  // Today's progress is about build habits — things you actively do today. Quit
+  // habits (abstinence) aren't "completed", so they're excluded from the counter.
+  // Rest days are resolved for the day, not misses, so they leave the denominator
+  // too — resting never reads as "behind".
+  const buildHabits = habits.filter(h => h.type !== 'quit');
+  const completedCount = buildHabits.filter(h => (h.today_status || (h.completed_today ? 'done' : 'none')) === 'done').length;
+  const skippedCount = buildHabits.filter(h => h.today_status === 'skipped').length;
   const totalCount = habits.length;
-  const activeCount = totalCount - skippedCount;
-  const dayPct = activeCount > 0 ? completedCount / activeCount : (totalCount > 0 ? 1 : 0);
+  const buildCount = buildHabits.length;
+  const activeCount = buildCount - skippedCount;
+  const dayPct = activeCount > 0 ? completedCount / activeCount : (buildCount > 0 ? 1 : 0);
 
   if (loading) {
     return (
@@ -110,13 +116,13 @@ export default function Habits() {
           <MonoLabel tone="mint" className="mb-3">rituals</MonoLabel>
           <h1 className="font-display text-[52px] md:text-[60px] leading-[1] tracking-tight">
             Habits
-            {totalCount > 0 && (
+            {buildCount > 0 && (
               <span className="font-mono text-[14px] tracking-wider text-text-3 ml-3 align-middle">
                 {completedCount.toString().padStart(2, '0')}/{activeCount.toString().padStart(2, '0')}
               </span>
             )}
           </h1>
-          {totalCount > 0 && (
+          {buildCount > 0 && (
             <p className="font-display italic text-[18px] text-text-2 mt-2">
               {dayPct === 1 ? 'A perfect day. All done.' :
                 dayPct >= 0.5 ? 'Halfway through. Keep going.' :
@@ -195,9 +201,11 @@ export default function Habits() {
             <div key={category}>
               <div className="flex items-baseline gap-3 mb-3 px-1">
                 <div className="mono-label">{category.toLowerCase().replace(/\s+/g, '_')}</div>
-                <span className="font-mono text-[10.5px] text-text-3">
-                  {categoryHabits.filter(h => h.completed_today).length}/{categoryHabits.filter(h => h.today_status !== 'skipped').length}
-                </span>
+                {categoryHabits.some(h => h.type !== 'quit') && (
+                  <span className="font-mono text-[10.5px] text-text-3">
+                    {categoryHabits.filter(h => h.type !== 'quit' && h.completed_today).length}/{categoryHabits.filter(h => h.type !== 'quit' && h.today_status !== 'skipped').length}
+                  </span>
+                )}
                 <div className="flex-1 h-px" style={{ background: 'linear-gradient(to right, rgba(255,255,255,0.06), transparent)' }} />
               </div>
               <div className="space-y-2">
@@ -242,17 +250,28 @@ export default function Habits() {
                           {h.completionRate}<span className="text-[16px] text-text-3 ml-0.5">%</span>
                         </div>
                         <div className="font-mono text-[10.5px] text-text-3 mt-1">
-                          {h.completedLast30}/{h.expectedLast30} {h.streakUnit === 'week' ? 'this mo' : 'days'}
+                          {h.completedLast30}/{h.expectedLast30} {h.type === 'quit' ? 'clean' : h.streakUnit === 'week' ? 'this mo' : 'days'}
                         </div>
                       </div>
                       {h.streak > 0 && (
-                        <div
-                          className="flex items-center gap-1 px-2 py-1 rounded-full"
-                          style={{ background: 'rgb(var(--amber) / 0.12)', boxShadow: 'inset 0 0 0 1px rgb(var(--amber) / 0.25)' }}
-                        >
-                          <Flame className="w-3 h-3" style={{ color: 'rgb(var(--amber-glow))' }} />
-                          <span className="font-mono text-[11px]" style={{ color: 'rgb(var(--amber-glow))' }}>{h.streak}{h.streakUnit === 'week' ? 'w' : ''}</span>
-                        </div>
+                        h.type === 'quit' ? (
+                          <div
+                            className="flex items-center gap-1 px-2 py-1 rounded-full"
+                            style={{ background: 'rgb(var(--mint) / 0.12)', boxShadow: 'inset 0 0 0 1px rgb(var(--mint) / 0.25)' }}
+                            title={`${h.streak} days clean`}
+                          >
+                            <Shield className="w-3 h-3" style={{ color: 'rgb(var(--mint-glow))' }} />
+                            <span className="font-mono text-[11px]" style={{ color: 'rgb(var(--mint-glow))' }}>{h.streak}d</span>
+                          </div>
+                        ) : (
+                          <div
+                            className="flex items-center gap-1 px-2 py-1 rounded-full"
+                            style={{ background: 'rgb(var(--amber) / 0.12)', boxShadow: 'inset 0 0 0 1px rgb(var(--amber) / 0.25)' }}
+                          >
+                            <Flame className="w-3 h-3" style={{ color: 'rgb(var(--amber-glow))' }} />
+                            <span className="font-mono text-[11px]" style={{ color: 'rgb(var(--amber-glow))' }}>{h.streak}{h.streakUnit === 'week' ? 'w' : ''}</span>
+                          </div>
+                        )
                       )}
                     </div>
                   </div>

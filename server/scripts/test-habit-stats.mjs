@@ -5,7 +5,7 @@
 //   06-18 Thu · 06-17 Wed · 06-16 Tue · 06-15 Mon · 06-12 Fri · 06-10 Wed · 06-08 Mon
 // Weeks (Mon-start): current 06-15..06-21 · prior 06-08..06-14 · before 06-01..06-07
 import assert from 'node:assert/strict';
-import { computeStreak, computeCompletion, isDueOn } from '../src/routes/habits.js';
+import { computeStreak, computeCompletion, isDueOn, computeQuitStreak, computeQuitCompletion } from '../src/routes/habits.js';
 
 const TODAY = '2026-06-18';
 const set = (...dates) => new Set(dates);
@@ -181,6 +181,38 @@ t('weekly streak: skip set is ignored (no-op)', () => {
   const { streak, unit } = computeStreak(weekly3, completed, TODAY, skipped);
   assert.equal(streak, 2);
   assert.equal(unit, 'week');
+});
+
+// --- quit habits (clean-day streaks; a log is a slip) ---
+t('quit streak: no slips → clean days back to the creation anchor', () => {
+  const quit = { created_at: '2026-06-16' }; // 06-16,06-17,06-18 = 3 days incl. today
+  const { streak, unit } = computeQuitStreak(quit, set(), TODAY);
+  assert.equal(streak, 3);
+  assert.equal(unit, 'day');
+});
+t('quit streak: a slip yesterday → streak is just today', () => {
+  const quit = { created_at: '2026-01-01' };
+  const { streak } = computeQuitStreak(quit, set('2026-06-17'), TODAY);
+  assert.equal(streak, 1); // today clean, yesterday slipped
+});
+t('quit streak: slipped today → 0', () => {
+  const quit = { created_at: '2026-01-01' };
+  const { streak } = computeQuitStreak(quit, set('2026-06-18'), TODAY);
+  assert.equal(streak, 0);
+});
+t('quit completion: clean-day rate over the window, slips excluded', () => {
+  const quit = { created_at: '2026-01-01' }; // anchor well before the window
+  const r = computeQuitCompletion(quit, set('2026-06-10', '2026-06-05'), TODAY, 30);
+  assert.equal(r.expectedLast30, 30);
+  assert.equal(r.completedLast30, 28); // 30 days − 2 slips
+  assert.equal(r.completionRate, 93);  // round(28/30 * 100)
+});
+t('quit completion: counts only days since creation', () => {
+  const quit = { created_at: '2026-06-16' }; // only 06-16..06-18 fall in-window & post-anchor
+  const r = computeQuitCompletion(quit, set(), TODAY, 30);
+  assert.equal(r.expectedLast30, 3);
+  assert.equal(r.completedLast30, 3);
+  assert.equal(r.completionRate, 100);
 });
 
 console.log(`\n✅ ${passed} habit-stats tests passed`);

@@ -66,18 +66,25 @@ router.get('/stats', async (req, res) => {
     const today = new Date().toISOString().split('T')[0];
     const habitStats = habits.map(habit => {
       const logs = allLogs.filter(l => l.habit_id === habit.id);
-      const completedSet = new Set(logs.filter(l => l.status === 'done').map(l => l.completed_date));
-      const skippedSet = new Set(logs.filter(l => l.status === 'skipped').map(l => l.completed_date));
 
-      const { streak, unit: streakUnit } = computeStreak(habit, completedSet, today, skippedSet);
-      const { completionRate, completedLast30, expectedLast30 } =
-        computeCompletion(habit, completedSet, today, 30, skippedSet);
+      let streak, streakUnit, completionRate, completedLast30, expectedLast30;
+      if (habit.type === 'quit') {
+        const slipSet = new Set(logs.filter(l => l.status === 'slip').map(l => l.completed_date));
+        ({ streak, unit: streakUnit } = computeQuitStreak(habit, slipSet, today));
+        ({ completionRate, completedLast30, expectedLast30 } = computeQuitCompletion(habit, slipSet, today, 30));
+      } else {
+        const completedSet = new Set(logs.filter(l => l.status === 'done').map(l => l.completed_date));
+        const skippedSet = new Set(logs.filter(l => l.status === 'skipped').map(l => l.completed_date));
+        ({ streak, unit: streakUnit } = computeStreak(habit, completedSet, today, skippedSet));
+        ({ completionRate, completedLast30, expectedLast30 } = computeCompletion(habit, completedSet, today, 30, skippedSet));
+      }
 
       return {
         id: habit.id,
         name: habit.name,
         category: habit.category,
         color: habit.color,
+        type: habit.type,
         streak,
         streakUnit,
         completionRate,
@@ -104,15 +111,15 @@ router.get('/stats', async (req, res) => {
 // POST /api/habits - create a habit
 router.post('/', async (req, res) => {
   try {
-    const { name, description, frequency, target_days, category, color } = req.body;
+    const { name, description, frequency, target_days, category, color, type } = req.body;
     if (!name?.trim()) {
       return res.status(400).json({ error: 'Habit name is required' });
     }
     await assertWithinLimit(req.user.id, 'habits');
 
     const { rows } = await pool.query(
-      `INSERT INTO habits (name, description, frequency, target_days, category, color, user_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+      `INSERT INTO habits (name, description, frequency, target_days, category, color, type, user_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
       [
         name.trim(),
         description || null,
@@ -120,6 +127,7 @@ router.post('/', async (req, res) => {
         target_days ? JSON.stringify(target_days) : null,
         normalizeCategory(category),
         color || '#3b82f6',
+        type === 'quit' ? 'quit' : 'build',
         req.user.id,
       ]
     );
@@ -140,7 +148,7 @@ router.post('/', async (req, res) => {
 // PUT /api/habits/:id - update a habit
 router.put('/:id', async (req, res) => {
   try {
-    const { name, description, frequency, target_days, category, color, active } = req.body;
+    const { name, description, frequency, target_days, category, color, active, type } = req.body;
 
     const fields = [];
     const values = [];
@@ -151,6 +159,7 @@ router.put('/:id', async (req, res) => {
     if (category !== undefined)    { fields.push(`category = $${fields.length + 1}`); values.push(normalizeCategory(category)); }
     if (color !== undefined)       { fields.push(`color = $${fields.length + 1}`); values.push(color); }
     if (active !== undefined)      { fields.push(`active = $${fields.length + 1}`); values.push(!!active); }
+    if (type !== undefined)        { fields.push(`type = $${fields.length + 1}`); values.push(type === 'quit' ? 'quit' : 'build'); }
 
     if (fields.length === 0) return res.status(400).json({ error: 'No fields to update' });
 
@@ -191,12 +200,20 @@ router.delete('/:id', async (req, res) => {
   }
 });
 
-// POST /api/habits/:id/toggle - cycle a date's state: none → done → skipped → none.
-// "Skipped" is a deliberate rest day (neutral for streaks/completion), so a third
-// tap clears the day entirely. Returns the new state; `completed` kept for back-compat.
+// POST /api/habits/:id/toggle - cycle a date's state.
+//   build habits: none → done → skipped → none ('skipped' = a neutral rest day).
+//   quit habits:  none → slip → none           (a logged day is a slip; no rest).
+// Returns the new state; `completed` kept for back-compat.
 router.post('/:id/toggle', async (req, res) => {
   try {
     const date = req.body.date || new Date().toISOString().split('T')[0];
+
+    const { rows: habitRows } = await pool.query(
+      'SELECT type FROM habits WHERE id = $1 AND user_id = $2',
+      [req.params.id, req.user.id]
+    );
+    if (!habitRows[0]) return res.status(404).json({ error: 'Habit not found' });
+    const isQuit = habitRows[0].type === 'quit';
 
     const { rows: existingRows } = await pool.query(
       'SELECT id, status FROM habit_logs WHERE habit_id = $1 AND completed_date = $2 AND user_id = $3',
@@ -205,7 +222,20 @@ router.post('/:id/toggle', async (req, res) => {
     const existing = existingRows[0];
 
     let status;
-    if (!existing) {
+    if (isQuit) {
+      if (!existing) {
+        // none → slip
+        await pool.query(
+          "INSERT INTO habit_logs (habit_id, completed_date, user_id, status) VALUES ($1, $2, $3, 'slip')",
+          [req.params.id, date, req.user.id]
+        );
+        status = 'slip';
+      } else {
+        // slip → none
+        await pool.query('DELETE FROM habit_logs WHERE id = $1', [existing.id]);
+        status = 'none';
+      }
+    } else if (!existing) {
       // none → done
       await pool.query(
         "INSERT INTO habit_logs (habit_id, completed_date, user_id, status) VALUES ($1, $2, $3, 'done')",
@@ -391,6 +421,47 @@ export function computeCompletion(habit, completedSet, todayStr, windowDays = 30
     completionRate: expected > 0 ? Math.round((completed / expected) * 100) : 0,
     completedLast30: completed,
     expectedLast30: expected,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Quit-habit stats. A "quit" habit succeeds by abstinence: a log is a *slip*,
+// and every day is implicitly a clean day unless it has a slip. These count
+// calendar days (frequency doesn't apply to abstinence) and are bounded by the
+// creation anchor — there are no clean days before the habit existed.
+// ---------------------------------------------------------------------------
+
+// Consecutive clean days ending today. Today counts as clean unless slipped; a
+// slip ends the streak; we stop at the creation anchor.
+export function computeQuitStreak(habit, slipSet, todayStr) {
+  const anchor = anchorDateStr(habit);
+  let streak = 0;
+  let cursor = todayStr;
+  for (let guard = 0; guard < 3660; guard++) {
+    if (anchor && cursor < anchor) break; // before the habit existed
+    if (slipSet.has(cursor)) break;       // a slip ends the clean run
+    streak++;
+    cursor = addDaysStr(cursor, -1);
+  }
+  return { streak, unit: 'day' };
+}
+
+// Clean-day rate over the last `windowDays`, counting only days since creation.
+// `completedLast30`/`expectedLast30` carry clean-days / total-days for the UI.
+export function computeQuitCompletion(habit, slipSet, todayStr, windowDays = 30) {
+  const anchor = anchorDateStr(habit);
+  let total = 0;
+  let clean = 0;
+  for (let i = 0; i < windowDays; i++) {
+    const ds = addDaysStr(todayStr, -i);
+    if (anchor && ds < anchor) continue; // habit didn't exist yet
+    total++;
+    if (!slipSet.has(ds)) clean++;
+  }
+  return {
+    completionRate: total > 0 ? Math.round((clean / total) * 100) : 100,
+    completedLast30: clean,
+    expectedLast30: total,
   };
 }
 

@@ -24,14 +24,14 @@ export const SUGGESTED_HABITS = [
   { name: 'Drink Water',       description: '8 glasses of water',     category: 'Health',       color: '#5eead4', frequency: 'daily' },
   { name: 'Journal',           description: 'Write daily reflections', category: 'Mindfulness', color: '#fbbf24', frequency: 'daily' },
   { name: 'Sleep 8 Hours',     description: 'Get enough rest',        category: 'Health',       color: '#34d399', frequency: 'daily' },
-  { name: 'No Social Media',   description: 'Limit screen time',      category: 'Productivity', color: '#f472b6', frequency: 'daily' },
+  { name: 'No Social Media',   description: 'Stay off the feeds',     category: 'Productivity', color: '#f472b6', frequency: 'daily', type: 'quit' },
   { name: 'Learn Something New', description: 'Study or practice',    category: 'Learning',     color: '#f97316', frequency: 'daily' },
 ];
 
 export default function HabitModal({ habit, onClose, onSave, existingCategories = [], existingHabitNames = [] }) {
   const [form, setForm] = useState({
     name: '', description: '', frequency: 'daily', target_days: [],
-    category: '', color: '#a78bfa',
+    category: '', color: '#a78bfa', type: 'build',
   });
   const [customCategory, setCustomCategory] = useState(false);
   const [customCategoryValue, setCustomCategoryValue] = useState('');
@@ -57,6 +57,7 @@ export default function HabitModal({ habit, onClose, onSave, existingCategories 
         target_days: habit.target_days || [],
         category: isCustom ? '__custom__' : cat,
         color: habit.color || '#a78bfa',
+        type: habit.type || 'build',
       });
       if (isCustom) { setCustomCategory(true); setCustomCategoryValue(cat); }
     }
@@ -92,12 +93,15 @@ export default function HabitModal({ habit, onClose, onSave, existingCategories 
   const handleSubmit = (e) => {
     e.preventDefault();
     const category = customCategory ? customCategoryValue.trim() : form.category;
+    const isQuit = form.type === 'quit';
     const data = {
       ...form,
       name: form.name.trim(),
       description: form.description.trim() || null,
       category: category || null,
-      target_days: ['specific_days', 'weekly', 'interval'].includes(form.frequency)
+      // Quit habits are daily abstinence — frequency/target_days don't apply.
+      frequency: isQuit ? 'daily' : form.frequency,
+      target_days: !isQuit && ['specific_days', 'weekly', 'interval'].includes(form.frequency)
         ? form.target_days
         : null,
     };
@@ -158,6 +162,38 @@ export default function HabitModal({ habit, onClose, onSave, existingCategories 
 
         <form onSubmit={handleSubmit} className="p-5 space-y-4 max-h-[65vh] overflow-y-auto">
           <div>
+            <label className="gtd-label">Type</label>
+            <div className="grid grid-cols-2 gap-2">
+              {[
+                { value: 'build', label: 'Build a habit' },
+                { value: 'quit', label: 'Quit a habit' },
+              ].map(opt => {
+                const active = (form.type || 'build') === opt.value;
+                return (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setForm(f => opt.value === 'quit'
+                      ? { ...f, type: 'quit', frequency: 'daily', target_days: [] }
+                      : { ...f, type: 'build' })}
+                    className="py-2 rounded-lg text-[12.5px] font-medium transition-all"
+                    style={active
+                      ? { background: 'linear-gradient(180deg, rgb(var(--mint) / 0.20), rgb(var(--mint) / 0.10))', color: 'rgb(var(--mint-glow))', boxShadow: 'inset 0 0 0 1px rgb(var(--mint) / 0.35)' }
+                      : { color: 'rgb(var(--text-3))', boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.08)' }}
+                  >
+                    {opt.label}
+                  </button>
+                );
+              })}
+            </div>
+            <p className="text-[11.5px] text-text-3 mt-1.5">
+              {form.type === 'quit'
+                ? 'Tracks days clean. Tap a day only if you slip — no streak shame.'
+                : 'Tracks the days you do it.'}
+            </p>
+          </div>
+
+          <div>
             <label className="gtd-label">Name</label>
             <input
               type="text"
@@ -182,19 +218,21 @@ export default function HabitModal({ habit, onClose, onSave, existingCategories 
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="gtd-label">Frequency</label>
-              <select
-                value={form.frequency}
-                onChange={e => setForm({ ...form, frequency: e.target.value, target_days: [] })}
-                className="gtd-input"
-              >
-                <option value="daily">Daily</option>
-                <option value="weekly">Weekly (X times)</option>
-                <option value="specific_days">Specific Days</option>
-                <option value="interval">Every N days</option>
-              </select>
-            </div>
+            {form.type !== 'quit' && (
+              <div>
+                <label className="gtd-label">Frequency</label>
+                <select
+                  value={form.frequency}
+                  onChange={e => setForm({ ...form, frequency: e.target.value, target_days: [] })}
+                  className="gtd-input"
+                >
+                  <option value="daily">Daily</option>
+                  <option value="weekly">Weekly (X times)</option>
+                  <option value="specific_days">Specific Days</option>
+                  <option value="interval">Every N days</option>
+                </select>
+              </div>
+            )}
 
             <div>
               <label className="gtd-label">Category</label>
