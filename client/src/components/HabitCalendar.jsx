@@ -110,13 +110,15 @@ export default function HabitCalendar({ habit, onToggle, onClose }) {
       onClick={onClose}
     >
       <div
-        className="relative w-full max-w-[340px] max-h-[90vh] overflow-y-auto rounded-2xl glass"
+        className="relative w-full max-w-[340px] max-h-[90vh] overflow-y-auto rounded-2xl"
         onClick={e => e.stopPropagation()}
         style={{
-          // Opaque dark base so the busy habit list behind doesn't bleed through
-          // the grid (the .glass white layer alone is too translucent here).
-          background: 'linear-gradient(180deg, rgb(22 22 32 / 0.98), rgb(15 15 23 / 0.98))',
-          boxShadow: '0 24px 64px -16px rgba(0,0,0,0.55), inset 0 1px 0 rgb(255 255 255 / 0.06), inset 0 0 0 1px rgb(var(--mint) / 0.16)',
+          // Fully opaque, no backdrop-filter: the shared .glass layer is too
+          // translucent here and let the busy habit list bleed through the grid.
+          // A solid base can't bleed under any compositing path.
+          background: '#15151d',
+          border: '1px solid rgba(255,255,255,0.08)',
+          boxShadow: '0 24px 64px -16px rgba(0,0,0,0.6), inset 0 1px 0 rgb(255 255 255 / 0.06), inset 0 0 0 1px rgb(var(--mint) / 0.16)',
         }}
       >
         {/* Header */}
