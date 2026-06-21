@@ -39,21 +39,27 @@ export default function Habits() {
 
   useEffect(() => { fetchData(); }, []);
 
-  const handleToggle = async (habitId, date) => {
+  const handleToggle = async (habitId, date, opts = {}) => {
     try {
       const result = await api.habits.toggle(habitId, date);
-      if (!date) {
+      const todayStr = new Date().toISOString().split('T')[0];
+      // Keep the card's today control in sync whether toggled from the circle
+      // (no date) or via the calendar popover (date === today).
+      if (!date || date === todayStr) {
         setHabits(prev => prev.map(h =>
           h.id === habitId ? { ...h, today_status: result.status, completed_today: result.status === 'done' } : h
         ));
       }
-      const verb = result.status === 'done' ? 'logged'
-        : result.status === 'skipped' ? 'set to rest'
-        : result.status === 'slip' ? 'marked as a slip'
-        : 'cleared';
-      addToast(date ? `Habit ${verb} for ${date}` : undefined);
+      if (!opts.silent && date) {
+        const verb = result.status === 'done' ? 'logged'
+          : result.status === 'skipped' ? 'set to rest'
+          : result.status === 'slip' ? 'marked as a slip'
+          : 'cleared';
+        addToast(`Habit ${verb} for ${date}`);
+      }
       const statsData = await api.habits.getStats();
       setStats(statsData);
+      return result;
     } catch (err) { addToast(err.message, 'error'); }
   };
 

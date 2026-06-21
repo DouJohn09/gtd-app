@@ -115,6 +115,7 @@ export const api = {
     update: (id, updates) => fetchApi(`/habits/${id}`, { method: 'PUT', body: JSON.stringify(updates) }),
     delete: (id) => fetchApi(`/habits/${id}`, { method: 'DELETE' }),
     toggle: (id, date = undefined) => fetchApi(`/habits/${id}/toggle`, { method: 'POST', body: JSON.stringify({ date }) }),
+    logs: (id) => fetchApi(`/habits/${id}/logs`),
   },
 
   calendar: {

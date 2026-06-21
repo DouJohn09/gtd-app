@@ -1,9 +1,9 @@
-import { useRef } from 'react';
+import { useState } from 'react';
 import { Flame, Pencil, Trash2, Calendar, Check, Minus, Shield, X } from 'lucide-react';
+import HabitCalendar from './HabitCalendar';
 
 export default function HabitCard({ habit, onToggle, onEdit, onDelete }) {
-  const dateInputRef = useRef(null);
-  const today = new Date().toISOString().split('T')[0];
+  const [showCalendar, setShowCalendar] = useState(false);
   const isQuit = habit.type === 'quit';
   // Build habits: done | skipped (rest day) | none. Quit habits: a logged day is
   // a slip, so the only states are slip | none (clean). Fall back to the legacy
@@ -12,14 +12,6 @@ export default function HabitCard({ habit, onToggle, onEdit, onDelete }) {
   const done = !isQuit && status === 'done';
   const skipped = !isQuit && status === 'skipped';
   const slipped = isQuit && status === 'slip';
-
-  const handleDateChange = (e) => {
-    const date = e.target.value;
-    if (date) {
-      onToggle(habit.id, date);
-      e.target.value = '';
-    }
-  };
 
   return (
     <div
@@ -121,23 +113,13 @@ export default function HabitCard({ habit, onToggle, onEdit, onDelete }) {
       )}
 
       <div className="flex items-center gap-0.5 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-        <div className="relative">
-          <button
-            onClick={() => dateInputRef.current?.showPicker?.() || dateInputRef.current?.click()}
-            className="p-1.5 text-text-3 hover:text-violet-glow rounded-lg transition-colors"
-            title="Log for another date"
-          >
-            <Calendar className="w-3.5 h-3.5" />
-          </button>
-          <input
-            ref={dateInputRef}
-            type="date"
-            max={today}
-            onChange={handleDateChange}
-            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-            tabIndex={-1}
-          />
-        </div>
+        <button
+          onClick={() => setShowCalendar(true)}
+          className="p-1.5 text-text-3 hover:text-violet-glow rounded-lg transition-colors"
+          title={isQuit ? 'View history & log a slip' : 'View history & log other days'}
+        >
+          <Calendar className="w-3.5 h-3.5" />
+        </button>
         <button
           onClick={() => onEdit(habit)}
           className="p-1.5 text-text-3 hover:text-text-1 rounded-lg transition-colors"
@@ -151,6 +133,10 @@ export default function HabitCard({ habit, onToggle, onEdit, onDelete }) {
           <Trash2 className="w-3.5 h-3.5" />
         </button>
       </div>
+
+      {showCalendar && (
+        <HabitCalendar habit={habit} onToggle={onToggle} onClose={() => setShowCalendar(false)} />
+      )}
     </div>
   );
 }

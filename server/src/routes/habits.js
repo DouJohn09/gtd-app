@@ -108,6 +108,26 @@ router.get('/stats', async (req, res) => {
   }
 });
 
+// GET /api/habits/:id/logs - this habit's logged days + status, for the calendar.
+router.get('/:id/logs', async (req, res) => {
+  try {
+    const { rows: owner } = await pool.query(
+      'SELECT id FROM habits WHERE id = $1 AND user_id = $2',
+      [req.params.id, req.user.id]
+    );
+    if (!owner[0]) return res.status(404).json({ error: 'Habit not found' });
+
+    const { rows } = await pool.query(
+      'SELECT completed_date, status FROM habit_logs WHERE habit_id = $1 AND user_id = $2 ORDER BY completed_date',
+      [req.params.id, req.user.id]
+    );
+    res.json(rows.map(r => ({ date: r.completed_date, status: r.status })));
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // POST /api/habits - create a habit
 router.post('/', async (req, res) => {
   try {
