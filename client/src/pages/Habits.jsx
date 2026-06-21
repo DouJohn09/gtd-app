@@ -44,10 +44,11 @@ export default function Habits() {
       const result = await api.habits.toggle(habitId, date);
       if (!date) {
         setHabits(prev => prev.map(h =>
-          h.id === habitId ? { ...h, completed_today: !h.completed_today } : h
+          h.id === habitId ? { ...h, today_status: result.status, completed_today: result.status === 'done' } : h
         ));
       }
-      addToast(date ? `Habit ${result.completed ? 'logged' : 'unlogged'} for ${date}` : undefined);
+      const verb = result.status === 'done' ? 'logged' : result.status === 'skipped' ? 'set to rest' : 'cleared';
+      addToast(date ? `Habit ${verb} for ${date}` : undefined);
       const statsData = await api.habits.getStats();
       setStats(statsData);
     } catch (err) { addToast(err.message, 'error'); }
@@ -82,9 +83,14 @@ export default function Habits() {
     return groups;
   }, [habits]);
 
-  const completedCount = habits.filter(h => h.completed_today).length;
+  // Rest days are resolved for the day, not misses — exclude them from the
+  // denominator so resting never reads as "behind". All-done-or-resting = a calm
+  // perfect day even if some were rested.
+  const completedCount = habits.filter(h => (h.today_status || (h.completed_today ? 'done' : 'none')) === 'done').length;
+  const skippedCount = habits.filter(h => h.today_status === 'skipped').length;
   const totalCount = habits.length;
-  const dayPct = totalCount > 0 ? completedCount / totalCount : 0;
+  const activeCount = totalCount - skippedCount;
+  const dayPct = activeCount > 0 ? completedCount / activeCount : (totalCount > 0 ? 1 : 0);
 
   if (loading) {
     return (
@@ -106,7 +112,7 @@ export default function Habits() {
             Habits
             {totalCount > 0 && (
               <span className="font-mono text-[14px] tracking-wider text-text-3 ml-3 align-middle">
-                {completedCount.toString().padStart(2, '0')}/{totalCount.toString().padStart(2, '0')}
+                {completedCount.toString().padStart(2, '0')}/{activeCount.toString().padStart(2, '0')}
               </span>
             )}
           </h1>
@@ -190,7 +196,7 @@ export default function Habits() {
               <div className="flex items-baseline gap-3 mb-3 px-1">
                 <div className="mono-label">{category.toLowerCase().replace(/\s+/g, '_')}</div>
                 <span className="font-mono text-[10.5px] text-text-3">
-                  {categoryHabits.filter(h => h.completed_today).length}/{categoryHabits.length}
+                  {categoryHabits.filter(h => h.completed_today).length}/{categoryHabits.filter(h => h.today_status !== 'skipped').length}
                 </span>
                 <div className="flex-1 h-px" style={{ background: 'linear-gradient(to right, rgba(255,255,255,0.06), transparent)' }} />
               </div>

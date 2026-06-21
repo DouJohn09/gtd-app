@@ -1,10 +1,14 @@
 import { useRef } from 'react';
-import { Flame, Pencil, Trash2, Calendar, Check } from 'lucide-react';
+import { Flame, Pencil, Trash2, Calendar, Check, Minus } from 'lucide-react';
 
 export default function HabitCard({ habit, onToggle, onEdit, onDelete }) {
   const dateInputRef = useRef(null);
   const today = new Date().toISOString().split('T')[0];
-  const done = habit.completed_today;
+  // Three states: done | skipped (rest day) | none. Fall back to the legacy
+  // boolean for any habit object that hasn't been refreshed with today_status.
+  const status = habit.today_status || (habit.completed_today ? 'done' : 'none');
+  const done = status === 'done';
+  const skipped = status === 'skipped';
 
   const handleDateChange = (e) => {
     const date = e.target.value;
@@ -20,12 +24,15 @@ export default function HabitCard({ habit, onToggle, onEdit, onDelete }) {
       style={
         done
           ? { boxShadow: '0 8px 32px -12px rgba(0,0,0,0.4), inset 0 1px 0 rgb(255 255 255 / 0.05), inset 0 0 0 1px rgba(255,255,255,0.05), inset 3px 0 0 rgb(var(--mint-glow))' }
-          : undefined
+          : skipped
+            ? { boxShadow: 'inset 0 1px 0 rgb(255 255 255 / 0.05), inset 0 0 0 1px rgba(255,255,255,0.05), inset 3px 0 0 rgba(255,255,255,0.18)' }
+            : undefined
       }
     >
       <button
         onClick={() => onToggle(habit.id)}
-        aria-pressed={done}
+        title={done ? 'Done — tap to mark as a rest day' : skipped ? 'Rest day — tap to clear' : 'Tap to mark done'}
+        aria-label={done ? 'Done. Tap to mark as a rest day.' : skipped ? 'Rest day. Tap to clear.' : 'Not done. Tap to mark done.'}
         className="fresh-check w-6 h-6 rounded-full grid place-items-center transition-all flex-shrink-0"
         style={
           done
@@ -33,17 +40,25 @@ export default function HabitCard({ habit, onToggle, onEdit, onDelete }) {
                 background: 'linear-gradient(180deg, rgb(var(--mint) / 0.85), rgb(var(--mint) / 0.65))',
                 boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.18), 0 0 14px rgb(var(--mint) / 0.4)',
               }
-            : { boxShadow: 'inset 0 0 0 1.5px rgba(255,255,255,0.18)' }
+            : skipped
+              ? { background: 'rgba(255,255,255,0.06)', boxShadow: 'inset 0 0 0 1.5px rgba(255,255,255,0.14)' }
+              : { boxShadow: 'inset 0 0 0 1.5px rgba(255,255,255,0.18)' }
         }
       >
         {done && <Check className="w-3.5 h-3.5 text-bg" strokeWidth={3} />}
+        {skipped && <Minus className="w-3.5 h-3.5 text-text-3" strokeWidth={3} />}
       </button>
 
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
-          <span className={`text-[14px] font-medium ${done ? 'line-through text-text-3' : 'text-text-1'}`}>
+          <span className={`text-[14px] font-medium ${done ? 'line-through text-text-3' : skipped ? 'text-text-3' : 'text-text-1'}`}>
             {habit.name}
           </span>
+          {skipped && (
+            <span className="font-mono text-[10px] uppercase tracking-wider text-text-3 px-1.5 py-0.5 rounded-md" style={{ boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.10)' }}>
+              rest day
+            </span>
+          )}
           {habit.category && (
             <span
               className="font-mono text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded-md"

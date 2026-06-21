@@ -99,4 +99,59 @@ t('completion (specific_days): only scheduled days count as expected', () => {
   assert.equal(r.completionRate, 50);
 });
 
+// --- skip / rest days (daily) ---
+t('daily streak: a skipped past due-day is neutral, does not break the streak', () => {
+  // done today, yesterday, day-before; 06-15 was a rest day (no completion logged)
+  const completed = set('2026-06-18', '2026-06-17', '2026-06-16', '2026-06-14');
+  const skipped = set('2026-06-15');
+  const { streak } = computeStreak({ frequency: 'daily' }, completed, TODAY, skipped);
+  // 18,17,16,(15 rest bridges),14 — chain survives the rest day. Streak counts the
+  // 4 completions; the rest day bridges but doesn't itself increment. (Contrast the
+  // next test: the same day *missed* instead of rested breaks the chain at 3.)
+  assert.equal(streak, 4);
+});
+t('daily streak: a missed (not skipped) past due-day still breaks it', () => {
+  const completed = set('2026-06-18', '2026-06-17', '2026-06-16', '2026-06-14'); // 06-15 simply missing
+  const { streak } = computeStreak({ frequency: 'daily' }, completed, TODAY); // no skip set
+  assert.equal(streak, 3); // breaks at the missing 06-15
+});
+t('daily streak: today marked as rest is neutral (counts back from yesterday)', () => {
+  const completed = set('2026-06-17', '2026-06-16', '2026-06-15');
+  const skipped = set('2026-06-18'); // resting today
+  const { streak } = computeStreak({ frequency: 'daily' }, completed, TODAY, skipped);
+  assert.equal(streak, 3);
+});
+
+// --- skip / rest days (specific_days) ---
+t('specific_days streak: skipped scheduled day is neutral', () => {
+  // Mon/Wed/Fri; completed Wed 06-17 & Mon 06-15, rested Fri 06-12, completed Wed 06-10
+  const completed = set('2026-06-17', '2026-06-15', '2026-06-10');
+  const skipped = set('2026-06-12');
+  const { streak } = computeStreak(mwf, completed, TODAY, skipped);
+  assert.equal(streak, 3); // 17,15,(12 rest),10 — holds across the rested Friday
+});
+
+// --- skip excluded from completion expected ---
+t('completion (daily): skipped due-days are excluded from expected', () => {
+  // 7d window: done 4 of the days, 1 day rested → expected drops to 6, not 7
+  const completed = set('2026-06-18', '2026-06-17', '2026-06-16', '2026-06-15');
+  const skipped = set('2026-06-14');
+  const r = computeCompletion({ frequency: 'daily' }, completed, TODAY, 7, skipped);
+  assert.equal(r.expectedLast30, 6); // 7 days − 1 rest day
+  assert.equal(r.completedLast30, 4);
+  assert.equal(r.completionRate, 67); // round(4/6 * 100)
+});
+
+// --- skip is a no-op for weekly ---
+t('weekly streak: skip set is ignored (no-op)', () => {
+  const completed = set(
+    '2026-06-15', '2026-06-16', '2026-06-17', // current week: 3 ✓
+    '2026-06-08', '2026-06-09', '2026-06-10', // prior week: 3 ✓
+  );
+  const skipped = set('2026-06-11'); // should have no effect on weekly
+  const { streak, unit } = computeStreak(weekly3, completed, TODAY, skipped);
+  assert.equal(streak, 2);
+  assert.equal(unit, 'week');
+});
+
 console.log(`\n✅ ${passed} habit-stats tests passed`);

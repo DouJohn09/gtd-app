@@ -21,16 +21,18 @@ router.get('/', async (req, res) => {
         [req.user.id]
       ),
       pool.query(
-        'SELECT habit_id FROM habit_logs WHERE user_id = $1 AND completed_date = $2',
+        'SELECT habit_id, status FROM habit_logs WHERE user_id = $1 AND completed_date = $2',
         [req.user.id, today]
       ),
     ]);
-    const completedToday = new Set(todayLogs.map(l => l.habit_id));
+    // habit_id → 'done' | 'skipped' for today (absent = 'none').
+    const todayStatus = new Map(todayLogs.map(l => [l.habit_id, l.status]));
 
     const result = habits.map(h => ({
       ...h,
       target_days: h.target_days ? JSON.parse(h.target_days) : null,
-      completed_today: completedToday.has(h.id),
+      today_status: todayStatus.get(h.id) || 'none',
+      completed_today: todayStatus.get(h.id) === 'done', // kept for back-compat
     }));
 
     res.json(result);
@@ -56,7 +58,7 @@ router.get('/stats', async (req, res) => {
         [req.user.id]
       ),
       pool.query(
-        'SELECT habit_id, completed_date FROM habit_logs WHERE user_id = $1 AND completed_date >= $2 ORDER BY completed_date',
+        'SELECT habit_id, completed_date, status FROM habit_logs WHERE user_id = $1 AND completed_date >= $2 ORDER BY completed_date',
         [req.user.id, startDate]
       ),
     ]);
@@ -64,11 +66,12 @@ router.get('/stats', async (req, res) => {
     const today = new Date().toISOString().split('T')[0];
     const habitStats = habits.map(habit => {
       const logs = allLogs.filter(l => l.habit_id === habit.id);
-      const completedSet = new Set(logs.map(l => l.completed_date));
+      const completedSet = new Set(logs.filter(l => l.status === 'done').map(l => l.completed_date));
+      const skippedSet = new Set(logs.filter(l => l.status === 'skipped').map(l => l.completed_date));
 
-      const { streak, unit: streakUnit } = computeStreak(habit, completedSet, today);
+      const { streak, unit: streakUnit } = computeStreak(habit, completedSet, today, skippedSet);
       const { completionRate, completedLast30, expectedLast30 } =
-        computeCompletion(habit, completedSet, today, 30);
+        computeCompletion(habit, completedSet, today, 30, skippedSet);
 
       return {
         id: habit.id,
@@ -83,9 +86,11 @@ router.get('/stats', async (req, res) => {
       };
     });
 
-    // Heatmap data: per-day completion counts for past 90 days
+    // Heatmap data: per-day completion counts for past 90 days. Only 'done' logs
+    // count — a rest day is neutral, so it shows as an empty (calm) cell, not a miss.
     const heatmap = {};
     for (const log of allLogs) {
+      if (log.status !== 'done') continue;
       heatmap[log.completed_date] = (heatmap[log.completed_date] || 0) + 1;
     }
 
@@ -120,6 +125,7 @@ router.post('/', async (req, res) => {
     );
     const habit = rows[0];
     habit.target_days = habit.target_days ? JSON.parse(habit.target_days) : null;
+    habit.today_status = 'none';
     habit.completed_today = false;
     res.status(201).json(habit);
   } catch (error) {
@@ -185,26 +191,38 @@ router.delete('/:id', async (req, res) => {
   }
 });
 
-// POST /api/habits/:id/toggle - toggle completion for a date
+// POST /api/habits/:id/toggle - cycle a date's state: none → done → skipped → none.
+// "Skipped" is a deliberate rest day (neutral for streaks/completion), so a third
+// tap clears the day entirely. Returns the new state; `completed` kept for back-compat.
 router.post('/:id/toggle', async (req, res) => {
   try {
     const date = req.body.date || new Date().toISOString().split('T')[0];
 
     const { rows: existingRows } = await pool.query(
-      'SELECT id FROM habit_logs WHERE habit_id = $1 AND completed_date = $2 AND user_id = $3',
+      'SELECT id, status FROM habit_logs WHERE habit_id = $1 AND completed_date = $2 AND user_id = $3',
       [req.params.id, date, req.user.id]
     );
+    const existing = existingRows[0];
 
-    if (existingRows[0]) {
-      await pool.query('DELETE FROM habit_logs WHERE id = $1', [existingRows[0].id]);
-      res.json({ completed: false, date });
-    } else {
+    let status;
+    if (!existing) {
+      // none → done
       await pool.query(
-        'INSERT INTO habit_logs (habit_id, completed_date, user_id) VALUES ($1, $2, $3)',
+        "INSERT INTO habit_logs (habit_id, completed_date, user_id, status) VALUES ($1, $2, $3, 'done')",
         [req.params.id, date, req.user.id]
       );
-      res.json({ completed: true, date });
+      status = 'done';
+    } else if (existing.status === 'done') {
+      // done → skipped
+      await pool.query("UPDATE habit_logs SET status = 'skipped' WHERE id = $1", [existing.id]);
+      status = 'skipped';
+    } else {
+      // skipped → none
+      await pool.query('DELETE FROM habit_logs WHERE id = $1', [existing.id]);
+      status = 'none';
     }
+
+    res.json({ status, completed: status === 'done', date });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Internal server error' });
@@ -275,7 +293,12 @@ export function isDueOn(habit, dateStr) {
 // (non-scheduled days skipped; an unfinished today doesn't break it). weekly →
 // consecutive weeks that met the X-times target. Returns the count and its unit
 // ('day' | 'week') so the UI can label "5 d" vs "5 wk".
-export function computeStreak(habit, completedSet, todayStr) {
+//
+// `skippedSet` holds days the user marked as a deliberate rest. A skipped due-day
+// is treated like a non-scheduled day: neutral — it neither extends nor breaks
+// the streak. Skip is a no-op for weekly habits (their target is per-week, not
+// per-day), so skippedSet is ignored there.
+export function computeStreak(habit, completedSet, todayStr, skippedSet = new Set()) {
   if (habit.frequency === 'weekly') {
     const target = weeklyTarget(habit);
     const currentWeek = startOfWeekStr(todayStr);
@@ -299,6 +322,7 @@ export function computeStreak(habit, completedSet, todayStr) {
   for (let guard = 0; guard < 366; guard++) {
     if (isDueOn(habit, cursor)) {
       if (completedSet.has(cursor)) streak++;
+      else if (skippedSet.has(cursor)) { /* rest day — neutral, keep looking back */ }
       else if (cursor !== todayStr) break; // a missed past due-day ends the streak
       // else: due today but not done yet — don't penalize, keep looking back
     }
@@ -310,7 +334,10 @@ export function computeStreak(habit, completedSet, todayStr) {
 // Completion rate over the last `windowDays`. daily/specific_days count
 // scheduled days; weekly counts logged completions against the pro-rated weekly
 // target. Rate clamped to 0–100.
-export function computeCompletion(habit, completedSet, todayStr, windowDays = 30) {
+//
+// A skipped due-day is excluded from `expected` entirely (it's a rest day, not a
+// miss), so resting never drags the rate down. Skip is a no-op for weekly habits.
+export function computeCompletion(habit, completedSet, todayStr, windowDays = 30, skippedSet = new Set()) {
   if (habit.frequency === 'weekly') {
     const target = weeklyTarget(habit);
     let completed = 0;
@@ -329,7 +356,7 @@ export function computeCompletion(habit, completedSet, todayStr, windowDays = 30
   let completed = 0;
   for (let i = 0; i < windowDays; i++) {
     const ds = addDaysStr(todayStr, -i);
-    if (isDueOn(habit, ds)) {
+    if (isDueOn(habit, ds) && !skippedSet.has(ds)) {
       expected++;
       if (completedSet.has(ds)) completed++;
     }

@@ -264,6 +264,9 @@ export default function HabitModal({ habit, onClose, onSave, existingCategories 
                 onChange={e => setForm({ ...form, target_days: [parseInt(e.target.value)] })}
                 className="gtd-input w-24"
               />
+              <p className="text-[11.5px] text-text-3 mt-1.5">
+                A goal, not a quota — hit it on whichever days suit you.
+              </p>
             </div>
           )}
 
