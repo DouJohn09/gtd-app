@@ -86,7 +86,7 @@ export default function HabitCalendar({ habit, onToggle, onClose }) {
   const cellStyle = (dateStr) => {
     const status = logs[dateStr];
     const future = dateStr > todayStr;
-    if (future) return { opacity: 0.25 };
+    if (future) return { opacity: 0.4, boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.05)', color: 'rgb(var(--text-3))' };
     if (status === 'done') {
       return { background: 'linear-gradient(180deg, rgb(var(--mint) / 0.85), rgb(var(--mint) / 0.6))', color: 'rgb(var(--bg))' };
     }
@@ -110,9 +110,14 @@ export default function HabitCalendar({ habit, onToggle, onClose }) {
       onClick={onClose}
     >
       <div
-        className="relative w-full max-w-[340px] rounded-2xl glass overflow-hidden"
+        className="relative w-full max-w-[340px] max-h-[90vh] overflow-y-auto rounded-2xl glass"
         onClick={e => e.stopPropagation()}
-        style={{ boxShadow: '0 24px 64px -16px rgba(0,0,0,0.55), inset 0 1px 0 rgb(255 255 255 / 0.06), inset 0 0 0 1px rgb(var(--mint) / 0.16)' }}
+        style={{
+          // Opaque dark base so the busy habit list behind doesn't bleed through
+          // the grid (the .glass white layer alone is too translucent here).
+          background: 'linear-gradient(180deg, rgb(22 22 32 / 0.98), rgb(15 15 23 / 0.98))',
+          boxShadow: '0 24px 64px -16px rgba(0,0,0,0.55), inset 0 1px 0 rgb(255 255 255 / 0.06), inset 0 0 0 1px rgb(var(--mint) / 0.16)',
+        }}
       >
         {/* Header */}
         <div className="flex items-start justify-between p-4 border-b border-white/[0.05]">
