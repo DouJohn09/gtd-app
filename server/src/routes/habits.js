@@ -295,9 +295,11 @@ router.delete('/:id', async (req, res) => {
   }
 });
 
-// POST /api/habits/:id/toggle - cycle a date's state.
-//   build habits: none → done → skipped → none ('skipped' = a neutral rest day).
-//   quit habits:  none → slip → none           (a logged day is a slip; no rest).
+// POST /api/habits/:id/toggle - set or cycle a date's state.
+//   With body.status ('done'|'skipped'|'slip'|'none'): set that state directly
+//     (used by the calendar's explicit state buttons — non-destructive selection).
+//   Without it: cycle. build: none → done → skipped → none ('skipped' = rest day);
+//     quit: none → slip → none (a logged day is a slip; no rest).
 // Returns the new state; `completed` kept for back-compat.
 router.post('/:id/toggle', async (req, res) => {
   try {
@@ -309,6 +311,26 @@ router.post('/:id/toggle', async (req, res) => {
     );
     if (!habitRows[0]) return res.status(404).json({ error: 'Habit not found' });
     const isQuit = habitRows[0].type === 'quit';
+
+    // Direct set (explicit target status). Upsert keeps any existing note.
+    if (req.body.status !== undefined) {
+      const target = req.body.status;
+      const allowed = isQuit ? ['slip', 'none'] : ['done', 'skipped', 'none'];
+      if (!allowed.includes(target)) return res.status(400).json({ error: 'Invalid status for this habit' });
+      if (target === 'none') {
+        await pool.query(
+          'DELETE FROM habit_logs WHERE habit_id = $1 AND completed_date = $2 AND user_id = $3',
+          [req.params.id, date, req.user.id]
+        );
+      } else {
+        await pool.query(
+          `INSERT INTO habit_logs (habit_id, completed_date, user_id, status) VALUES ($1, $2, $3, $4)
+           ON CONFLICT (habit_id, completed_date) DO UPDATE SET status = EXCLUDED.status`,
+          [req.params.id, date, req.user.id, target]
+        );
+      }
+      return res.json({ status: target, completed: target === 'done', date });
+    }
 
     const { rows: existingRows } = await pool.query(
       'SELECT id, status FROM habit_logs WHERE habit_id = $1 AND completed_date = $2 AND user_id = $3',

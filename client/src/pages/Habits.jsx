@@ -43,7 +43,7 @@ export default function Habits() {
 
   const handleToggle = async (habitId, date, opts = {}) => {
     try {
-      const result = await api.habits.toggle(habitId, date);
+      const result = await api.habits.toggle(habitId, date, opts.status);
       const todayStr = new Date().toISOString().split('T')[0];
       // Keep the card's today control in sync whether toggled from the circle
       // (no date) or via the calendar popover (date === today).

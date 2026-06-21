@@ -114,7 +114,7 @@ export const api = {
     create: (habit) => fetchApi('/habits', { method: 'POST', body: JSON.stringify(habit) }),
     update: (id, updates) => fetchApi(`/habits/${id}`, { method: 'PUT', body: JSON.stringify(updates) }),
     delete: (id) => fetchApi(`/habits/${id}`, { method: 'DELETE' }),
-    toggle: (id, date = undefined) => fetchApi(`/habits/${id}/toggle`, { method: 'POST', body: JSON.stringify({ date }) }),
+    toggle: (id, date = undefined, status = undefined) => fetchApi(`/habits/${id}/toggle`, { method: 'POST', body: JSON.stringify({ date, status }) }),
     logs: (id) => fetchApi(`/habits/${id}/logs`),
     setLogNote: (id, date, note) => fetchApi(`/habits/${id}/logs/${date}`, { method: 'PUT', body: JSON.stringify({ note }) }),
     setRestDays: (from, to) => fetchApi('/habits/rest-days', { method: 'POST', body: JSON.stringify({ from, to }) }),

@@ -45,11 +45,12 @@ export default function HabitCalendar({ habit, onToggle, onClose }) {
     return () => { alive = false; };
   }, [habit.id]);
 
-  // Load the selected day's note into the editor when the selection changes or
-  // logs first arrive (not on every keystroke, so typing isn't clobbered).
+  // Sync the editor to the selected day's saved note — on selection change, on
+  // load, and when the day's state is cleared/recreated. Not on every keystroke
+  // (we only setLogs on blur), so typing isn't clobbered.
   useEffect(() => {
     setNoteDraft(logs[selectedDate]?.note || '');
-  }, [selectedDate, loading]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [selectedDate, logs[selectedDate]?.note]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const h = (e) => { if (e.key === 'Escape') onClose(); };
@@ -76,17 +77,24 @@ export default function HabitCalendar({ habit, onToggle, onClose }) {
   };
   const atCurrentMonth = year === Number(todayStr.slice(0, 4)) && month === Number(todayStr.slice(5, 7)) - 1;
 
-  const handleDayClick = async (dateStr) => {
-    if (!dateStr || dateStr > todayStr || busy) return;
-    setSelectedDate(dateStr); // point the note editor at this day
+  // Clicking a day only SELECTS it (shows its state + note) — never mutates, so
+  // opening a note can't accidentally change a logged day. State changes go through
+  // the explicit buttons below.
+  const handleDayClick = (dateStr) => {
+    if (!dateStr || dateStr > todayStr) return;
+    setSelectedDate(dateStr);
+  };
+
+  const setStatus = async (target) => {
+    if (busy || !selectedDate || selectedDate > todayStr) return;
     setBusy(true);
     try {
-      const r = await onToggle(habit.id, dateStr, { silent: true });
+      const r = await onToggle(habit.id, selectedDate, { silent: true, status: target });
       if (r) {
         setLogs(prev => {
           const next = { ...prev };
-          if (r.status === 'none') delete next[dateStr]; // clearing the day drops its note too
-          else next[dateStr] = { status: r.status, note: prev[dateStr]?.note || null };
+          if (r.status === 'none') delete next[selectedDate]; // clearing drops the note too
+          else next[selectedDate] = { status: r.status, note: prev[selectedDate]?.note || null };
           return next;
         });
       }
@@ -206,7 +214,7 @@ export default function HabitCalendar({ habit, onToggle, onClose }) {
                   <button
                     key={i}
                     onClick={() => handleDayClick(dateStr)}
-                    disabled={future || busy}
+                    disabled={future}
                     title={future ? '' : (logs[dateStr]?.note || dateStr)}
                     className="relative aspect-square rounded-lg grid place-items-center text-[12px] font-medium transition-all disabled:cursor-default"
                     style={{ ...cellStyle(dateStr), ...(isSelected && !future ? { outline: '1px solid rgb(var(--mint) / 0.6)', outlineOffset: '-1px' } : {}) }}
@@ -224,44 +232,54 @@ export default function HabitCalendar({ habit, onToggle, onClose }) {
             </div>
           )}
 
-          {/* Note for the selected day */}
-          {!loading && (
-            <div className="mt-3 pt-3 border-t border-white/[0.05]">
-              <div className="mono-label mb-1.5 text-text-3">
-                note · {MONTHS[Number(selectedDate.slice(5, 7)) - 1].slice(0, 3)} {Number(selectedDate.slice(8, 10))}
+          {/* Detail for the selected day: set its state (explicit, non-destructive)
+              and add an optional note. Selecting a day above never mutates it. */}
+          {!loading && (() => {
+            const sel = logs[selectedDate];
+            const selStatus = sel?.status || 'none';
+            const selFuture = selectedDate > todayStr;
+            const options = isQuit
+              ? [{ v: 'slip', label: 'Slip' }, { v: 'none', label: 'Clean' }]
+              : [{ v: 'done', label: 'Done' }, { v: 'skipped', label: 'Rest' }, { v: 'none', label: 'Clear' }];
+            return (
+              <div className="mt-3 pt-3 border-t border-white/[0.05]">
+                <div className="mono-label mb-2 text-text-3">
+                  {MONTHS[Number(selectedDate.slice(5, 7)) - 1].slice(0, 3)} {Number(selectedDate.slice(8, 10))}
+                </div>
+                <div className={`grid gap-1.5 mb-2 ${isQuit ? 'grid-cols-2' : 'grid-cols-3'}`}>
+                  {options.map(opt => {
+                    const active = selStatus === opt.v;
+                    return (
+                      <button
+                        key={opt.v}
+                        onClick={() => setStatus(opt.v)}
+                        disabled={busy || selFuture}
+                        className="py-1.5 rounded-lg text-[12px] font-medium transition-all disabled:opacity-40"
+                        style={active
+                          ? { background: 'linear-gradient(180deg, rgb(var(--mint) / 0.22), rgb(var(--mint) / 0.10))', color: 'rgb(var(--mint-glow))', boxShadow: 'inset 0 0 0 1px rgb(var(--mint) / 0.35)' }
+                          : { color: 'rgb(var(--text-2))', boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.08)' }}
+                      >
+                        {opt.label}
+                      </button>
+                    );
+                  })}
+                </div>
+                {sel ? (
+                  <input
+                    value={noteDraft}
+                    onChange={e => setNoteDraft(e.target.value)}
+                    onBlur={commitNote}
+                    onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+                    maxLength={500}
+                    placeholder="Add a note for this day…"
+                    className="gtd-input text-[13px]"
+                  />
+                ) : (
+                  <p className="text-[12px] text-text-3">{selFuture ? "Can't log a future day." : 'Set a state above to add a note.'}</p>
+                )}
               </div>
-              {logs[selectedDate] ? (
-                <input
-                  value={noteDraft}
-                  onChange={e => setNoteDraft(e.target.value)}
-                  onBlur={commitNote}
-                  onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); }}
-                  maxLength={500}
-                  placeholder="Add a note for this day…"
-                  className="gtd-input text-[13px]"
-                />
-              ) : (
-                <p className="text-[12px] text-text-3">Mark this day to add a note.</p>
-              )}
-            </div>
-          )}
-
-          {/* Legend */}
-          <div className="flex items-center justify-center gap-3 mt-4 font-mono text-[10px] text-text-3">
-            {isQuit ? (
-              <>
-                <span className="inline-flex items-center gap-1"><X className="w-3 h-3" style={{ color: 'rgb(var(--rose-glow))' }} /> slip</span>
-                <span className="inline-flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm" style={{ background: 'rgb(var(--mint) / 0.10)' }} /> clean</span>
-                <span>tap a day to toggle</span>
-              </>
-            ) : (
-              <>
-                <span className="inline-flex items-center gap-1"><Check className="w-3 h-3" style={{ color: 'rgb(var(--mint-glow))' }} /> done</span>
-                <span className="inline-flex items-center gap-1"><Minus className="w-3 h-3" /> rest</span>
-                <span>tap to cycle</span>
-              </>
-            )}
-          </div>
+            );
+          })()}
         </div>
       </div>
     </div>,
