@@ -23,9 +23,13 @@ export default function HabitCalendar({ habit, onToggle, onClose }) {
 
   const [year, setYear] = useState(Number(todayStr.slice(0, 4)));
   const [month, setMonth] = useState(Number(todayStr.slice(5, 7)) - 1); // 0-11
-  const [logs, setLogs] = useState({}); // 'YYYY-MM-DD' -> status
+  const [logs, setLogs] = useState({}); // 'YYYY-MM-DD' -> { status, note }
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [selectedDate, setSelectedDate] = useState(todayStr); // day the note editor targets
+  const [noteDraft, setNoteDraft] = useState('');
+
+  const statusOf = (d) => logs[d]?.status;
 
   useEffect(() => {
     let alive = true;
@@ -33,13 +37,19 @@ export default function HabitCalendar({ habit, onToggle, onClose }) {
       .then(data => {
         if (!alive) return;
         const map = {};
-        data.forEach(l => { map[l.date] = l.status; });
+        data.forEach(l => { map[l.date] = { status: l.status, note: l.note || null }; });
         setLogs(map);
       })
       .catch(() => {})
       .finally(() => { if (alive) setLoading(false); });
     return () => { alive = false; };
   }, [habit.id]);
+
+  // Load the selected day's note into the editor when the selection changes or
+  // logs first arrive (not on every keystroke, so typing isn't clobbered).
+  useEffect(() => {
+    setNoteDraft(logs[selectedDate]?.note || '');
+  }, [selectedDate, loading]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const h = (e) => { if (e.key === 'Escape') onClose(); };
@@ -68,14 +78,15 @@ export default function HabitCalendar({ habit, onToggle, onClose }) {
 
   const handleDayClick = async (dateStr) => {
     if (!dateStr || dateStr > todayStr || busy) return;
+    setSelectedDate(dateStr); // point the note editor at this day
     setBusy(true);
     try {
       const r = await onToggle(habit.id, dateStr, { silent: true });
       if (r) {
         setLogs(prev => {
           const next = { ...prev };
-          if (r.status === 'none') delete next[dateStr];
-          else next[dateStr] = r.status;
+          if (r.status === 'none') delete next[dateStr]; // clearing the day drops its note too
+          else next[dateStr] = { status: r.status, note: prev[dateStr]?.note || null };
           return next;
         });
       }
@@ -84,8 +95,18 @@ export default function HabitCalendar({ habit, onToggle, onClose }) {
     }
   };
 
+  // Save the note for the selected day (only meaningful if that day has a log).
+  const commitNote = async () => {
+    const draft = noteDraft.trim();
+    if (!logs[selectedDate] || draft === (logs[selectedDate]?.note || '')) return;
+    try {
+      const r = await api.habits.setLogNote(habit.id, selectedDate, draft);
+      setLogs(prev => ({ ...prev, [selectedDate]: { ...prev[selectedDate], note: r.note } }));
+    } catch { /* keep draft on failure */ }
+  };
+
   const cellStyle = (dateStr) => {
-    const status = logs[dateStr];
+    const status = statusOf(dateStr);
     const future = dateStr > todayStr;
     if (future) return { opacity: 0.4, boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.05)', color: 'rgb(var(--text-3))' };
     if (status === 'done') {
@@ -178,24 +199,50 @@ export default function HabitCalendar({ habit, onToggle, onClose }) {
                 if (!dateStr) return <div key={i} />;
                 const future = dateStr > todayStr;
                 const day = Number(dateStr.slice(8, 10));
-                const status = logs[dateStr];
-                const isToday = dateStr === todayStr;
+                const status = statusOf(dateStr);
+                const hasNote = !!logs[dateStr]?.note;
+                const isSelected = dateStr === selectedDate;
                 return (
                   <button
                     key={i}
                     onClick={() => handleDayClick(dateStr)}
                     disabled={future || busy}
-                    title={future ? '' : dateStr}
+                    title={future ? '' : (logs[dateStr]?.note || dateStr)}
                     className="relative aspect-square rounded-lg grid place-items-center text-[12px] font-medium transition-all disabled:cursor-default"
-                    style={{ ...cellStyle(dateStr), ...(isToday ? { outline: '1px solid rgb(var(--mint) / 0.5)', outlineOffset: '-1px' } : {}) }}
+                    style={{ ...cellStyle(dateStr), ...(isSelected && !future ? { outline: '1px solid rgb(var(--mint) / 0.6)', outlineOffset: '-1px' } : {}) }}
                   >
                     {status === 'done' ? <Check className="w-3.5 h-3.5" strokeWidth={3} />
                       : status === 'skipped' ? <Minus className="w-3.5 h-3.5" strokeWidth={3} />
                       : status === 'slip' ? <X className="w-3.5 h-3.5" strokeWidth={3} />
                       : day}
+                    {hasNote && (
+                      <span className="absolute top-1 right-1 w-1 h-1 rounded-full" style={{ background: 'rgb(var(--amber-glow))' }} />
+                    )}
                   </button>
                 );
               })}
+            </div>
+          )}
+
+          {/* Note for the selected day */}
+          {!loading && (
+            <div className="mt-3 pt-3 border-t border-white/[0.05]">
+              <div className="mono-label mb-1.5 text-text-3">
+                note · {MONTHS[Number(selectedDate.slice(5, 7)) - 1].slice(0, 3)} {Number(selectedDate.slice(8, 10))}
+              </div>
+              {logs[selectedDate] ? (
+                <input
+                  value={noteDraft}
+                  onChange={e => setNoteDraft(e.target.value)}
+                  onBlur={commitNote}
+                  onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+                  maxLength={500}
+                  placeholder="Add a note for this day…"
+                  className="gtd-input text-[13px]"
+                />
+              ) : (
+                <p className="text-[12px] text-text-3">Mark this day to add a note.</p>
+              )}
             </div>
           )}
 

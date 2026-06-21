@@ -172,10 +172,31 @@ router.get('/:id/logs', async (req, res) => {
     if (!owner[0]) return res.status(404).json({ error: 'Habit not found' });
 
     const { rows } = await pool.query(
-      'SELECT completed_date, status FROM habit_logs WHERE habit_id = $1 AND user_id = $2 ORDER BY completed_date',
+      'SELECT completed_date, status, note FROM habit_logs WHERE habit_id = $1 AND user_id = $2 ORDER BY completed_date',
       [req.params.id, req.user.id]
     );
-    res.json(rows.map(r => ({ date: r.completed_date, status: r.status })));
+    res.json(rows.map(r => ({ date: r.completed_date, status: r.status, note: r.note })));
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// PUT /api/habits/:id/logs/:date { note } - set/clear the note on a day's log.
+// The log must exist (a note attaches to a logged day); empty note clears it.
+router.put('/:id/logs/:date', async (req, res) => {
+  try {
+    if (!ISO_DATE.test(req.params.date)) return res.status(400).json({ error: 'Invalid date' });
+    const note = typeof req.body.note === 'string' && req.body.note.trim()
+      ? req.body.note.trim().slice(0, 500)
+      : null;
+
+    const { rowCount } = await pool.query(
+      'UPDATE habit_logs SET note = $1 WHERE habit_id = $2 AND completed_date = $3 AND user_id = $4',
+      [note, req.params.id, req.params.date, req.user.id]
+    );
+    if (rowCount === 0) return res.status(404).json({ error: 'No log for that day' });
+    res.json({ ok: true, note });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Internal server error' });
