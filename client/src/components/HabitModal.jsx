@@ -97,8 +97,8 @@ export default function HabitModal({ habit, onClose, onSave, existingCategories 
       name: form.name.trim(),
       description: form.description.trim() || null,
       category: category || null,
-      target_days: form.frequency === 'specific_days' ? form.target_days
-        : form.frequency === 'weekly' ? form.target_days
+      target_days: ['specific_days', 'weekly', 'interval'].includes(form.frequency)
+        ? form.target_days
         : null,
     };
     onSave(data);
@@ -186,12 +186,13 @@ export default function HabitModal({ habit, onClose, onSave, existingCategories 
               <label className="gtd-label">Frequency</label>
               <select
                 value={form.frequency}
-                onChange={e => setForm({ ...form, frequency: e.target.value })}
+                onChange={e => setForm({ ...form, frequency: e.target.value, target_days: [] })}
                 className="gtd-input"
               >
                 <option value="daily">Daily</option>
                 <option value="weekly">Weekly (X times)</option>
                 <option value="specific_days">Specific Days</option>
+                <option value="interval">Every N days</option>
               </select>
             </div>
 
@@ -266,6 +267,25 @@ export default function HabitModal({ habit, onClose, onSave, existingCategories 
               />
               <p className="text-[11.5px] text-text-3 mt-1.5">
                 A goal, not a quota — hit it on whichever days suit you.
+              </p>
+            </div>
+          )}
+
+          {form.frequency === 'interval' && (
+            <div>
+              <label className="gtd-label">Repeat every</label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  min="2" max="365"
+                  value={form.target_days[0] || 2}
+                  onChange={e => setForm({ ...form, target_days: [parseInt(e.target.value)] })}
+                  className="gtd-input w-24"
+                />
+                <span className="text-[13px] text-text-3">days</span>
+              </div>
+              <p className="text-[11.5px] text-text-3 mt-1.5">
+                Counts from the day you create it — e.g. every 3 days.
               </p>
             </div>
           )}

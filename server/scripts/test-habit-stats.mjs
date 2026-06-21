@@ -142,6 +142,35 @@ t('completion (daily): skipped due-days are excluded from expected', () => {
   assert.equal(r.completionRate, 67); // round(4/6 * 100)
 });
 
+// --- interval ("every N days") ---
+// Anchor 2026-06-09 (a Tuesday), N=3 → due 06-09, 06-12, 06-15, 06-18, 06-21…
+const every3 = { frequency: 'interval', target_days: [3], created_at: '2026-06-09' };
+t('isDueOn interval: due on anchor + every Nth day, not between', () => {
+  assert.equal(isDueOn(every3, '2026-06-18'), true);   // diff 9
+  assert.equal(isDueOn(every3, '2026-06-15'), true);   // diff 6
+  assert.equal(isDueOn(every3, '2026-06-09'), true);   // diff 0 (anchor)
+  assert.equal(isDueOn(every3, '2026-06-17'), false);  // diff 8
+  assert.equal(isDueOn(every3, '2026-06-06'), false);  // before the anchor
+});
+t('interval streak: counts back over due days, stops at the anchor', () => {
+  const completed = set('2026-06-18', '2026-06-15', '2026-06-12', '2026-06-09');
+  const { streak, unit } = computeStreak(every3, completed, TODAY);
+  assert.equal(streak, 4); // 4 due-days completed; nothing due before the anchor
+  assert.equal(unit, 'day');
+});
+t('interval streak: a missed due-day breaks it (non-due days ignored)', () => {
+  const completed = set('2026-06-18', '2026-06-15'); // 06-12 due but missing
+  const { streak } = computeStreak(every3, completed, TODAY);
+  assert.equal(streak, 2);
+});
+t('interval completion: only interval due-days count as expected', () => {
+  // last 30d due-days ≥ anchor: 06-09, 06-12, 06-15, 06-18 = 4 expected
+  const r = computeCompletion(every3, set('2026-06-18', '2026-06-15', '2026-06-12'), TODAY, 30);
+  assert.equal(r.expectedLast30, 4);
+  assert.equal(r.completedLast30, 3);
+  assert.equal(r.completionRate, 75);
+});
+
 // --- skip is a no-op for weekly ---
 t('weekly streak: skip set is ignored (no-op)', () => {
   const completed = set(

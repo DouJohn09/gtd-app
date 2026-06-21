@@ -265,6 +265,24 @@ function weeklyTarget(habit) {
   return Math.max(1, parseInt(parseTargetDays(habit)[0], 10) || 1);
 }
 
+// Interval length N = "every N days" (stored in target_days[0], like weekly).
+// Minimum 2 — "every 1 day" is just `daily`.
+function intervalN(habit) {
+  return Math.max(2, parseInt(parseTargetDays(habit)[0], 10) || 2);
+}
+
+// Interval habits are anchored to their creation date (UTC): due on the anchor
+// and every Nth day after. created_at may arrive as a Date (pg) or a string.
+function anchorDateStr(habit) {
+  const c = habit.created_at;
+  if (!c) return null;
+  return (c instanceof Date ? c.toISOString() : String(c)).slice(0, 10);
+}
+
+function daysBetweenStr(a, b) {
+  return Math.round((Date.parse(b + 'T00:00:00Z') - Date.parse(a + 'T00:00:00Z')) / 86400000);
+}
+
 // Monday-based start of the week containing dateStr.
 function startOfWeekStr(dateStr) {
   const dow = dowUTC(dateStr);
@@ -280,11 +298,19 @@ function countCompletedInWeek(completedSet, weekStartStr) {
   return n;
 }
 
-// Is this habit scheduled on the given date? Daily/specific_days only; weekly
-// habits have no fixed days and are handled per-week elsewhere.
+// Is this habit scheduled on the given date? Daily/specific_days/interval have
+// fixed due-days; weekly habits have no fixed days and are handled per-week
+// elsewhere. Because streak/completion only special-case weekly and otherwise
+// loop over isDueOn, teaching this function about intervals is all that's needed.
 export function isDueOn(habit, dateStr) {
   if (habit.frequency === 'specific_days') {
     return parseTargetDays(habit).includes(DAY_NAMES[dowUTC(dateStr)]);
+  }
+  if (habit.frequency === 'interval') {
+    const anchor = anchorDateStr(habit);
+    if (!anchor) return false;
+    const diff = daysBetweenStr(anchor, dateStr);
+    return diff >= 0 && diff % intervalN(habit) === 0; // on the anchor or every Nth day after
   }
   return habit.frequency === 'daily';
 }
