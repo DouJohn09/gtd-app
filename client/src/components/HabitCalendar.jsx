@@ -105,17 +105,19 @@ export default function HabitCalendar({ habit, onToggle, onClose }) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 z-50 flex items-start justify-center p-4 sm:p-8 overflow-y-auto"
       style={{ background: 'rgba(8,8,14,0.55)', backdropFilter: 'blur(8px)' }}
       onClick={onClose}
     >
       <div
-        className="relative w-full max-w-[340px] max-h-[90vh] overflow-y-auto rounded-2xl"
+        className="relative w-full max-w-[340px] my-6 rounded-2xl"
         onClick={e => e.stopPropagation()}
         style={{
-          // Fully opaque, no backdrop-filter: the shared .glass layer is too
-          // translucent here and let the busy habit list bleed through the grid.
-          // A solid base can't bleed under any compositing path.
+          // Fully opaque, no backdrop-filter, and NO height cap on the panel:
+          // the .glass layer was too translucent, and a max-h + overflow on the
+          // panel let the lower rows spill outside the painted background. The
+          // panel now sizes to its content (solid bg covers all of it) and the
+          // overlay scrolls if the viewport is short — same pattern as HabitModal.
           background: '#15151d',
           border: '1px solid rgba(255,255,255,0.08)',
           boxShadow: '0 24px 64px -16px rgba(0,0,0,0.6), inset 0 1px 0 rgb(255 255 255 / 0.06), inset 0 0 0 1px rgb(var(--mint) / 0.16)',
