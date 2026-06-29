@@ -8,9 +8,15 @@
   </url>
   <url>
     <loc>https://cleartable.app/blog/</loc>
-    <lastmod>2026-06-26</lastmod>
+    <lastmod>2026-06-29</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://cleartable.app/blog/what-is-getting-things-done.html</loc>
+    <lastmod>2026-06-29</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
   </url>
   <url>
     <loc>https://cleartable.app/blog/how-to-stop-procrastinating.html</loc>
