@@ -65,7 +65,7 @@ export function sortTasks(tasks, sortBy) {
   });
 }
 
-export default function SortDropdown({ value, onChange, completed = false }) {
+export default function SortDropdown({ value, onChange, completed = false, compact = false }) {
   const options = completed ? COMPLETED_SORT_OPTIONS : SORT_OPTIONS;
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
@@ -96,7 +96,7 @@ export default function SortDropdown({ value, onChange, completed = false }) {
         className="inline-flex items-center gap-1.5 rounded-xl glass px-2.5 py-1.5 transition-colors hover:bg-white/[0.06]"
       >
         <ArrowUpDown className="w-3.5 h-3.5 text-text-3" />
-        <span className="font-mono text-[11px] uppercase tracking-wider text-text-2">
+        <span className={`font-mono text-[11px] uppercase tracking-wider text-text-2 ${compact ? 'hidden sm:inline' : ''}`}>
           {current?.label || 'Sort'}
         </span>
       </button>

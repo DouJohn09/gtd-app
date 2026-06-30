@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Inbox, ListTodo, Clock, CloudSun, CheckCircle2, Target, Sparkles,
-  ArrowUpRight, ChevronRight, Flame, Plus, EyeOff,
+  ArrowUpRight, ChevronRight, Flame, Plus, X,
 } from 'lucide-react';
 import { api } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
@@ -11,7 +11,8 @@ import { linkify } from '../lib/linkify.jsx';
 import { useToast } from '../components/Toast';
 import TaskModal from '../components/TaskModal';
 import SortDropdown, { sortTasks } from '../components/SortDropdown';
-import FilterDropdown, { useTaskFilters, applyFilters } from '../components/FilterDropdown';
+import { useTaskFilters, applyFilters } from '../components/FilterDropdown';
+import FiltersMenu from '../components/FiltersMenu';
 import GlassCard from '../components/ui/GlassCard';
 import Chip from '../components/ui/Chip';
 import FreshCheck from '../components/ui/FreshCheck';
@@ -63,6 +64,8 @@ export default function Dashboard() {
   const [filterContext, setFilterContext] = useState(() => localStorage.getItem('filter_context_focus') || '');
   const [filterProject, setFilterProject] = useState(() => localStorage.getItem('filter_project_focus') || '');
   const [hideOverdue, setHideOverdue] = useState(() => localStorage.getItem('hide_overdue_focus') === 'true');
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiResult, setAiResult] = useState(null); // { pickIds: [...ordered], reasonById: { [id]: { confidence, reason } } }
   const { user } = useAuth();
   const { addToast } = useToast();
 
@@ -126,6 +129,56 @@ export default function Dashboard() {
     return sortTasks(withoutOverdue, sortBy);
   }, [dailyFocus, sortBy, filterContext, filterProject, hideOverdue]);
 
+  // When AI suggest is active, float its picks (those still present in the
+  // visible list) to the top in the AI's order; everything else keeps its sort.
+  const { aiPicks, restFocus } = useMemo(() => {
+    if (!aiResult) return { aiPicks: null, restFocus: sortedFocus };
+    const order = new Map(aiResult.pickIds.map((id, i) => [id, i]));
+    const picks = sortedFocus
+      .filter(t => order.has(t.id))
+      .sort((a, b) => order.get(a.id) - order.get(b.id));
+    const rest = sortedFocus.filter(t => !order.has(t.id));
+    return { aiPicks: picks, restFocus: rest };
+  }, [aiResult, sortedFocus]);
+  const hasAiPicks = !!aiPicks && aiPicks.length > 0;
+
+  const runAiSuggest = async () => {
+    if (aiLoading) return;
+    setAiLoading(true);
+    try {
+      const result = await api.ai.getDailyPriorities();
+      const focus = result?.suggested_focus || [];
+      const tasks = result?.tasks || [];
+      const pickIds = [];
+      const reasonById = {};
+      for (const f of focus) {
+        const task = tasks[f.task_index - 1];
+        if (!task) continue;
+        pickIds.push(task.id);
+        reasonById[task.id] = { confidence: f.confidence, reason: f.reason };
+      }
+      if (pickIds.length === 0) {
+        setAiResult(null);
+        addToast('AI had no strong picks right now.', 'info');
+        return;
+      }
+      setAiResult({ pickIds, reasonById });
+      const shown = pickIds.filter(id => dailyFocus.some(t => t.id === id)).length;
+      addToast(
+        shown > 0
+          ? `AI surfaced ${shown} ${shown === 1 ? 'task' : 'tasks'} to focus on.`
+          : "AI's picks aren't on today's list — open AI assistant to add them.",
+        shown > 0 ? 'success' : 'info',
+      );
+    } catch (e) {
+      console.error('AI suggest failed:', e);
+      addToast(e?.message?.includes('limit') ? 'Daily AI limit reached.' : 'Could not get AI suggestions.', 'error');
+    } finally {
+      setAiLoading(false);
+    }
+  };
+  const clearAiSuggest = () => setAiResult(null);
+
   const focusTotal = dailyFocus.length;
   const focusDone = dailyFocus.filter(t => t.completed).length;
   const remaining = focusTotal - focusDone;
@@ -186,38 +239,54 @@ export default function Dashboard() {
         {/* Hero — Today's Focus */}
         <GlassCard className="col-span-12 xl:col-span-8" padded={false}>
           <div className="p-7">
-            <div className="flex items-end justify-between mb-6">
-              <div>
-                <MonoLabel className="mb-1.5">today's focus</MonoLabel>
-                <h2 className="font-display text-[28px] leading-none">What matters now</h2>
-              </div>
-              <div className="flex items-center gap-2 flex-wrap justify-end">
+            <div className="mb-6">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                  <MonoLabel className="mb-1.5">today's focus</MonoLabel>
+                  <h2 className="font-display text-[28px] leading-none">What matters now</h2>
+                </div>
                 {focusTotal > 0 && (
-                  <>
-                    {(overdueCount > 0 || hideOverdue) && (
-                      <button
-                        onClick={() => setHideOverdue(v => !v)}
-                        title={hideOverdue ? 'Show overdue tasks' : 'Hide overdue tasks'}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-mono uppercase tracking-wider transition-all"
-                        style={
-                          hideOverdue
-                            ? { background: 'rgb(var(--violet) / 0.14)', color: 'rgb(var(--violet-glow))', boxShadow: 'inset 0 0 0 1px rgb(var(--violet) / 0.28)' }
-                            : { background: 'rgba(255,255,255,0.04)', color: 'rgb(var(--text-3))', boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.06)' }
-                        }
-                      >
-                        <EyeOff className="w-3 h-3" />
-                        {hideOverdue ? `Overdue hidden (${overdueCount})` : 'Hide overdue'}
-                      </button>
-                    )}
-                    <FilterDropdown label="Context" options={focusContexts} value={filterContext} onChange={setFilterContext} />
-                    <FilterDropdown label="Project" options={focusProjects} value={filterProject} onChange={setFilterProject} />
-                    <SortDropdown value={sortBy} onChange={setSortBy} />
-                  </>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <FiltersMenu
+                      contexts={focusContexts}
+                      projects={focusProjects}
+                      context={filterContext}
+                      project={filterProject}
+                      onContext={setFilterContext}
+                      onProject={setFilterProject}
+                      hideOverdue={hideOverdue}
+                      onToggleOverdue={() => setHideOverdue(v => !v)}
+                      overdueCount={overdueCount}
+                    />
+                    <SortDropdown value={sortBy} onChange={setSortBy} compact />
+                    <button
+                      onClick={runAiSuggest}
+                      disabled={aiLoading}
+                      title="AI — suggest what to focus on"
+                      aria-label="AI suggest focus"
+                      className="gtd-btn gtd-btn-primary !px-2.5 !py-1.5 grid place-items-center disabled:opacity-70"
+                    >
+                      {aiLoading
+                        ? <span className="w-4 h-4 rounded-full border-2 border-white/40 border-t-white animate-spin" />
+                        : <Sparkles className="w-4 h-4" />}
+                    </button>
+                  </div>
                 )}
-                <Link to="/ai" className="gtd-btn gtd-btn-primary inline-flex items-center gap-1.5">
-                  <Sparkles className="w-3.5 h-3.5" /> AI suggest
-                </Link>
               </div>
+
+              {focusTotal > 0 && (filterContext || filterProject || hideOverdue) && (
+                <div className="flex flex-wrap items-center gap-2 mt-3">
+                  {filterContext && (
+                    <ActiveFilterChip label={`@${filterContext}`} onRemove={() => setFilterContext('')} />
+                  )}
+                  {filterProject && (
+                    <ActiveFilterChip label={filterProject} onRemove={() => setFilterProject('')} />
+                  )}
+                  {hideOverdue && (
+                    <ActiveFilterChip label={`Overdue hidden (${overdueCount})`} onRemove={() => setHideOverdue(false)} />
+                  )}
+                </div>
+              )}
             </div>
 
             {focusTotal === 0 ? (
@@ -243,7 +312,41 @@ export default function Dashboard() {
             ) : (
               <>
                 <div className="flex flex-col">
-                  {sortedFocus.map((t, i) => (
+                  {hasAiPicks && (
+                    <>
+                      <div className="flex items-center justify-between pb-2">
+                        <span
+                          className="inline-flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-wider"
+                          style={{ color: 'rgb(var(--violet-glow))' }}
+                        >
+                          <Sparkles className="w-3.5 h-3.5" /> AI focus
+                        </span>
+                        <button
+                          onClick={clearAiSuggest}
+                          className="font-mono text-[10.5px] uppercase tracking-wider text-text-3 hover:text-text-1 transition-colors"
+                        >
+                          undo
+                        </button>
+                      </div>
+                      {aiPicks.map((t, i) => (
+                        <FocusRow
+                          key={t.id}
+                          task={t}
+                          first={i === 0}
+                          reason={aiResult.reasonById[t.id]?.reason}
+                          confidence={aiResult.reasonById[t.id]?.confidence}
+                          onToggle={() => handleComplete(t.id)}
+                          onEdit={() => { setEditingTask(t); setShowModal(true); }}
+                        />
+                      ))}
+                      {restFocus.length > 0 && (
+                        <div className="mt-4 pt-3 border-t border-white/[0.06] font-mono text-[10.5px] uppercase tracking-wider text-text-3">
+                          everything else
+                        </div>
+                      )}
+                    </>
+                  )}
+                  {restFocus.map((t, i) => (
                     <FocusRow
                       key={t.id}
                       task={t}
@@ -316,7 +419,13 @@ export default function Dashboard() {
 
 /* ============================================================ */
 
-function FocusRow({ task, first, onToggle, onEdit }) {
+const CONFIDENCE_COLOR = {
+  high: 'rgb(var(--mint-glow))',
+  medium: 'rgb(var(--violet-glow))',
+  low: 'rgb(var(--text-3))',
+};
+
+function FocusRow({ task, first, reason, confidence, onToggle, onEdit }) {
   const isDone = !!task.completed;
   return (
     <div
@@ -342,9 +451,40 @@ function FocusRow({ task, first, onToggle, onEdit }) {
           )}
           {task.project_name && <Chip>{task.project_name}</Chip>}
         </div>
+        {reason && (
+          <div className="mt-2 text-[12.5px] leading-snug text-text-3 [overflow-wrap:anywhere]">
+            {confidence && (
+              <span
+                className="font-mono uppercase text-[9.5px] tracking-wider mr-1.5"
+                style={{ color: CONFIDENCE_COLOR[confidence] || 'rgb(var(--text-3))' }}
+              >
+                {confidence}
+              </span>
+            )}
+            <span className="italic">{reason}</span>
+          </div>
+        )}
       </button>
       <ArrowUpRight className="w-4 h-4 mt-1 opacity-0 group-hover:opacity-100 transition-opacity text-text-3" />
     </div>
+  );
+}
+
+function ActiveFilterChip({ label, onRemove }) {
+  return (
+    <span
+      className="inline-flex items-center gap-1.5 pl-2.5 pr-1 py-0.5 rounded-full text-[11px] font-mono"
+      style={{ background: 'rgba(167,139,250,0.10)', border: '1px solid rgba(167,139,250,0.22)', color: 'rgb(var(--violet-glow))' }}
+    >
+      {label}
+      <button
+        onClick={onRemove}
+        aria-label={`Remove ${label} filter`}
+        className="grid place-items-center w-4 h-4 rounded-full hover:bg-white/10 transition-colors"
+      >
+        <X className="w-3 h-3" />
+      </button>
+    </span>
   );
 }
 
