@@ -36,12 +36,16 @@ const ROUTING = {
   'import-notes':      { primary: { provider: 'groq',   model: GROQ },     fallback: { provider: 'openai', model: 'gpt-4o' } },
   'find-duplicates':   { primary: { provider: 'groq',   model: GROQ },     fallback: { provider: 'openai', model: 'gpt-4o' } },
   'url-extract':       { primary: { provider: 'groq',   model: GROQ },     fallback: { provider: 'openai', model: 'gpt-4o-mini' } },
-  // Kept on gpt-4o by default (low-frequency, high-judgment advisory ops). Routed
-  // through complete() so flipping to Groq is a one-line change after eval.
-  'daily-priorities':  { primary: { provider: 'openai', model: 'gpt-4o' }, fallback: null },
-  'analyze-task':      { primary: { provider: 'openai', model: 'gpt-4o' }, fallback: null },
-  'project-breakdown': { primary: { provider: 'openai', model: 'gpt-4o' }, fallback: null },
-  'weekly-review':     { primary: { provider: 'openai', model: 'gpt-4o' }, fallback: null },
+  // Advisory ops (low-frequency, high-judgment). Flipped to Groq primary with a
+  // gpt-4o fallback on 2026-06-30 after OpenAI hit a billing/quota 429 that left
+  // all four dead (fallback was null). Structural parity was proven in eval
+  // (scripts/eval-heavy-ops.mjs); advice-quality on Groq is still unverified, so
+  // gpt-4o stays as the fallback and auto-resumes as the path of choice once
+  // OpenAI credit is restored (swap primary/fallback back to revert).
+  'daily-priorities':  { primary: { provider: 'groq', model: GROQ }, fallback: { provider: 'openai', model: 'gpt-4o' } },
+  'analyze-task':      { primary: { provider: 'groq', model: GROQ }, fallback: { provider: 'openai', model: 'gpt-4o' } },
+  'project-breakdown': { primary: { provider: 'groq', model: GROQ }, fallback: { provider: 'openai', model: 'gpt-4o' } },
+  'weekly-review':     { primary: { provider: 'groq', model: GROQ }, fallback: { provider: 'openai', model: 'gpt-4o' } },
 };
 
 // Test-only: force every complete() call onto one {provider, model}, bypassing
