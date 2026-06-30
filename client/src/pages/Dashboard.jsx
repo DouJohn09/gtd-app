@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Inbox, ListTodo, Clock, CloudSun, CheckCircle2, Target, Sparkles,
-  ArrowUpRight, ChevronRight, Flame, Plus, X,
+  ArrowUpRight, ChevronRight, Flame, Plus, EyeOff,
 } from 'lucide-react';
 import { api } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
@@ -12,7 +12,7 @@ import { useToast } from '../components/Toast';
 import TaskModal from '../components/TaskModal';
 import SortDropdown, { sortTasks } from '../components/SortDropdown';
 import { useTaskFilters, applyFilters } from '../components/FilterDropdown';
-import FiltersMenu from '../components/FiltersMenu';
+import FiltersMenu, { ActiveFilters } from '../components/FiltersMenu';
 import GlassCard from '../components/ui/GlassCard';
 import Chip from '../components/ui/Chip';
 import FreshCheck from '../components/ui/FreshCheck';
@@ -179,6 +179,22 @@ export default function Dashboard() {
   };
   const clearAiSuggest = () => setAiResult(null);
 
+  const filterToggles = [
+    {
+      key: 'overdue',
+      label: 'Hide overdue tasks',
+      activeLabel: `Overdue hidden (${overdueCount})`,
+      active: hideOverdue,
+      onToggle: () => setHideOverdue(v => !v),
+      icon: EyeOff,
+      show: overdueCount > 0 || hideOverdue,
+    },
+  ];
+  const filterFilters = [
+    { key: 'context', label: 'Context', options: focusContexts, value: filterContext, onChange: setFilterContext, renderValue: v => `@${v}` },
+    { key: 'project', label: 'Project', options: focusProjects, value: filterProject, onChange: setFilterProject },
+  ];
+
   const focusTotal = dailyFocus.length;
   const focusDone = dailyFocus.filter(t => t.completed).length;
   const remaining = focusTotal - focusDone;
@@ -247,17 +263,7 @@ export default function Dashboard() {
                 </div>
                 {focusTotal > 0 && (
                   <div className="flex items-center gap-2 shrink-0">
-                    <FiltersMenu
-                      contexts={focusContexts}
-                      projects={focusProjects}
-                      context={filterContext}
-                      project={filterProject}
-                      onContext={setFilterContext}
-                      onProject={setFilterProject}
-                      hideOverdue={hideOverdue}
-                      onToggleOverdue={() => setHideOverdue(v => !v)}
-                      overdueCount={overdueCount}
-                    />
+                    <FiltersMenu toggles={filterToggles} filters={filterFilters} />
                     <SortDropdown value={sortBy} onChange={setSortBy} compact />
                     <button
                       onClick={runAiSuggest}
@@ -274,18 +280,8 @@ export default function Dashboard() {
                 )}
               </div>
 
-              {focusTotal > 0 && (filterContext || filterProject || hideOverdue) && (
-                <div className="flex flex-wrap items-center gap-2 mt-3">
-                  {filterContext && (
-                    <ActiveFilterChip label={`@${filterContext}`} onRemove={() => setFilterContext('')} />
-                  )}
-                  {filterProject && (
-                    <ActiveFilterChip label={filterProject} onRemove={() => setFilterProject('')} />
-                  )}
-                  {hideOverdue && (
-                    <ActiveFilterChip label={`Overdue hidden (${overdueCount})`} onRemove={() => setHideOverdue(false)} />
-                  )}
-                </div>
+              {focusTotal > 0 && (
+                <ActiveFilters toggles={filterToggles} filters={filterFilters} className="mt-3" />
               )}
             </div>
 
@@ -467,24 +463,6 @@ function FocusRow({ task, first, reason, confidence, onToggle, onEdit }) {
       </button>
       <ArrowUpRight className="w-4 h-4 mt-1 opacity-0 group-hover:opacity-100 transition-opacity text-text-3" />
     </div>
-  );
-}
-
-function ActiveFilterChip({ label, onRemove }) {
-  return (
-    <span
-      className="inline-flex items-center gap-1.5 pl-2.5 pr-1 py-0.5 rounded-full text-[11px] font-mono"
-      style={{ background: 'rgba(167,139,250,0.10)', border: '1px solid rgba(167,139,250,0.22)', color: 'rgb(var(--violet-glow))' }}
-    >
-      {label}
-      <button
-        onClick={onRemove}
-        aria-label={`Remove ${label} filter`}
-        className="grid place-items-center w-4 h-4 rounded-full hover:bg-white/10 transition-colors"
-      >
-        <X className="w-3 h-3" />
-      </button>
-    </span>
   );
 }
 

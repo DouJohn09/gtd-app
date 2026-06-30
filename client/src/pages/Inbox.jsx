@@ -7,7 +7,9 @@ import QuickCapture from '../components/QuickCapture';
 import TaskCard from '../components/TaskCard';
 import TaskModal from '../components/TaskModal';
 import SortDropdown, { sortTasks } from '../components/SortDropdown';
-import FilterDropdown, { useTaskFilters, applyFilters } from '../components/FilterDropdown';
+import { useTaskFilters, applyFilters } from '../components/FilterDropdown';
+import FiltersMenu, { ActiveFilters } from '../components/FiltersMenu';
+import InboxProcessPanel from '../components/InboxProcessPanel';
 import MonoLabel from '../components/ui/MonoLabel';
 import GlassCard from '../components/ui/GlassCard';
 import ConfirmModal from '../components/ui/ConfirmModal';
@@ -40,6 +42,10 @@ export default function Inbox() {
   const [showDeferred, setShowDeferred] = useState(() => localStorage.getItem('deferred_inbox') === 'true');
   const [filterContext, setFilterContext] = useState(() => localStorage.getItem('filter_context_inbox') || '');
   const [filterProject, setFilterProject] = useState(() => localStorage.getItem('filter_project_inbox') || '');
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiResult, setAiResult] = useState(null);
+  const [aiKept, setAiKept] = useState(() => new Set());
+  const [applying, setApplying] = useState(false);
   const { addToast } = useToast();
 
   useEffect(() => { localStorage.setItem('sort_inbox', sortBy); }, [sortBy]);
@@ -89,7 +95,68 @@ export default function Inbox() {
     catch (err) { addToast(err.message, 'error'); }
   };
 
+  const runProcessInbox = async () => {
+    if (aiLoading) return;
+    setAiLoading(true);
+    try {
+      const result = await api.ai.processInbox();
+      const items = result?.processed_items || [];
+      if (!items.length) {
+        setAiResult(null);
+        addToast('AI found nothing to process.', 'info');
+        return;
+      }
+      setAiResult(result);
+      setAiKept(new Set(items.map(it => it.original_index)));
+    } catch (err) {
+      console.error('Process inbox failed:', err);
+      addToast(err?.message?.includes('limit') ? 'Daily AI limit reached.' : 'Could not process inbox.', 'error');
+    } finally {
+      setAiLoading(false);
+    }
+  };
+  const toggleAiKept = (idx) => setAiKept(prev => {
+    const next = new Set(prev);
+    next.has(idx) ? next.delete(idx) : next.add(idx);
+    return next;
+  });
+  const cancelProcessing = () => { setAiResult(null); setAiKept(new Set()); };
+  const applyProcessing = async () => {
+    if (!aiResult?.processed_items) return;
+    setApplying(true);
+    try {
+      const items = aiResult.processed_items
+        .filter(it => aiKept.has(it.original_index))
+        .map(it => ({ task_id: aiResult.tasks[it.original_index - 1]?.id, ...it }))
+        .filter(it => it.task_id);
+      await api.ai.applyInboxProcessing(items);
+      addToast(`Processed ${items.length} ${items.length === 1 ? 'item' : 'items'}.`, 'success');
+      setAiResult(null);
+      setAiKept(new Set());
+      fetchData();
+    } catch (err) {
+      console.error('Apply inbox processing failed:', err);
+      addToast('Could not apply changes.', 'error');
+    } finally {
+      setApplying(false);
+    }
+  };
+
   const { contexts: inboxContexts, projects: inboxProjects } = useTaskFilters(tasks);
+  const inboxToggles = [
+    {
+      key: 'deferred',
+      label: 'Show deferred tasks',
+      activeLabel: deferredTasks.length > 0 ? `Deferred shown (${deferredTasks.length})` : 'Deferred shown',
+      active: showDeferred,
+      onToggle: () => setShowDeferred(v => !v),
+      icon: CalendarClock,
+    },
+  ];
+  const inboxFilters = [
+    { key: 'context', label: 'Context', options: inboxContexts, value: filterContext, onChange: setFilterContext, renderValue: v => `@${v}` },
+    { key: 'project', label: 'Project', options: inboxProjects, value: filterProject, onChange: setFilterProject },
+  ];
   const sortedTasks = useMemo(
     () => sortTasks(applyFilters(tasks, { context: filterContext, project: filterProject }), sortBy),
     [tasks, sortBy, filterContext, filterProject],
@@ -132,30 +199,44 @@ export default function Inbox() {
 
           {/* Controls bar */}
           {!loading && (
-            <div className="flex items-center justify-between px-1">
-              <div className="font-mono text-[11px] text-text-3 uppercase tracking-wider">
-                {tasks.length > 0
-                  ? `${sortedTasks.length} ${sortedTasks.length === 1 ? 'item' : 'items'} to process`
-                  : 'inbox at zero'}
+            <div>
+              <div className="flex items-center justify-between gap-3 px-1">
+                <div className="font-mono text-[11px] text-text-3 uppercase tracking-wider">
+                  {tasks.length > 0
+                    ? `${sortedTasks.length} ${sortedTasks.length === 1 ? 'item' : 'items'} to process`
+                    : 'inbox at zero'}
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <FiltersMenu toggles={inboxToggles} filters={inboxFilters} />
+                  <SortDropdown value={sortBy} onChange={setSortBy} compact />
+                  {tasks.length > 0 && (
+                    <button
+                      onClick={runProcessInbox}
+                      disabled={aiLoading || !!aiResult}
+                      title="AI — sort & categorize the inbox"
+                      aria-label="AI process inbox"
+                      className="gtd-btn gtd-btn-primary !px-2.5 !py-1.5 grid place-items-center disabled:opacity-70"
+                    >
+                      {aiLoading
+                        ? <span className="w-4 h-4 rounded-full border-2 border-white/40 border-t-white animate-spin" />
+                        : <Sparkles className="w-4 h-4" />}
+                    </button>
+                  )}
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setShowDeferred(prev => !prev)}
-                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-mono uppercase tracking-wider transition-all"
-                  style={
-                    showDeferred
-                      ? { background: 'rgb(var(--violet) / 0.14)', color: 'rgb(var(--violet-glow))', boxShadow: 'inset 0 0 0 1px rgb(var(--violet) / 0.28)' }
-                      : { background: 'rgba(255,255,255,0.04)', color: 'rgb(var(--text-3))', boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.06)' }
-                  }
-                >
-                  <CalendarClock className="w-2.5 h-2.5" />
-                  Deferred{deferredTasks.length > 0 && showDeferred ? ` (${deferredTasks.length})` : ''}
-                </button>
-                <FilterDropdown label="Context" options={inboxContexts} value={filterContext} onChange={setFilterContext} />
-                <FilterDropdown label="Project" options={inboxProjects} value={filterProject} onChange={setFilterProject} />
-                <SortDropdown value={sortBy} onChange={setSortBy} />
-              </div>
+              <ActiveFilters toggles={inboxToggles} filters={inboxFilters} className="mt-3 px-1" />
             </div>
+          )}
+
+          {aiResult && (
+            <InboxProcessPanel
+              result={aiResult}
+              kept={aiKept}
+              onToggleKept={toggleAiKept}
+              onApply={applyProcessing}
+              onCancel={cancelProcessing}
+              applying={applying}
+            />
           )}
 
           {/* Body */}

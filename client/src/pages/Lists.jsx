@@ -6,7 +6,8 @@ import { useToast } from '../components/Toast';
 import TaskCard from '../components/TaskCard';
 import TaskModal from '../components/TaskModal';
 import SortDropdown, { sortTasks } from '../components/SortDropdown';
-import FilterDropdown, { useTaskFilters, applyFilters } from '../components/FilterDropdown';
+import { useTaskFilters, applyFilters } from '../components/FilterDropdown';
+import FiltersMenu, { ActiveFilters } from '../components/FiltersMenu';
 import MonoLabel from '../components/ui/MonoLabel';
 import ConfirmModal from '../components/ui/ConfirmModal';
 import { formatCompletionToast } from '../lib/dateUtils';
@@ -124,6 +125,21 @@ export default function Lists() {
     [tasks, sortBy, filterContext, filterProject],
   );
 
+  const listToggles = [
+    {
+      key: 'deferred',
+      label: 'Show deferred tasks',
+      activeLabel: deferredTasks.length > 0 ? `Deferred shown (${deferredTasks.length})` : 'Deferred shown',
+      active: showDeferred,
+      onToggle: toggleDeferred,
+      icon: CalendarClock,
+    },
+  ];
+  const listFilters = [
+    { key: 'context', label: 'Context', options: listContexts, value: filterContext, onChange: setFilterContext, renderValue: v => `@${v}` },
+    { key: 'project', label: 'Project', options: listProjects, value: filterProject, onChange: setFilterProject },
+  ];
+
   const groupedByContext =
     list === 'next_actions' && sortBy === 'priority'
       ? sortedTasks.reduce((acc, task) => {
@@ -158,23 +174,11 @@ export default function Lists() {
             <Plus className="w-3.5 h-3.5" /> Add
           </button>
         </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          <button
-            onClick={toggleDeferred}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-mono uppercase tracking-wider transition-all"
-            style={
-              showDeferred
-                ? { background: 'rgb(var(--violet) / 0.14)', color: 'rgb(var(--violet-glow))', boxShadow: 'inset 0 0 0 1px rgb(var(--violet) / 0.28)' }
-                : { background: 'rgba(255,255,255,0.04)', color: 'rgb(var(--text-3))', boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.06)' }
-            }
-          >
-            <CalendarClock className="w-3 h-3" />
-            Deferred{deferredTasks.length > 0 && showDeferred ? ` (${deferredTasks.length})` : ''}
-          </button>
-          <FilterDropdown label="Context" options={listContexts} value={filterContext} onChange={setFilterContext} />
-          <FilterDropdown label="Project" options={listProjects} value={filterProject} onChange={setFilterProject} />
-          <SortDropdown value={sortBy} onChange={setSortBy} />
+        <div className="flex items-center gap-2">
+          <FiltersMenu toggles={listToggles} filters={listFilters} />
+          <SortDropdown value={sortBy} onChange={setSortBy} compact />
         </div>
+        <ActiveFilters toggles={listToggles} filters={listFilters} className="mt-3" />
       </div>
 
       {/* Body */}

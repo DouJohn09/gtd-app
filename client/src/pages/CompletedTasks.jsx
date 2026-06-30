@@ -3,7 +3,8 @@ import { CheckCircle2, RotateCcw, Trash2, Check } from 'lucide-react';
 import { api } from '../lib/api';
 import { useToast } from '../components/Toast';
 import SortDropdown, { sortTasks } from '../components/SortDropdown';
-import FilterDropdown, { useTaskFilters, applyFilters } from '../components/FilterDropdown';
+import { useTaskFilters, applyFilters } from '../components/FilterDropdown';
+import FiltersMenu, { ActiveFilters } from '../components/FiltersMenu';
 import MonoLabel from '../components/ui/MonoLabel';
 import ConfirmModal from '../components/ui/ConfirmModal';
 import { linkify } from '../lib/linkify.jsx';
@@ -105,6 +106,11 @@ export default function CompletedTasks() {
     [tasks, sortBy, filterContext, filterProject],
   );
 
+  const completedFilters = [
+    { key: 'context', label: 'Context', options: completedContexts, value: filterContext, onChange: setFilterContext, renderValue: v => `@${v}` },
+    { key: 'project', label: 'Project', options: completedProjects, value: filterProject, onChange: setFilterProject },
+  ];
+
   const grouped = sortedTasks.reduce((acc, task) => {
     const date = task.completed_at ? task.completed_at.split('T')[0] : 'Unknown';
     if (!acc[date]) acc[date] = [];
@@ -139,10 +145,12 @@ export default function CompletedTasks() {
           </p>
         </div>
         {tasks.length > 0 && (
-          <div className="flex items-center gap-2 flex-wrap">
-            <FilterDropdown label="Context" options={completedContexts} value={filterContext} onChange={setFilterContext} />
-            <FilterDropdown label="Project" options={completedProjects} value={filterProject} onChange={setFilterProject} />
-            <SortDropdown value={sortBy} onChange={setSortBy} completed />
+          <div className="flex flex-col gap-3 lg:items-end">
+            <div className="flex items-center gap-2">
+              <FiltersMenu filters={completedFilters} />
+              <SortDropdown value={sortBy} onChange={setSortBy} completed compact />
+            </div>
+            <ActiveFilters filters={completedFilters} />
           </div>
         )}
       </div>
