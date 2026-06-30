@@ -51,7 +51,7 @@ const PANEL_STYLE = {
  * Anchored absolute dropdown (no fixed positioning) so it is safe inside a
  * .glass card.
  */
-export default function FiltersMenu({ toggles = [], filters = [] }) {
+export default function FiltersMenu({ toggles = [], filters = [], align = 'right' }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
 
@@ -110,7 +110,7 @@ export default function FiltersMenu({ toggles = [], filters = [] }) {
 
       {open && (
         <div
-          className="absolute right-0 top-full mt-1.5 z-50 w-[min(280px,calc(100vw-3rem))] max-h-[min(70vh,420px)] overflow-y-auto rounded-xl"
+          className={`absolute ${align === 'left' ? 'left-0' : 'right-0'} top-full mt-1.5 z-50 w-[min(280px,calc(100vw-3rem))] max-h-[min(70vh,420px)] overflow-y-auto rounded-xl`}
           style={PANEL_STYLE}
         >
           {visibleToggles.length > 0 && (

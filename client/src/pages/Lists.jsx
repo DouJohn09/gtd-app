@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
-import { ListTodo, Clock, CloudSun, Plus, Trash2, CalendarClock } from 'lucide-react';
+import { ListTodo, Clock, CloudSun, Plus, Trash2, CalendarClock, Sparkles } from 'lucide-react';
 import { api } from '../lib/api';
 import { useToast } from '../components/Toast';
 import TaskCard from '../components/TaskCard';
@@ -8,7 +8,14 @@ import TaskModal from '../components/TaskModal';
 import SortDropdown, { sortTasks } from '../components/SortDropdown';
 import { useTaskFilters, applyFilters } from '../components/FilterDropdown';
 import FiltersMenu, { ActiveFilters } from '../components/FiltersMenu';
+import { useAiFocus, partitionByAi } from '../hooks/useAiFocus';
 import MonoLabel from '../components/ui/MonoLabel';
+
+const CONFIDENCE_COLOR = {
+  high: 'rgb(var(--mint-glow))',
+  medium: 'rgb(var(--violet-glow))',
+  low: 'rgb(var(--text-3))',
+};
 import ConfirmModal from '../components/ui/ConfirmModal';
 import { formatCompletionToast } from '../lib/dateUtils';
 
@@ -60,6 +67,8 @@ export default function Lists() {
   const [filterContext, setFilterContext] = useState(() => localStorage.getItem(`filter_context_list_${list}`) || '');
   const [filterProject, setFilterProject] = useState(() => localStorage.getItem(`filter_project_list_${list}`) || '');
   const { addToast } = useToast();
+  const aiEnabled = list === 'next_actions';
+  const { aiLoading, aiResult, run: runAiSuggest, clear: clearAiSuggest } = useAiFocus(tasks, addToast);
 
   // Per-list scoping for all view state — each list (next_actions, waiting_for,
   // someday_maybe) keeps its own sort/filter/deferred-toggle settings.
@@ -67,6 +76,7 @@ export default function Lists() {
     setSortBy(localStorage.getItem(`sort_list_${list}`) || 'priority');
     setFilterContext(localStorage.getItem(`filter_context_list_${list}`) || '');
     setFilterProject(localStorage.getItem(`filter_project_list_${list}`) || '');
+    clearAiSuggest();
   }, [list]);
   useEffect(() => { localStorage.setItem(`sort_list_${list}`, sortBy); }, [sortBy, list]);
   useEffect(() => { setShowDeferred(localStorage.getItem(`deferred_list_${list}`) === 'true'); }, [list]);
@@ -140,8 +150,15 @@ export default function Lists() {
     { key: 'project', label: 'Project', options: listProjects, value: filterProject, onChange: setFilterProject },
   ];
 
+  const { aiPicks, rest: restTasks } = aiEnabled
+    ? partitionByAi(sortedTasks, aiResult)
+    : { aiPicks: null, rest: sortedTasks };
+  const hasAiPicks = !!aiPicks && aiPicks.length > 0;
+
+  // Context-grouping (next_actions + priority) is bypassed while AI picks are
+  // floated to the top, so the AI section reads as a single ordered list.
   const groupedByContext =
-    list === 'next_actions' && sortBy === 'priority'
+    list === 'next_actions' && sortBy === 'priority' && !hasAiPicks
       ? sortedTasks.reduce((acc, task) => {
           const ctx = task.context || 'No Context';
           if (!acc[ctx]) acc[ctx] = [];
@@ -175,8 +192,21 @@ export default function Lists() {
           </button>
         </div>
         <div className="flex items-center gap-2">
-          <FiltersMenu toggles={listToggles} filters={listFilters} />
+          <FiltersMenu toggles={listToggles} filters={listFilters} align="left" />
           <SortDropdown value={sortBy} onChange={setSortBy} compact />
+          {aiEnabled && tasks.length > 0 && (
+            <button
+              onClick={runAiSuggest}
+              disabled={aiLoading}
+              title="AI — suggest what to focus on"
+              aria-label="AI suggest focus"
+              className="gtd-btn gtd-btn-primary !px-2.5 !py-1.5 grid place-items-center disabled:opacity-70"
+            >
+              {aiLoading
+                ? <span className="w-4 h-4 rounded-full border-2 border-white/40 border-t-white animate-spin" />
+                : <Sparkles className="w-4 h-4" />}
+            </button>
+          )}
         </div>
         <ActiveFilters toggles={listToggles} filters={listFilters} className="mt-3" />
       </div>
@@ -234,7 +264,58 @@ export default function Lists() {
         </div>
       ) : (
         <div className="space-y-3">
-          {sortedTasks.map(task => (
+          {hasAiPicks && (
+            <>
+              <div className="flex items-center justify-between pb-1">
+                <span
+                  className="inline-flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-wider"
+                  style={{ color: 'rgb(var(--violet-glow))' }}
+                >
+                  <Sparkles className="w-3.5 h-3.5" /> AI focus
+                </span>
+                <button
+                  onClick={clearAiSuggest}
+                  className="font-mono text-[10.5px] uppercase tracking-wider text-text-3 hover:text-text-1 transition-colors"
+                >
+                  undo
+                </button>
+              </div>
+              {aiPicks.map(task => {
+                const r = aiResult.reasonById[task.id];
+                return (
+                  <div key={task.id} className="group relative">
+                    <TaskCard task={task} onComplete={handleComplete} onEdit={handleEdit} />
+                    <button
+                      onClick={() => setConfirmDeleteId(task.id)}
+                      className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 text-text-3 hover:text-rose-glow transition-all"
+                      title="Delete"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                    {r?.reason && (
+                      <div className="mt-1.5 px-1 text-[12px] leading-snug text-text-3 [overflow-wrap:anywhere]">
+                        {r.confidence && (
+                          <span
+                            className="font-mono uppercase text-[9.5px] tracking-wider mr-1.5"
+                            style={{ color: CONFIDENCE_COLOR[r.confidence] || 'rgb(var(--text-3))' }}
+                          >
+                            {r.confidence}
+                          </span>
+                        )}
+                        <span className="italic">{r.reason}</span>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+              {restTasks.length > 0 && (
+                <div className="pt-2 font-mono text-[10.5px] uppercase tracking-wider text-text-3">
+                  everything else
+                </div>
+              )}
+            </>
+          )}
+          {restTasks.map(task => (
             <div key={task.id} className="group relative">
               <TaskCard task={task} onComplete={handleComplete} onEdit={handleEdit} />
               <button

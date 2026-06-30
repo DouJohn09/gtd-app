@@ -80,7 +80,7 @@ export default function UnscheduledSidebar({ tasks, onEditTask, onCompleteTask, 
       </div>
 
       <div className="mb-3">
-        <FiltersMenu filters={sidebarFilters} />
+        <FiltersMenu filters={sidebarFilters} align="left" />
         <ActiveFilters filters={sidebarFilters} className="mt-2" />
       </div>
 
