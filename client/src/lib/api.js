@@ -1,5 +1,13 @@
 const API_BASE = '/api';
 
+// A React provider registers a handler here so any 402 `limit_reached` from
+// the server surfaces an upgrade prompt, even for the many mutation callers
+// that don't wrap their await in a try/catch.
+let onLimitReached = null;
+export function setLimitHandler(fn) {
+  onLimitReached = fn;
+}
+
 function getClientTimezone() {
   try {
     return Intl.DateTimeFormat().resolvedOptions().timeZone || '';
@@ -46,6 +54,9 @@ async function fetchApi(endpoint, options = {}) {
     err.status = response.status;
     err.code = errorData.code;
     err.data = errorData;
+    if (err.code === 'limit_reached' && onLimitReached) {
+      onLimitReached({ resource: errorData.resource, limit: errorData.limit, message: errorMessage });
+    }
     throw err;
   }
 

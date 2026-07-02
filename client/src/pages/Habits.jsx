@@ -75,7 +75,7 @@ export default function Habits() {
         addToast('Habit created', 'success');
       }
       setShowModal(false); setEditingHabit(null); fetchData();
-    } catch (err) { addToast(err.message, 'error'); }
+    } catch (err) { if (err.code !== 'limit_reached') addToast(err.message, 'error'); }
   };
 
   const handleDelete = async (id) => {
@@ -198,9 +198,13 @@ export default function Habits() {
                   </div>
                   <button
                     onClick={async () => {
-                      await api.habits.create(s);
-                      addToast(`Added "${s.name}"`, 'success');
-                      fetchData();
+                      try {
+                        await api.habits.create(s);
+                        addToast(`Added "${s.name}"`, 'success');
+                        fetchData();
+                      } catch (err) {
+                        if (err.code !== 'limit_reached') addToast(err.message, 'error');
+                      }
                     }}
                     className="gtd-btn gtd-btn-secondary text-[11px] py-1 px-2.5 flex-shrink-0 opacity-70 group-hover:opacity-100 transition-opacity"
                   >

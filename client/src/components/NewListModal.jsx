@@ -62,7 +62,9 @@ export default function NewListModal({ list, onClose, onSave }) {
       onSave?.();
       onClose();
     } catch (err) {
-      setError(err.message);
+      // The global upgrade modal handles limit_reached; just close out of the way.
+      if (err.code === 'limit_reached') onClose();
+      else setError(err.message);
     } finally { setLoading(false); }
   };
 

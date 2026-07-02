@@ -5,6 +5,7 @@ import { GoogleOAuthProvider } from '@react-oauth/google';
 import App from './App';
 import { AuthProvider } from './contexts/AuthContext';
 import { ToastProvider } from './components/Toast';
+import { UpgradeProvider } from './components/UpgradeModal';
 import UpdatePrompt from './components/UpdatePrompt';
 import './index.css';
 
@@ -34,8 +35,10 @@ function Root() {
       <BrowserRouter basename={import.meta.env.BASE_URL}>
         <AuthProvider>
           <ToastProvider>
-            <App />
-            <UpdatePrompt />
+            <UpgradeProvider>
+              <App />
+              <UpdatePrompt />
+            </UpgradeProvider>
           </ToastProvider>
         </AuthProvider>
       </BrowserRouter>

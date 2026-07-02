@@ -89,7 +89,13 @@ export default function Projects() {
   const handleCreateProject = async (e) => {
     e.preventDefault();
     if (!newProject.name.trim()) return;
-    await api.projects.create(newProject);
+    try {
+      await api.projects.create(newProject);
+    } catch (err) {
+      // The global upgrade modal handles limit_reached (form stays open to retry).
+      if (err.code !== 'limit_reached') addToast('Could not create project', 'error');
+      return;
+    }
     setNewProject({ name: '', description: '', outcome: '', execution_mode: 'parallel' });
     setShowNewProject(false);
     fetchProjects();
