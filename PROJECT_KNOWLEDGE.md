@@ -353,6 +353,8 @@ The #1 most requested feature ecosystem-wide. Users describe 4 levels of sophist
 | `OPENAI_API_KEY` | OpenAI API key — AI fallback + primary for advisory ops |
 | `GROQ_API_KEY` | Groq API key — primary for Smart Capture + objective AI ops. If unset, those transparently use the OpenAI fallback |
 | `AI_DAILY_LIMIT_FREE` / `AI_DAILY_LIMIT_PRO` | Per-tier daily AI-call cap. `0`/unset = unlimited (enforcement OFF; usage still counted) |
+| `RESEND_API_KEY` | Resend API key for transactional email (waitlist welcome). **Unset = email no-ops (logs, never sent) — signup still succeeds.** Activate by verifying `cleartable.app` as a sending domain in Resend, then setting this |
+| `WAITLIST_FROM_EMAIL` | Sender for waitlist email, e.g. `Cleartable <hello@cleartable.app>` (default). Must be an address on a Resend-verified domain |
 | `DATABASE_URL` | Postgres connection string (Railway injects the internal URL; `DATABASE_PUBLIC_URL` on the Postgres service for off-network access) |
 | `PORT` | Server port (default: 3000) |
 | `NODE_ENV` | Environment (production on Railway) |

@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { pool } from '../db/pool.js';
+import { sendWaitlistWelcome } from '../services/email.js';
 
 const router = Router();
 
@@ -55,12 +56,22 @@ router.post('/', async (req, res) => {
       ? source
       : null;
 
-    await pool.query(
+    const { rows } = await pool.query(
       `INSERT INTO waitlist (email, source)
        VALUES ($1, $2)
-       ON CONFLICT (email) DO NOTHING`,
+       ON CONFLICT (email) DO NOTHING
+       RETURNING id`,
       [normalizedEmail, normalizedSource]
     );
+
+    // Only email genuinely new signups (RETURNING is empty on a duplicate).
+    // Fire-and-forget: a mail failure must never fail or delay the signup, and
+    // we still return the same {ok:true} either way (no enumeration signal).
+    if (rows.length > 0) {
+      sendWaitlistWelcome(normalizedEmail).catch(err =>
+        console.error('Waitlist welcome email failed:', err.message)
+      );
+    }
 
     return res.json({ ok: true });
   } catch (err) {

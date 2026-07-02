@@ -113,7 +113,7 @@ Ranked by user pain:
 Ranked:
 1. [ ] **Real product screenshots on the landing page** (preview frame is a "coming soon" placeholder — zero UI shown anywhere). Then record the 60s demo (`DEMO_60S.md` storyboard ready). Biggest single conversion lever.
 2. [ ] **Founder pre-sale purchase path** — 3 pricing cards, zero buttons. Paddle sandbox tested. Add "Reserve a founder spot" (waitlist `source:'founder'` until live keys).
-3. [ ] **Waitlist welcome email + founder-priority copy.** Endpoint never sends anything; hero promises "we'll email you." Tie waitlist to "first crack at 30 founder spots."
+3. [~] **Waitlist welcome email + founder-priority copy.** ✅ Built — `services/email.js` (Resend, dependency-free, no-ops without key) sends a welcome email on new signups only; bottom form now has a real success state; success copy ties to founder-price priority. ⛔ **To activate:** verify `cleartable.app` in Resend + set `RESEND_API_KEY`/`WAITLIST_FROM_EMAIL` on Railway (Jan).
 4. [ ] **Fix "Sign in" dead-end** — routes non-test-users to Google's "unverified app" block. Route to a private-beta interstitial until OAuth verification.
 5. [ ] **GTD-forward entry point for the r/gtd soft launch** — landing hides GTD but that's the first launch channel. Anchor section or "Cleartable for GTD" page (contexts, defer, waiting-for, 4-step review). Reframe AI as "prepares" not "runs" the review.
 6. [ ] **Import-from-Todoist story** — FAQ only advertises CSV *export* (an exit door). Switchers ask how to get 400 tasks in.
