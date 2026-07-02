@@ -3,6 +3,7 @@ import { Sparkles, Inbox, Target, CheckCircle2, ArrowRight, FileText, Upload, Co
 import { api } from '../lib/api';
 import MonoLabel from '../components/ui/MonoLabel';
 import { linkify } from '../lib/linkify.jsx';
+import { contextLabel } from '../lib/context';
 
 const LIST_OPTIONS = [
   { value: 'inbox', label: 'inbox' },
@@ -281,7 +282,7 @@ export default function AIAssistant() {
                               {item.recommended_list.replace('_', ' ')}
                             </span>
                             {item.context && showField(item, 'context') && (
-                              <span className={`context-badge ${fadeIfMedium(item, 'context')}`}>{item.context}</span>
+                              <span className={`context-badge ${fadeIfMedium(item, 'context')}`}>{contextLabel(item.context)}</span>
                             )}
                             {item.priority != null && showField(item, 'priority') && (
                               <span className={`font-mono text-[10.5px] text-text-3 ${fadeIfMedium(item, 'priority')}`}>p{item.priority}</span>
@@ -737,7 +738,7 @@ export default function AIAssistant() {
                             {item.recommended_list.replace('_', ' ')}
                           </span>
                           {item.context && showField(item, 'context') && (
-                            <span className={`context-badge ${fadeIfMedium(item, 'context')}`}>{item.context}</span>
+                            <span className={`context-badge ${fadeIfMedium(item, 'context')}`}>{contextLabel(item.context)}</span>
                           )}
                           {item.project_id && showField(item, 'project') && (
                             <span className={`font-mono text-[10.5px] text-text-3 ${fadeIfMedium(item, 'project')}`}>

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { X, AlertCircle, Plus, Sparkles, ExternalLink, Repeat } from 'lucide-react';
 import { api } from '../lib/api';
+import { contextLabel } from '../lib/context';
 import { useToast } from './Toast';
 import GlassSelect from './ui/GlassSelect';
 import DatePicker from './ui/DatePicker';
@@ -286,7 +287,7 @@ export default function TaskModal({ task, projects, onClose, onSave }) {
                   onChange={(v) => setForm({ ...form, context: v })}
                   options={[
                     { value: '', label: 'No context' },
-                    ...contexts.map(c => ({ value: c.name, label: c.name })),
+                    ...contexts.map(c => ({ value: c.name, label: contextLabel(c.name) })),
                   ]}
                   placeholder="No context"
                   onAdd={() => setAddingContext(true)}

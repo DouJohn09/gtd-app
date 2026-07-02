@@ -1,4 +1,5 @@
 import { Sparkles, Check, ArrowRight } from 'lucide-react';
+import { contextLabel } from '../lib/context';
 
 const LIST_LABEL = {
   inbox: 'Inbox',
@@ -66,7 +67,7 @@ export default function InboxProcessPanel({ result, kept, onToggleKept, onApply,
                   <span className={`gtd-badge list-${item.recommended_list}`}>
                     {LIST_LABEL[item.recommended_list] || item.recommended_list?.replace('_', ' ')}
                   </span>
-                  {item.context && <span className="context-badge">{item.context}</span>}
+                  {item.context && <span className="context-badge">{contextLabel(item.context)}</span>}
                   {item.priority != null && <span className="font-mono text-[10.5px] text-text-3">p{item.priority}</span>}
                   {item.due_date && <span className="font-mono text-[10.5px] text-text-3">{item.due_date}</span>}
                 </div>

@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { CheckCircle2, RotateCcw, Trash2, Check } from 'lucide-react';
 import { api } from '../lib/api';
+import { contextLabel } from '../lib/context';
 import { useToast } from '../components/Toast';
 import SortDropdown, { sortTasks } from '../components/SortDropdown';
 import { useTaskFilters, applyFilters } from '../components/FilterDropdown';
@@ -24,7 +25,7 @@ function TaskRow({ task, onRestore, onDelete }) {
       <div className="flex-1 min-w-0">
         <p className="text-[13.5px] text-text-2 line-through truncate">{linkify(task.title)}</p>
         {task.context && (
-          <span className="font-mono text-[10.5px] text-text-3">@{task.context}</span>
+          <span className="font-mono text-[10.5px] text-text-3">{contextLabel(task.context)}</span>
         )}
       </div>
       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">

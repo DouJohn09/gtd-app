@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import { ListTodo, Clock, CloudSun, Plus, Trash2, CalendarClock, Sparkles } from 'lucide-react';
 import { api } from '../lib/api';
+import { contextLabel } from '../lib/context';
 import { useToast } from '../components/Toast';
 import TaskCard from '../components/TaskCard';
 import TaskModal from '../components/TaskModal';
@@ -239,7 +240,7 @@ export default function Lists() {
           {Object.entries(groupedByContext).map(([context, contextTasks]) => (
             <div key={context}>
               <div className="flex items-baseline gap-3 mb-3">
-                <div className="mono-label">{context.toLowerCase().replace(/\s+/g, '_')}</div>
+                <div className="mono-label">{(context === 'No Context' ? context : contextLabel(context)).toLowerCase().replace(/\s+/g, '_')}</div>
                 <span className="font-mono text-[10.5px] text-text-3">
                   {contextTasks.length.toString().padStart(2, '0')}
                 </span>

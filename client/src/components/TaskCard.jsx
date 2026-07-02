@@ -1,5 +1,6 @@
 import { Check, Clock, Zap, Tag, FolderOpen, User, ExternalLink, Repeat, CalendarClock } from 'lucide-react';
 import { siteLabel, linkify } from '../lib/linkify.jsx';
+import { contextLabel } from '../lib/context';
 
 const ENERGY_TONES = {
   low: 'mint',
@@ -96,7 +97,7 @@ export default function TaskCard({ task, onComplete, onEdit, showList = false, q
           {task.context && (
             <span className="context-badge inline-flex items-center gap-1">
               <Tag className="w-2.5 h-2.5" />
-              {task.context}
+              {contextLabel(task.context)}
             </span>
           )}
 

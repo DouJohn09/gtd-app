@@ -7,6 +7,7 @@ import {
 import { api } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import { isOverdue, formatCompletionToast } from '../lib/dateUtils';
+import { contextLabel } from '../lib/context';
 import { linkify } from '../lib/linkify.jsx';
 import { useToast } from '../components/Toast';
 import TaskModal from '../components/TaskModal';
@@ -393,7 +394,7 @@ function FocusRow({ task, first, reason, confidence, onToggle, onEdit }) {
               {LIST_LABEL[task.list] || task.list}
             </Chip>
           )}
-          {task.context && <Chip tone="violet">@{task.context}</Chip>}
+          {task.context && <Chip tone="violet">{contextLabel(task.context)}</Chip>}
           {task.due_date && (
             <Chip>
               <Clock className="w-3 h-3" />

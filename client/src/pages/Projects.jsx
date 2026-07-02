@@ -5,6 +5,7 @@ import {
   Trash2, ArrowRightLeft, Clock, X, Check, Pencil,
 } from 'lucide-react';
 import { api } from '../lib/api';
+import { contextLabel } from '../lib/context';
 import TaskModal from '../components/TaskModal';
 import { useToast } from '../components/Toast';
 import { formatCompletionToast } from '../lib/dateUtils';
@@ -598,7 +599,7 @@ function ProjectTaskList({ project, expandedData, onComplete, onEdit, onMove }) 
                   {linkify(task.title)}
                 </div>
                 <div className="mt-1.5 flex flex-wrap items-center gap-2">
-                  {task.context && <Chip tone="violet">@{task.context}</Chip>}
+                  {task.context && <Chip tone="violet">{contextLabel(task.context)}</Chip>}
                   {task.due_date && (
                     <Chip>
                       <Clock className="w-3 h-3" />
