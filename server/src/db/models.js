@@ -456,7 +456,8 @@ export const ProjectModel = {
   },
 
   async update(id, updates, userId) {
-    const fields = Object.keys(updates).filter(k => updates[k] !== undefined);
+    const allowedFields = ['name', 'description', 'status', 'outcome', 'execution_mode'];
+    const fields = Object.keys(updates).filter(k => allowedFields.includes(k) && updates[k] !== undefined);
     if (fields.length === 0) return this.getById(id, userId);
 
     const setClause = fields.map((f, i) => `${f} = $${i + 1}`).join(', ');
