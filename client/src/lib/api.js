@@ -23,7 +23,9 @@ async function fetchApi(endpoint, options = {}) {
 
   if (response.status === 401) {
     localStorage.removeItem('token');
-    window.location.href = '/login';
+    // BASE_URL is '/app/' in prod, '/' in dev — hard-coding '/login' ejected
+    // users to the landing domain's dead path under the '/app/' base.
+    window.location.href = `${import.meta.env.BASE_URL}login`;
     throw new Error('Session expired');
   }
 

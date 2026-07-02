@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { GoogleLogin } from '@react-oauth/google';
 import { useAuth } from '../contexts/AuthContext';
 import { Navigate } from 'react-router-dom';
@@ -5,8 +6,22 @@ import AuroraBackground from '../components/AuroraBackground';
 
 export default function Login() {
   const { user, login } = useAuth();
+  const [error, setError] = useState(null);
+  const [signingIn, setSigningIn] = useState(false);
 
   if (user) return <Navigate to="/" replace />;
+
+  const handleSuccess = async (credentialResponse) => {
+    setError(null);
+    setSigningIn(true);
+    try {
+      await login(credentialResponse.credential);
+    } catch {
+      setError("We couldn't sign you in. Cleartable is in private beta right now — if you haven't been invited, your account isn't enabled yet. Otherwise, please try again.");
+    } finally {
+      setSigningIn(false);
+    }
+  };
 
   return (
     <>
@@ -53,14 +68,28 @@ export default function Login() {
 
               <div className="flex justify-center">
                 <GoogleLogin
-                  onSuccess={(credentialResponse) => login(credentialResponse.credential)}
-                  onError={() => console.error('Login failed')}
+                  onSuccess={handleSuccess}
+                  onError={() => setError("Google sign-in didn't complete. Please try again.")}
                   theme="filled_black"
                   shape="pill"
                   size="large"
                   text="continue_with"
                 />
               </div>
+
+              {signingIn && (
+                <p className="mt-4 font-mono text-[11px] text-text-3 uppercase tracking-widest">signing in…</p>
+              )}
+
+              {error && (
+                <div
+                  role="alert"
+                  className="mt-5 rounded-xl px-4 py-3 text-[13px] leading-relaxed text-left"
+                  style={{ background: 'rgb(var(--rose) / 0.10)', border: '1px solid rgb(var(--rose) / 0.28)', color: 'rgb(var(--rose))' }}
+                >
+                  {error}
+                </div>
+              )}
 
               <div className="mt-7 flex items-center justify-center gap-2">
                 <div className="h-px w-10 bg-white/10" />
