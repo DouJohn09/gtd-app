@@ -14,12 +14,34 @@ function coerceBooleans(updates) {
   return out;
 }
 
+// Ownership guards: a client can send any FK id (project_id, list_id), and
+// SERIAL ids are enumerable — so verify the referenced row belongs to the
+// caller before binding to it, or a task/item can point at another user's
+// project/list (leaking its name via JOINs, or getting cascade-deleted with it).
+async function projectBelongsTo(projectId, userId) {
+  if (!projectId) return false;
+  const { rows } = await pool.query(
+    'SELECT 1 FROM projects WHERE id = $1 AND user_id = $2',
+    [projectId, userId]
+  );
+  return rows.length > 0;
+}
+
+async function listBelongsTo(listId, userId) {
+  if (!listId) return false;
+  const { rows } = await pool.query(
+    'SELECT 1 FROM custom_lists WHERE id = $1 AND user_id = $2',
+    [listId, userId]
+  );
+  return rows.length > 0;
+}
+
 export const TaskModel = {
   async getAll(list = null, userId) {
     if (list === 'next_actions') {
       const sql = `
         SELECT t.*, p.name as project_name FROM tasks t
-        LEFT JOIN projects p ON t.project_id = p.id
+        LEFT JOIN projects p ON t.project_id = p.id AND p.user_id = t.user_id
         WHERE t.list = 'next_actions' AND t.user_id = $1
           AND (t.start_date IS NULL OR t.start_date <= CURRENT_DATE)
           AND (
@@ -39,12 +61,12 @@ export const TaskModel = {
     if (list) {
       const orderBy = list === 'completed' ? 't.completed_at DESC' : 't.priority DESC, t.created_at DESC';
       const deferFilter = list === 'completed' ? '' : " AND (t.start_date IS NULL OR t.start_date <= CURRENT_DATE)";
-      const sql = `SELECT t.*, p.name as project_name FROM tasks t LEFT JOIN projects p ON t.project_id = p.id WHERE t.list = $1 AND t.user_id = $2${deferFilter} ORDER BY ${orderBy}`;
+      const sql = `SELECT t.*, p.name as project_name FROM tasks t LEFT JOIN projects p ON t.project_id = p.id AND p.user_id = t.user_id WHERE t.list = $1 AND t.user_id = $2${deferFilter} ORDER BY ${orderBy}`;
       const { rows } = await pool.query(sql, [list, userId]);
       return rows;
     }
     const { rows } = await pool.query(
-      `SELECT t.*, p.name as project_name FROM tasks t LEFT JOIN projects p ON t.project_id = p.id WHERE t.user_id = $1 ORDER BY t.priority DESC, t.created_at DESC`,
+      `SELECT t.*, p.name as project_name FROM tasks t LEFT JOIN projects p ON t.project_id = p.id AND p.user_id = t.user_id WHERE t.user_id = $1 ORDER BY t.priority DESC, t.created_at DESC`,
       [userId]
     );
     return rows;
@@ -52,7 +74,7 @@ export const TaskModel = {
 
   async getById(id, userId) {
     const { rows } = await pool.query(
-      `SELECT t.*, p.name as project_name FROM tasks t LEFT JOIN projects p ON t.project_id = p.id WHERE t.id = $1 AND t.user_id = $2`,
+      `SELECT t.*, p.name as project_name FROM tasks t LEFT JOIN projects p ON t.project_id = p.id AND p.user_id = t.user_id WHERE t.id = $1 AND t.user_id = $2`,
       [id, userId]
     );
     return rows[0] || null;
@@ -60,7 +82,7 @@ export const TaskModel = {
 
   async getDailyFocus(userId) {
     const { rows } = await pool.query(
-      `SELECT t.*, p.name as project_name FROM tasks t LEFT JOIN projects p ON t.project_id = p.id WHERE (t.is_daily_focus = true OR t.due_date <= CURRENT_DATE) AND t.list != 'completed' AND t.list != 'someday_maybe' AND t.user_id = $1 AND (t.start_date IS NULL OR t.start_date <= CURRENT_DATE) ORDER BY t.priority DESC, t.due_date ASC`,
+      `SELECT t.*, p.name as project_name FROM tasks t LEFT JOIN projects p ON t.project_id = p.id AND p.user_id = t.user_id WHERE (t.is_daily_focus = true OR t.due_date <= CURRENT_DATE) AND t.list != 'completed' AND t.list != 'someday_maybe' AND t.user_id = $1 AND (t.start_date IS NULL OR t.start_date <= CURRENT_DATE) ORDER BY t.priority DESC, t.due_date ASC`,
       [userId]
     );
     return rows;
@@ -77,7 +99,7 @@ export const TaskModel = {
   async getDeferred(list, userId) {
     const { rows } = await pool.query(
       `SELECT t.*, p.name as project_name FROM tasks t
-       LEFT JOIN projects p ON t.project_id = p.id
+       LEFT JOIN projects p ON t.project_id = p.id AND p.user_id = t.user_id
        WHERE t.list = $1 AND t.user_id = $2 AND t.start_date > CURRENT_DATE
        ORDER BY t.start_date ASC, t.priority DESC`,
       [list, userId]
@@ -88,7 +110,7 @@ export const TaskModel = {
   async getByDateRange(startDate, endDate, userId) {
     const { rows } = await pool.query(
       `SELECT t.*, p.name as project_name FROM tasks t
-       LEFT JOIN projects p ON t.project_id = p.id
+       LEFT JOIN projects p ON t.project_id = p.id AND p.user_id = t.user_id
        WHERE t.user_id = $1 AND t.list != 'completed'
          AND (
            (t.due_date >= $2 AND t.due_date <= $3)
@@ -103,7 +125,7 @@ export const TaskModel = {
   async getUnscheduled(userId) {
     const { rows } = await pool.query(
       `SELECT t.*, p.name as project_name FROM tasks t
-       LEFT JOIN projects p ON t.project_id = p.id
+       LEFT JOIN projects p ON t.project_id = p.id AND p.user_id = t.user_id
        WHERE t.user_id = $1 AND t.due_date IS NULL AND t.list != 'completed'
        ORDER BY t.priority DESC, t.created_at DESC`,
       [userId]
@@ -112,6 +134,10 @@ export const TaskModel = {
   },
 
   async create(task, userId) {
+    // Only bind project_id if the project belongs to the caller (see guards above).
+    if (task.project_id && !(await projectBelongsTo(task.project_id, userId))) {
+      task = { ...task, project_id: null };
+    }
     // Auto-assign position for tasks in a project
     let position = task.position ?? 0;
     if (task.project_id && position === 0) {
@@ -158,6 +184,11 @@ export const TaskModel = {
 
   async update(id, updates, userId) {
     const allowedFields = ['title', 'notes', 'list', 'context', 'project_id', 'waiting_for_person', 'due_date', 'start_date', 'scheduled_time', 'duration', 'energy_level', 'time_estimate', 'priority', 'is_daily_focus', 'completed_at', 'position', 'recurrence_rule', 'recurrence_interval', 'recurrence_days', 'recurrence_type'];
+    // Reject a project_id the caller doesn't own (clearing to null is still allowed).
+    if (updates.project_id && !(await projectBelongsTo(updates.project_id, userId))) {
+      updates = { ...updates };
+      delete updates.project_id;
+    }
     const coerced = coerceBooleans(updates);
     const fields = Object.keys(coerced).filter(k => allowedFields.includes(k) && coerced[k] !== undefined);
     if (fields.length === 0) return this.getById(id, userId);
@@ -346,7 +377,7 @@ export const TaskModel = {
   async getStats(userId) {
     const nextActionsSql = `
       SELECT COUNT(*)::int AS cnt FROM tasks t
-      LEFT JOIN projects p ON t.project_id = p.id
+      LEFT JOIN projects p ON t.project_id = p.id AND p.user_id = t.user_id
       WHERE t.list = 'next_actions' AND t.user_id = $1
         AND (t.start_date IS NULL OR t.start_date <= CURRENT_DATE)
         AND (
@@ -548,7 +579,7 @@ export const WeeklyReviewModel = {
   async getStaleItems(userId, days = 14) {
     const { rows } = await pool.query(
       `SELECT t.*, p.name as project_name FROM tasks t
-       LEFT JOIN projects p ON t.project_id = p.id
+       LEFT JOIN projects p ON t.project_id = p.id AND p.user_id = t.user_id
        WHERE t.list IN ('next_actions', 'waiting_for', 'someday_maybe')
          AND t.user_id = $1
          AND t.updated_at < NOW() - ($2 * INTERVAL '1 day')
@@ -671,6 +702,8 @@ export const ListItemModel = {
   },
 
   async create(data, userId) {
+    // Refuse to attach an item to a list the caller doesn't own.
+    if (!(await listBelongsTo(data.list_id, userId))) return null;
     const { rows: maxRows } = await pool.query(
       'SELECT COALESCE(MAX(position), -1) AS mp FROM list_items WHERE list_id = $1 AND user_id = $2',
       [data.list_id, userId]

@@ -75,7 +75,9 @@ router.get('/:id/items', async (req, res) => {
 router.post('/:id/items', async (req, res) => {
   try {
     if (!req.body.title?.trim()) return res.status(400).json({ error: 'Title is required' });
-    res.status(201).json(await ListItemModel.create({ ...req.body, list_id: parseInt(req.params.id) }, req.user.id));
+    const item = await ListItemModel.create({ ...req.body, list_id: parseInt(req.params.id) }, req.user.id);
+    if (!item) return res.status(404).json({ error: 'List not found' });
+    res.status(201).json(item);
   } catch (err) { console.error(err); res.status(500).json({ error: 'Internal server error' }); }
 });
 
