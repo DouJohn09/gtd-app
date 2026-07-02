@@ -87,6 +87,8 @@ Severity: **CRITICAL** (fix now) · **HIGH** (launch blocker) · **MEDIUM** · *
 - [ ] **P2 — Per-device settings in localStorage** (`smart_capture_routing`) diverge between phone/desktop; unbounded key sprawl; transient cross-list filter write (`Lists.jsx:75-85`).
 - [ ] **P2 — Minor leaks:** `UpdatePrompt.jsx:16-23` interval/listeners not cleaned; `Toast.jsx:12` timeout; nested `<button>` in Dashboard HabitsCard (`:491-507`).
 
+- [ ] **P2 — Context labels render `@@` for all real users** (found 2026-07-02 during screenshot work). `Dashboard.jsx:396`, `Projects.jsx:601`, `CompletedTasks.jsx:27` hard-prepend `@`; `TaskCard.jsx`/`Lists.jsx` render the raw value. Default contexts are seeded WITH a leading `@` in `auth.js` (`@home`, `@work`…), so every real user sees **`@@home`** on the dashboard/projects/completed but `@home` on lists. **Fix:** standardize on bare-name storage + display `@` consistently everywhere; migrate existing contexts to strip a leading `@` (and update `auth.js` defaults to bare).
+
 ## 6. Accessibility
 - [ ] **P1 — No modal focus management** (TaskModal, HabitModal, ConfirmModal, CommandCapture, HabitCalendar): no `role="dialog"`, `aria-modal`, focus trap, or focus-restore. Tab reaches background; destructive Delete sits in that layer.
 - [ ] **P1 — `--text-3` (#6b6b75 on #0a0a0f ≈ 3.7:1) fails WCAG AA** and is used for 9.5-11px mono labels everywhere incl. placeholders (`index.css:147`).
