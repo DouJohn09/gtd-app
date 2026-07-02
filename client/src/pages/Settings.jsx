@@ -2,12 +2,16 @@ import { useState, useRef, useEffect } from 'react';
 import { Settings as SettingsIcon, FileJson, FileSpreadsheet, Upload, X, Tag, Plus, Sparkles } from 'lucide-react';
 import { api } from '../lib/api';
 import { useToast } from '../components/Toast';
+import { useAuth } from '../contexts/AuthContext';
 import MonoLabel from '../components/ui/MonoLabel';
 import ConfirmModal from '../components/ui/ConfirmModal';
 import BillingSection from '../components/BillingSection';
 
 export default function Settings() {
   const { addToast } = useToast();
+  const { logout } = useAuth();
+  const [showDeleteAccount, setShowDeleteAccount] = useState(false);
+  const [deletingAccount, setDeletingAccount] = useState(false);
   const [busy, setBusy] = useState(null);
   const [preview, setPreview] = useState(null);
   const [importing, setImporting] = useState(false);
@@ -61,6 +65,20 @@ export default function Settings() {
       addToast(err.message || 'Could not delete context', 'error');
     } finally {
       setContextToDelete(null);
+    }
+  }
+
+  async function handleDeleteAccount() {
+    setDeletingAccount(true);
+    try {
+      await api.account.delete();
+      // Clear any per-device app state, then drop the session (redirects to login).
+      try { localStorage.clear(); } catch { /* ignore */ }
+      logout();
+    } catch (err) {
+      addToast(err.message || 'Could not delete your account. Please try again.', 'error');
+      setDeletingAccount(false);
+      setShowDeleteAccount(false);
     }
   }
 
@@ -387,6 +405,28 @@ export default function Settings() {
         )}
       </section>
 
+      {/* Danger zone — GDPR right-to-erasure */}
+      <section
+        className="rounded-2xl p-5"
+        style={{ background: 'rgb(var(--rose) / 0.05)', boxShadow: 'inset 0 0 0 1px rgb(var(--rose) / 0.20)' }}
+      >
+        <MonoLabel className="mb-2" style={{ color: 'rgb(var(--rose-glow))' }}>danger zone</MonoLabel>
+        <h2 className="font-display text-[18px] leading-tight mb-1">Delete account</h2>
+        <p className="text-[13px] text-text-2 leading-relaxed mb-4 max-w-prose">
+          Permanently deletes your account and all your data — tasks, projects, habits, lists, contexts and history.
+          This cannot be undone. Any active subscription is canceled and your Google Calendar connection is revoked.
+          Consider exporting your data first (above).
+        </p>
+        <button
+          type="button"
+          onClick={() => setShowDeleteAccount(true)}
+          className="py-2.5 px-4 rounded-xl text-[12.5px] font-medium transition-all"
+          style={{ background: 'rgb(var(--rose) / 0.14)', color: 'rgb(var(--rose-glow))', boxShadow: 'inset 0 0 0 1px rgb(var(--rose) / 0.32)' }}
+        >
+          Delete my account
+        </button>
+      </section>
+
       {contextToDelete && (
         <ConfirmModal
           title={`Delete "${contextToDelete.name}"?`}
@@ -395,6 +435,17 @@ export default function Settings() {
           tone="rose"
           onConfirm={deleteContext}
           onCancel={() => setContextToDelete(null)}
+        />
+      )}
+
+      {showDeleteAccount && (
+        <ConfirmModal
+          title="Delete your account?"
+          message="This permanently erases your account and all your data — tasks, projects, habits, lists and history. Your subscription is canceled and your calendar connection revoked. This cannot be undone."
+          confirmLabel={deletingAccount ? 'Deleting…' : 'Delete everything'}
+          tone="rose"
+          onConfirm={deletingAccount ? () => {} : handleDeleteAccount}
+          onCancel={() => { if (!deletingAccount) setShowDeleteAccount(false); }}
         />
       )}
     </div>

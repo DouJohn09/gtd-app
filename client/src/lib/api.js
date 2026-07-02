@@ -188,4 +188,7 @@ export const api = {
     checkout: (plan) => fetchApi('/billing/checkout', { method: 'POST', body: JSON.stringify({ plan }) }),
     portal: () => fetchApi('/billing/portal'),
   },
+  account: {
+    delete: () => fetchApi('/auth/account', { method: 'DELETE' }),
+  },
 };

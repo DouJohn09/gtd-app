@@ -6,6 +6,7 @@ import { pool } from '../db/pool.js';
 import { requireAuth } from '../middleware/auth.js';
 import { exchangeCodeForTokens, revokeCalendarAccess, isCalendarConnected } from '../services/googleCalendar.js';
 import { isProActive } from '../services/billing.js';
+import { cancelSubscription } from '../services/paddle.js';
 
 const router = Router();
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
@@ -160,6 +161,36 @@ router.delete('/google-calendar', requireAuth, async (req, res) => {
     res.json({ connected: false });
   } catch (error) {
     console.error('Google Calendar disconnect error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// GDPR Art. 17 right-to-erasure. Deletes the account and all its data.
+// External side effects (cancel Paddle sub, revoke Google token) are
+// best-effort and must not block the local erasure. The users row delete
+// cascades to every user-scoped table (see migration 1782400000000).
+router.delete('/account', requireAuth, async (req, res) => {
+  const userId = req.user.id;
+  try {
+    // Best-effort external cleanup — log failures but proceed with erasure.
+    try {
+      const { rows } = await pool.query('SELECT paddle_subscription_id FROM users WHERE id = $1', [userId]);
+      const subId = rows[0]?.paddle_subscription_id;
+      if (subId) await cancelSubscription(subId);
+    } catch (err) {
+      console.error('Account deletion: Paddle cancel failed (continuing):', err.message);
+    }
+    try {
+      await revokeCalendarAccess(userId);
+    } catch (err) {
+      console.error('Account deletion: Google revoke failed (continuing):', err.message);
+    }
+
+    const { rowCount } = await pool.query('DELETE FROM users WHERE id = $1', [userId]);
+    if (rowCount === 0) return res.status(404).json({ error: 'Account not found' });
+    res.json({ deleted: true });
+  } catch (error) {
+    console.error('Account deletion error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

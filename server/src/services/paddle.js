@@ -46,6 +46,14 @@ export async function createCheckoutTransaction({ priceId, userId, customerId })
   return getPaddle().transactions.create(body);
 }
 
+// Cancel a subscription immediately (used on account deletion so we don't keep
+// billing a user whose data is gone). Best-effort: callers should not block
+// erasure on Paddle being reachable.
+export async function cancelSubscription(subscriptionId) {
+  if (!subscriptionId) return;
+  await getPaddle().subscriptions.cancel(subscriptionId, { effectiveFrom: 'immediately' });
+}
+
 // Map a Paddle subscription entity onto our users row. plan is 'pro' whenever a
 // subscription exists; isProActive() gates real access by status + period end,
 // so a canceled/past-due user keeps Pro until the period they paid for ends.
