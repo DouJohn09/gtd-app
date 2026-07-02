@@ -24,9 +24,14 @@ export function AuthProvider({ children }) {
   }, []);
 
   const login = async (googleCredential) => {
+    let tz = '';
+    try { tz = Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch { /* ignore */ }
     const res = await fetch('/api/auth/google', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(tz ? { 'X-Client-Timezone': tz } : {}),
+      },
       body: JSON.stringify({ credential: googleCredential }),
     });
     if (!res.ok) throw new Error('Login failed');

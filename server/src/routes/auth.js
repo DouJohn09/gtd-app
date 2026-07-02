@@ -7,6 +7,7 @@ import { requireAuth } from '../middleware/auth.js';
 import { exchangeCodeForTokens, revokeCalendarAccess, isCalendarConnected } from '../services/googleCalendar.js';
 import { isProActive } from '../services/billing.js';
 import { cancelSubscription } from '../services/paddle.js';
+import { isValidTimezone } from '../lib/dateTime.js';
 
 const router = Router();
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
@@ -32,6 +33,9 @@ router.post('/google', loginLimiter, async (req, res) => {
     });
     const payload = ticket.getPayload();
     const { sub: googleId, email, name, picture } = payload;
+    // Capture the browser timezone (forwarded via X-Client-Timezone) so
+    // server-side "today" is the user's local day. null = leave as-is.
+    const tz = isValidTimezone(req.clientTimezone) ? req.clientTimezone : null;
 
     const { rows: existingRows } = await pool.query(
       'SELECT * FROM users WHERE google_id = $1',
@@ -42,8 +46,8 @@ router.post('/google', loginLimiter, async (req, res) => {
     if (existingRows[0]) {
       user = existingRows[0];
       await pool.query(
-        'UPDATE users SET last_login = NOW(), name = $1, picture = $2 WHERE id = $3',
-        [name, picture, user.id]
+        'UPDATE users SET last_login = NOW(), name = $1, picture = $2, timezone = COALESCE($3, timezone) WHERE id = $4',
+        [name, picture, tz, user.id]
       );
 
       // Seed default contexts for existing users who don't have any
@@ -59,8 +63,8 @@ router.post('/google', loginLimiter, async (req, res) => {
       }
     } else {
       const { rows: insertRows } = await pool.query(
-        'INSERT INTO users (google_id, email, name, picture) VALUES ($1, $2, $3, $4) RETURNING id',
-        [googleId, email, name, picture]
+        'INSERT INTO users (google_id, email, name, picture, timezone) VALUES ($1, $2, $3, $4, $5) RETURNING id',
+        [googleId, email, name, picture, tz]
       );
       const id = insertRows[0].id;
       user = { id, google_id: googleId, email, name, picture };

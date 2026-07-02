@@ -14,7 +14,7 @@ const normalizeCategory = (cat) => {
 // GET /api/habits - list active habits with today's completion status
 router.get('/', async (req, res) => {
   try {
-    const today = new Date().toISOString().split('T')[0];
+    const today = req.today;
     const [{ rows: habits }, { rows: todayLogs }] = await Promise.all([
       pool.query(
         'SELECT * FROM habits WHERE user_id = $1 AND active = true ORDER BY category, name',
@@ -48,9 +48,9 @@ router.get('/stats', async (req, res) => {
     // Fetch a full year of logs so streaks compute accurately. The heatmap
     // still only renders the last 90 days client-side, and completion rate
     // uses the last 30 — extra rows are harmless and habit_logs is small.
-    const windowStart = new Date();
-    windowStart.setDate(windowStart.getDate() - 365);
-    const startDate = windowStart.toISOString().split('T')[0];
+    const windowStart = new Date(req.today + 'T00:00:00Z');
+    windowStart.setUTCDate(windowStart.getUTCDate() - 365);
+    const startDate = windowStart.toISOString().slice(0, 10);
 
     const [{ rows: habits }, { rows: allLogs }] = await Promise.all([
       pool.query(
@@ -63,7 +63,7 @@ router.get('/stats', async (req, res) => {
       ),
     ]);
 
-    const today = new Date().toISOString().split('T')[0];
+    const today = req.today;
     const habitStats = habits.map(habit => {
       const logs = allLogs.filter(l => l.habit_id === habit.id);
 
@@ -303,7 +303,7 @@ router.delete('/:id', async (req, res) => {
 // Returns the new state; `completed` kept for back-compat.
 router.post('/:id/toggle', async (req, res) => {
   try {
-    const date = req.body.date || new Date().toISOString().split('T')[0];
+    const date = req.body.date || req.today;
 
     const { rows: habitRows } = await pool.query(
       'SELECT type FROM habits WHERE id = $1 AND user_id = $2',

@@ -1,4 +1,9 @@
 import { pool } from './pool.js';
+import { todayInTz } from '../lib/dateTime.js';
+
+// Default "today" when a caller doesn't supply a tz-resolved date — UTC, i.e.
+// the previous behavior. Route handlers pass req.today (user's local day).
+const utcToday = () => todayInTz('UTC');
 
 // Boolean coercion for fields that some callers still pass as 0/1
 // (legacy from the sql.js INT-as-boolean convention). The DB columns are
@@ -37,13 +42,13 @@ async function listBelongsTo(listId, userId) {
 }
 
 export const TaskModel = {
-  async getAll(list = null, userId) {
+  async getAll(list = null, userId, today = utcToday()) {
     if (list === 'next_actions') {
       const sql = `
         SELECT t.*, p.name as project_name FROM tasks t
         LEFT JOIN projects p ON t.project_id = p.id AND p.user_id = t.user_id
         WHERE t.list = 'next_actions' AND t.user_id = $1
-          AND (t.start_date IS NULL OR t.start_date <= CURRENT_DATE)
+          AND (t.start_date IS NULL OR t.start_date <= $2::date)
           AND (
             p.execution_mode IS NULL
             OR p.execution_mode = 'parallel'
@@ -55,14 +60,15 @@ export const TaskModel = {
           )
         ORDER BY t.priority DESC, t.created_at DESC
       `;
-      const { rows } = await pool.query(sql, [userId]);
+      const { rows } = await pool.query(sql, [userId, today]);
       return rows;
     }
     if (list) {
       const orderBy = list === 'completed' ? 't.completed_at DESC' : 't.priority DESC, t.created_at DESC';
-      const deferFilter = list === 'completed' ? '' : " AND (t.start_date IS NULL OR t.start_date <= CURRENT_DATE)";
+      const deferFilter = list === 'completed' ? '' : " AND (t.start_date IS NULL OR t.start_date <= $3::date)";
       const sql = `SELECT t.*, p.name as project_name FROM tasks t LEFT JOIN projects p ON t.project_id = p.id AND p.user_id = t.user_id WHERE t.list = $1 AND t.user_id = $2${deferFilter} ORDER BY ${orderBy}`;
-      const { rows } = await pool.query(sql, [list, userId]);
+      const params = list === 'completed' ? [list, userId] : [list, userId, today];
+      const { rows } = await pool.query(sql, params);
       return rows;
     }
     const { rows } = await pool.query(
@@ -80,10 +86,10 @@ export const TaskModel = {
     return rows[0] || null;
   },
 
-  async getDailyFocus(userId) {
+  async getDailyFocus(userId, today = utcToday()) {
     const { rows } = await pool.query(
-      `SELECT t.*, p.name as project_name FROM tasks t LEFT JOIN projects p ON t.project_id = p.id AND p.user_id = t.user_id WHERE (t.is_daily_focus = true OR t.due_date <= CURRENT_DATE) AND t.list != 'completed' AND t.list != 'someday_maybe' AND t.user_id = $1 AND (t.start_date IS NULL OR t.start_date <= CURRENT_DATE) ORDER BY t.priority DESC, t.due_date ASC`,
-      [userId]
+      `SELECT t.*, p.name as project_name FROM tasks t LEFT JOIN projects p ON t.project_id = p.id AND p.user_id = t.user_id WHERE (t.is_daily_focus = true OR t.due_date <= $2::date) AND t.list != 'completed' AND t.list != 'someday_maybe' AND t.user_id = $1 AND (t.start_date IS NULL OR t.start_date <= $2::date) ORDER BY t.priority DESC, t.due_date ASC`,
+      [userId, today]
     );
     return rows;
   },
@@ -96,13 +102,13 @@ export const TaskModel = {
     return rows;
   },
 
-  async getDeferred(list, userId) {
+  async getDeferred(list, userId, today = utcToday()) {
     const { rows } = await pool.query(
       `SELECT t.*, p.name as project_name FROM tasks t
        LEFT JOIN projects p ON t.project_id = p.id AND p.user_id = t.user_id
-       WHERE t.list = $1 AND t.user_id = $2 AND t.start_date > CURRENT_DATE
+       WHERE t.list = $1 AND t.user_id = $2 AND t.start_date > $3::date
        ORDER BY t.start_date ASC, t.priority DESC`,
-      [list, userId]
+      [list, userId, today]
     );
     return rows;
   },
@@ -231,11 +237,11 @@ export const TaskModel = {
     return { changes: 1 };
   },
 
-  async complete(id, userId) {
+  async complete(id, userId, today = utcToday()) {
     const task = await this.getById(id, userId);
 
     if (task && task.recurrence_rule) {
-      return this._completeRecurring(task, userId);
+      return this._completeRecurring(task, userId, today);
     }
 
     const result = await this.update(id, { list: 'completed', completed_at: new Date().toISOString(), is_daily_focus: false }, userId);
@@ -260,7 +266,7 @@ export const TaskModel = {
     return result;
   },
 
-  async _completeRecurring(task, userId) {
+  async _completeRecurring(task, userId, today = utcToday()) {
     // Create a completed snapshot for history
     await pool.query(
       `INSERT INTO tasks (
@@ -276,7 +282,7 @@ export const TaskModel = {
       ]
     );
 
-    const nextDue = this._nextDueDate(task);
+    const nextDue = this._nextDueDate(task, today);
     const nextStart = task.start_date ? this._advanceDate(task.start_date, task) : null;
 
     await this.update(task.id, {
@@ -289,13 +295,12 @@ export const TaskModel = {
     return this.getById(task.id, userId);
   },
 
-  _nextDueDate(task) {
+  _nextDueDate(task, today = utcToday()) {
     const base = task.recurrence_type === 'relative'
-      ? new Date().toISOString().split('T')[0]
-      : (task.due_date || new Date().toISOString().split('T')[0]);
+      ? today
+      : (task.due_date || today);
     let next = this._advanceDate(base, task);
     if (task.recurrence_type !== 'relative') {
-      const today = new Date().toISOString().split('T')[0];
       while (next <= today) {
         next = this._advanceDate(next, task);
       }
@@ -374,12 +379,12 @@ export const TaskModel = {
     return this.getByProject(projectId, userId);
   },
 
-  async getStats(userId) {
+  async getStats(userId, today = utcToday()) {
     const nextActionsSql = `
       SELECT COUNT(*)::int AS cnt FROM tasks t
       LEFT JOIN projects p ON t.project_id = p.id AND p.user_id = t.user_id
       WHERE t.list = 'next_actions' AND t.user_id = $1
-        AND (t.start_date IS NULL OR t.start_date <= CURRENT_DATE)
+        AND (t.start_date IS NULL OR t.start_date <= $2::date)
         AND (
           p.execution_mode IS NULL
           OR p.execution_mode = 'parallel'
@@ -393,26 +398,26 @@ export const TaskModel = {
     const simpleCountSql = `
       SELECT COUNT(*)::int AS cnt FROM tasks
       WHERE list = $1 AND user_id = $2
-        AND (start_date IS NULL OR start_date <= CURRENT_DATE)
+        AND (start_date IS NULL OR start_date <= $3::date)
     `;
     const dailyFocusCountSql = `
       SELECT COUNT(*)::int AS cnt FROM tasks
-      WHERE (is_daily_focus = true OR due_date <= CURRENT_DATE)
+      WHERE (is_daily_focus = true OR due_date <= $2::date)
         AND list != 'completed' AND list != 'someday_maybe' AND user_id = $1
-        AND (start_date IS NULL OR start_date <= CURRENT_DATE)
+        AND (start_date IS NULL OR start_date <= $2::date)
     `;
     const completedTodaySql = `
       SELECT COUNT(*)::int AS cnt FROM tasks
-      WHERE list = 'completed' AND completed_at::date = CURRENT_DATE AND user_id = $1
+      WHERE list = 'completed' AND completed_at::date = $2::date AND user_id = $1
     `;
 
     const [inbox, nextActions, waiting, someday, dailyFocus, completedToday] = await Promise.all([
-      pool.query(simpleCountSql, ['inbox', userId]),
-      pool.query(nextActionsSql, [userId]),
-      pool.query(simpleCountSql, ['waiting_for', userId]),
-      pool.query(simpleCountSql, ['someday_maybe', userId]),
-      pool.query(dailyFocusCountSql, [userId]),
-      pool.query(completedTodaySql, [userId]),
+      pool.query(simpleCountSql, ['inbox', userId, today]),
+      pool.query(nextActionsSql, [userId, today]),
+      pool.query(simpleCountSql, ['waiting_for', userId, today]),
+      pool.query(simpleCountSql, ['someday_maybe', userId, today]),
+      pool.query(dailyFocusCountSql, [userId, today]),
+      pool.query(completedTodaySql, [userId, today]),
     ]);
 
     return {

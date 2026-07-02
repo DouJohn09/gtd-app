@@ -9,7 +9,7 @@ const router = Router();
 router.get('/', async (req, res) => {
   try {
     const { list } = req.query;
-    const tasks = await TaskModel.getAll(list || null, req.user.id);
+    const tasks = await TaskModel.getAll(list || null, req.user.id, req.today);
     res.json(tasks);
   } catch (error) {
     console.error(error);
@@ -21,7 +21,7 @@ router.get('/deferred', async (req, res) => {
   try {
     const { list } = req.query;
     if (!list) return res.status(400).json({ error: 'list query parameter is required' });
-    const tasks = await TaskModel.getDeferred(list, req.user.id);
+    const tasks = await TaskModel.getDeferred(list, req.user.id, req.today);
     res.json(tasks);
   } catch (error) {
     console.error(error);
@@ -31,7 +31,7 @@ router.get('/deferred', async (req, res) => {
 
 router.get('/stats', async (req, res) => {
   try {
-    const stats = await TaskModel.getStats(req.user.id);
+    const stats = await TaskModel.getStats(req.user.id, req.today);
     res.json(stats);
   } catch (error) {
     console.error(error);
@@ -41,7 +41,7 @@ router.get('/stats', async (req, res) => {
 
 router.get('/daily-focus', async (req, res) => {
   try {
-    const tasks = await TaskModel.getDailyFocus(req.user.id);
+    const tasks = await TaskModel.getDailyFocus(req.user.id, req.today);
     res.json(tasks);
   } catch (error) {
     console.error(error);
@@ -128,7 +128,7 @@ router.delete('/:id', async (req, res) => {
 
 router.post('/:id/complete', async (req, res) => {
   try {
-    const task = await TaskModel.complete(req.params.id, req.user.id);
+    const task = await TaskModel.complete(req.params.id, req.user.id, req.today);
     if (!task) {
       return res.status(404).json({ error: 'Task not found' });
     }

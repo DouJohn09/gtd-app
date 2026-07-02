@@ -51,9 +51,8 @@ router.post('/smart-capture', async (req, res) => {
       getRecentClassifiedTasks(req.user.id, 10),
     ]);
     const projects = allProjects.filter(p => p.status === 'active');
-    const now = new Date();
-    const today = now.toISOString().split('T')[0];
-    const dayName = now.toLocaleDateString('en-US', { weekday: 'long' });
+    const today = req.today;
+    const dayName = new Date().toLocaleDateString('en-US', { weekday: 'long', timeZone: req.clientTimezone || 'UTC' });
     // Soft throttle: when the user is over their daily AI budget, skip the
     // OpenAI call entirely and fall back to raw capture rather than hard-blocking.
     // The task still lands in the inbox as plain text — just without enrichment.
@@ -210,8 +209,8 @@ router.post('/apply-inbox-processing', async (req, res) => {
 router.post('/daily-priorities', enforceAiLimit, async (req, res) => {
   try {
     const [nextActions, stats] = await Promise.all([
-      TaskModel.getAll('next_actions', req.user.id),
-      TaskModel.getStats(req.user.id),
+      TaskModel.getAll('next_actions', req.user.id, req.today),
+      TaskModel.getStats(req.user.id, req.today),
     ]);
 
     if (nextActions.length === 0) {
@@ -248,9 +247,8 @@ router.post('/import-notes', enforceAiLimit, async (req, res) => {
       ProjectModel.getAll(req.user.id),
     ]);
     const projects = allProjects.filter(p => p.status === 'active');
-    const now = new Date();
-    const today = now.toISOString().split('T')[0];
-    const dayName = now.toLocaleDateString('en-US', { weekday: 'long' });
+    const today = req.today;
+    const dayName = new Date().toLocaleDateString('en-US', { weekday: 'long', timeZone: req.clientTimezone || 'UTC' });
     const result = await importNotes(text, userContexts, projects, today, dayName);
     if (!result) {
       return res.status(500).json({ error: 'AI processing failed' });
@@ -311,7 +309,7 @@ router.post('/apply-daily-focus', async (req, res) => {
     // Clear daily focus on all current next-actions, then set on the chosen ones.
     // Could be done as two SQL statements directly but going through TaskModel
     // keeps the auto-promotion + updated_at semantics consistent.
-    const nextActions = await TaskModel.getAll('next_actions', req.user.id);
+    const nextActions = await TaskModel.getAll('next_actions', req.user.id, req.today);
     await Promise.all(nextActions.map(task =>
       TaskModel.update(task.id, { is_daily_focus: false }, req.user.id)
     ));
@@ -331,7 +329,7 @@ router.post('/find-duplicates', enforceAiLimit, async (req, res) => {
   try {
     const lists = await Promise.all(
       ['inbox', 'next_actions', 'waiting_for', 'someday_maybe'].map(list =>
-        TaskModel.getAll(list, req.user.id)
+        TaskModel.getAll(list, req.user.id, req.today)
       )
     );
     const allTasks = lists.flat();
@@ -415,11 +413,11 @@ router.post('/weekly-review', enforceAiLimit, async (req, res) => {
   try {
     const userId = req.user.id;
     const [stats, inboxItems, nextActions, waitingFor, somedayMaybe, projects, staleItems, lastReview, streak, habitStats, userContexts] = await Promise.all([
-      TaskModel.getStats(userId),
-      TaskModel.getAll('inbox', userId),
-      TaskModel.getAll('next_actions', userId),
-      TaskModel.getAll('waiting_for', userId),
-      TaskModel.getAll('someday_maybe', userId),
+      TaskModel.getStats(userId, req.today),
+      TaskModel.getAll('inbox', userId, req.today),
+      TaskModel.getAll('next_actions', userId, req.today),
+      TaskModel.getAll('waiting_for', userId, req.today),
+      TaskModel.getAll('someday_maybe', userId, req.today),
       ProjectModel.getAll(userId),
       WeeklyReviewModel.getStaleItems(userId),
       WeeklyReviewModel.getLastReview(userId),

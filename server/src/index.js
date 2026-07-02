@@ -7,6 +7,7 @@ import { dirname, join } from 'path';
 import { pingDb } from './db/pool.js';
 import { requireAuth } from './middleware/auth.js';
 import { aiRateLimiter } from './middleware/rateLimit.js';
+import { todayInTz } from './lib/dateTime.js';
 import authRouter from './routes/auth.js';
 import tasksRouter from './routes/tasks.js';
 import projectsRouter from './routes/projects.js';
@@ -55,6 +56,9 @@ app.use((req, _res, next) => {
   if (tz && typeof tz === 'string' && tz.length <= 64) {
     req.clientTimezone = tz;
   }
+  // "Today" in the user's local timezone (falls back to UTC). Used by any route
+  // whose result depends on the current calendar day.
+  req.today = todayInTz(req.clientTimezone);
   next();
 });
 
