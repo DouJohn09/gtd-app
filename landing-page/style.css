@@ -663,6 +663,51 @@ nav .container {
   display: block;
 }
 
+/* Real product screenshot filling the browser frame (replaces the placeholder). */
+.preview-shot {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+/* Secondary screenshots below the hero frame. */
+.shot-gallery {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 22px;
+  max-width: 900px;
+  margin: 36px auto 0;
+}
+
+.shot {
+  margin: 0;
+  text-align: center;
+}
+
+.shot img {
+  width: 100%;
+  height: auto;
+  display: block;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 16px 40px -18px rgba(0, 0, 0, 0.5);
+}
+
+.shot figcaption {
+  margin-top: 14px;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+@media (max-width: 720px) {
+  .shot-gallery {
+    grid-template-columns: 1fr;
+    gap: 28px;
+    max-width: 420px;
+  }
+}
+
 .preview-body .play-icon {
   display: inline-flex;
   align-items: center;

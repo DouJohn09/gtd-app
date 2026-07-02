@@ -288,15 +288,27 @@
           <div class="preview-dot"></div>
           <div class="preview-dot"></div>
         </div>
-        <div class="preview-body" id="preview-body">
-          <!-- Replace this placeholder with the demo video before launch: -->
-          <!-- <video src="demo.mp4" poster="demo-poster.jpg" controls autoplay muted loop></video> -->
-          <div class="play-icon" aria-hidden="true">
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
-          </div>
-          <div class="tagline">A clear mind starts here.</div>
-          <div class="note">90-second walkthrough coming soon</div>
-        </div>
+        <!-- Swap this <img> for the demo video when it's recorded (keep the screenshot as the poster):
+             <video src="demo.mp4" poster="screenshots/app-today.jpg" controls playsinline></video> -->
+        <img class="preview-shot" src="screenshots/app-today.jpg" width="1600" height="1000"
+             alt="Cleartable Today view — your focus list, today's habits, and an AI suggestion to process your inbox" />
+      </div>
+      <div class="shot-gallery reveal-stagger">
+        <figure class="shot reveal">
+          <img src="screenshots/app-inbox.jpg" width="1000" height="625" loading="lazy"
+               alt="Inbox with unprocessed captures and an AI-processing panel" />
+          <figcaption>Capture anything. AI sorts your inbox into next actions, waiting-for, and someday.</figcaption>
+        </figure>
+        <figure class="shot reveal">
+          <img src="screenshots/app-calendar.jpg" width="1000" height="625" loading="lazy"
+               alt="Day view with tasks time-blocked into the calendar" />
+          <figcaption>Time-block your day. Drag tasks onto the calendar; push to Google Calendar.</figcaption>
+        </figure>
+        <figure class="shot reveal">
+          <img src="screenshots/app-habits.jpg" width="1000" height="625" loading="lazy"
+               alt="Habit tracking with streaks and a 90-day activity heatmap" />
+          <figcaption>Build habits that stick — forgiving streaks, no guilt.</figcaption>
+        </figure>
       </div>
     </div>
   </section>
