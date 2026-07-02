@@ -42,7 +42,12 @@ async function fetchApi(endpoint, options = {}) {
     let errorData = {};
     try {
       errorData = await response.json();
-      if (errorData.error) {
+      // Prefer a human-readable `message` (e.g. rate_limited / daily_ai_limit
+      // put the code in `error` and the friendly text in `message`); fall back
+      // to `error` for the many routes that put readable text there.
+      if (errorData.message) {
+        errorMessage = errorData.message;
+      } else if (errorData.error) {
         errorMessage = errorData.error;
       }
     } catch (e) {

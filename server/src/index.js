@@ -6,6 +6,7 @@ import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { pingDb } from './db/pool.js';
 import { requireAuth } from './middleware/auth.js';
+import { aiRateLimiter } from './middleware/rateLimit.js';
 import authRouter from './routes/auth.js';
 import tasksRouter from './routes/tasks.js';
 import projectsRouter from './routes/projects.js';
@@ -64,7 +65,7 @@ app.use('/api/waitlist', waitlistRouter);
 // Protected routes
 app.use('/api/tasks', requireAuth, tasksRouter);
 app.use('/api/projects', requireAuth, projectsRouter);
-app.use('/api/ai', requireAuth, aiRouter);
+app.use('/api/ai', requireAuth, aiRateLimiter, aiRouter);
 app.use('/api/contexts', requireAuth, contextsRouter);
 app.use('/api/habits', requireAuth, habitsRouter);
 app.use('/api/export', requireAuth, exportRouter);
