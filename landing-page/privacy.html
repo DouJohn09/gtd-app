@@ -71,7 +71,8 @@
     </ul>
     <h3>Technical data</h3>
     <ul>
-      <li>An authentication token (JWT) and preference settings stored in your browser's local storage. We do not use third-party advertising or cross-site tracking cookies.</li>
+      <li>An authentication token (JWT) and preference settings stored in your browser's local storage. We do not use advertising or cross-site tracking cookies.</li>
+      <li><strong>Analytics (with your consent):</strong> on the marketing website we use Google Analytics to understand how visitors use the site. It runs <strong>only if you accept</strong> the cookie banner, and your choice is remembered for 12 months. You can <a href="#" onclick="if(window.ctConsentReset){ctConsentReset();}else{localStorage.removeItem('ct-consent');location.reload();}return false;">reset your cookie choice</a> at any time. Declining never limits what you can do on the site or in the app.</li>
     </ul>
 
     <h2>3. How we use your data</h2>
@@ -85,7 +86,7 @@
     <h2>4. Legal bases for processing (GDPR Art. 6)</h2>
     <ul>
       <li><strong>Performance of a contract</strong> — providing the app and your account.</li>
-      <li><strong>Consent</strong> — connecting Google Calendar, and marketing emails. You may withdraw consent at any time.</li>
+      <li><strong>Consent</strong> — connecting Google Calendar, marketing emails, and website analytics cookies (Google Analytics). You may withdraw consent at any time.</li>
       <li><strong>Legitimate interests</strong> — keeping the service secure and functioning.</li>
       <li><strong>Legal obligation</strong> — tax and accounting records (handled via our Merchant of Record).</li>
     </ul>
@@ -107,7 +108,7 @@
       <tr><th>Provider</th><th>Purpose</th><th>Region</th></tr>
       <tr><td>Railway</td><td>Application hosting &amp; PostgreSQL database (where your tasks are stored)</td><td>EU / US</td></tr>
       <tr><td>Cloudflare</td><td>DNS, CDN/proxy for the website, and privacy-friendly (cookieless) web analytics</td><td>EU / US</td></tr>
-      <tr><td>Google</td><td>Sign-in (OAuth) and optional Calendar sync</td><td>EU / US</td></tr>
+      <tr><td>Google</td><td>Sign-in (OAuth), optional Calendar sync, and website analytics (Google Analytics, consent-based)</td><td>EU / US</td></tr>
       <tr><td>Groq</td><td>AI processing (capture &amp; objective ops)</td><td>US</td></tr>
       <tr><td>OpenAI</td><td>AI processing (fallback &amp; advisory ops)</td><td>US</td></tr>
       <tr><td>Paddle</td><td>Payments &amp; subscription management (Merchant of Record)</td><td>EU / US</td></tr>
@@ -180,5 +181,6 @@
       </div>
     </div>
   </footer>
+  <script src="/consent.js" defer></script>
 </body>
 </html>
