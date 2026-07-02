@@ -282,33 +282,39 @@
     <div class="container">
       <div class="mono-label violet" style="text-align: center; margin-bottom: 12px;">the app</div>
       <h2>Dark, calm, focused.</h2>
-      <div class="preview-frame">
-        <div class="preview-bar">
-          <div class="preview-dot"></div>
-          <div class="preview-dot"></div>
-          <div class="preview-dot"></div>
+      <div class="preview-carousel" id="preview-carousel">
+        <div class="preview-frame">
+          <div class="preview-bar">
+            <div class="preview-dot"></div>
+            <div class="preview-dot"></div>
+            <div class="preview-dot"></div>
+          </div>
+          <!-- Swap the slides for the demo video when it's recorded (keep the screenshot as the poster):
+               <video src="demo.mp4" poster="screenshots/app-today.jpg" controls playsinline></video> -->
+          <div class="carousel-viewport">
+            <img class="carousel-slide active" src="screenshots/app-today.jpg" width="1600" height="1000"
+                 alt="Cleartable Today view — your focus list, today's habits, and an AI suggestion to process your inbox" />
+            <img class="carousel-slide" src="screenshots/app-inbox.jpg" width="1600" height="1000" loading="lazy"
+                 alt="Inbox with unprocessed captures and an AI-processing panel" />
+            <img class="carousel-slide" src="screenshots/app-calendar.jpg" width="1600" height="1000" loading="lazy"
+                 alt="Day view with tasks time-blocked into the calendar" />
+            <img class="carousel-slide" src="screenshots/app-habits.jpg" width="1600" height="1000" loading="lazy"
+                 alt="Habit tracking with streaks and a 90-day activity heatmap" />
+          </div>
+          <button class="carousel-arrow prev" type="button" aria-label="Previous screenshot">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
+          </button>
+          <button class="carousel-arrow next" type="button" aria-label="Next screenshot">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
+          </button>
         </div>
-        <!-- Swap this <img> for the demo video when it's recorded (keep the screenshot as the poster):
-             <video src="demo.mp4" poster="screenshots/app-today.jpg" controls playsinline></video> -->
-        <img class="preview-shot" src="screenshots/app-today.jpg" width="1600" height="1000"
-             alt="Cleartable Today view — your focus list, today's habits, and an AI suggestion to process your inbox" />
-      </div>
-      <div class="shot-gallery reveal-stagger">
-        <figure class="shot reveal">
-          <img src="screenshots/app-inbox.jpg" width="1000" height="625" loading="lazy"
-               alt="Inbox with unprocessed captures and an AI-processing panel" />
-          <figcaption>Capture anything. AI sorts your inbox into next actions, waiting-for, and someday.</figcaption>
-        </figure>
-        <figure class="shot reveal">
-          <img src="screenshots/app-calendar.jpg" width="1000" height="625" loading="lazy"
-               alt="Day view with tasks time-blocked into the calendar" />
-          <figcaption>Time-block your day. Drag tasks onto the calendar; push to Google Calendar.</figcaption>
-        </figure>
-        <figure class="shot reveal">
-          <img src="screenshots/app-habits.jpg" width="1000" height="625" loading="lazy"
-               alt="Habit tracking with streaks and a 90-day activity heatmap" />
-          <figcaption>Build habits that stick — forgiving streaks, no guilt.</figcaption>
-        </figure>
+        <div class="carousel-dots">
+          <button class="carousel-dot active" type="button" aria-label="Today view" aria-current="true"></button>
+          <button class="carousel-dot" type="button" aria-label="Inbox"></button>
+          <button class="carousel-dot" type="button" aria-label="Calendar"></button>
+          <button class="carousel-dot" type="button" aria-label="Habits"></button>
+        </div>
+        <p class="carousel-caption" aria-live="polite">Start the day with a short, honest focus list — tasks, habits, and an AI nudge.</p>
       </div>
     </div>
   </section>
@@ -575,6 +581,72 @@
         submitWaitlist(form);
       });
     });
+
+    // ----- Screenshot carousel -----
+    (function () {
+      const carousel = document.getElementById('preview-carousel');
+      if (!carousel) return;
+      const slides = carousel.querySelectorAll('.carousel-slide');
+      const dots = carousel.querySelectorAll('.carousel-dot');
+      const caption = carousel.querySelector('.carousel-caption');
+      const captions = [
+        'Start the day with a short, honest focus list — tasks, habits, and an AI nudge.',
+        'Capture anything. AI sorts your inbox into next actions, waiting-for, and someday.',
+        'Time-block your day. Drag tasks onto the calendar; push to Google Calendar.',
+        'Build habits that stick — forgiving streaks, no guilt.'
+      ];
+      let index = 0;
+      let timer = null;
+
+      function goTo(i) {
+        index = (i + slides.length) % slides.length;
+        slides.forEach((s, n) => s.classList.toggle('active', n === index));
+        dots.forEach((d, n) => {
+          d.classList.toggle('active', n === index);
+          if (n === index) d.setAttribute('aria-current', 'true');
+          else d.removeAttribute('aria-current');
+        });
+        caption.textContent = captions[index];
+      }
+
+      // Any manual interaction stops the auto-rotation for good.
+      function manual(i) {
+        if (timer) { clearInterval(timer); timer = null; }
+        goTo(i);
+      }
+
+      carousel.querySelector('.carousel-arrow.prev').addEventListener('click', () => manual(index - 1));
+      carousel.querySelector('.carousel-arrow.next').addEventListener('click', () => manual(index + 1));
+      dots.forEach((d, n) => d.addEventListener('click', () => manual(n)));
+
+      carousel.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowLeft') manual(index - 1);
+        if (e.key === 'ArrowRight') manual(index + 1);
+      });
+
+      let touchX = null;
+      carousel.addEventListener('touchstart', (e) => { touchX = e.touches[0].clientX; }, { passive: true });
+      carousel.addEventListener('touchend', (e) => {
+        if (touchX === null) return;
+        const dx = e.changedTouches[0].clientX - touchX;
+        touchX = null;
+        if (Math.abs(dx) > 40) manual(index + (dx < 0 ? 1 : -1));
+      }, { passive: true });
+
+      if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        let paused = false;
+        carousel.addEventListener('mouseenter', () => { paused = true; });
+        carousel.addEventListener('mouseleave', () => { paused = false; });
+        carousel.addEventListener('focusin', () => { paused = true; });
+        carousel.addEventListener('focusout', () => { paused = false; });
+        timer = setInterval(() => {
+          if (paused || document.hidden) return;
+          const r = carousel.getBoundingClientRect();
+          if (r.bottom < 0 || r.top > window.innerHeight) return;
+          goTo(index + 1);
+        }, 6000);
+      }
+    })();
   </script>
 
 </body>
