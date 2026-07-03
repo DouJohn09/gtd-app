@@ -2,10 +2,12 @@ import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   FolderKanban, Plus, Sparkles, ChevronRight, ChevronUp, ChevronDown,
-  Trash2, ArrowRightLeft, Clock, X, Check, Pencil,
+  Trash2, ArrowRightLeft, Clock, X, Check, Pencil, AlertTriangle,
 } from 'lucide-react';
 import { api } from '../lib/api';
 import { contextLabel } from '../lib/context';
+import { listLabel } from '../lib/listLabel';
+import { isOverdue } from '../lib/dateUtils';
 import TaskModal from '../components/TaskModal';
 import { useToast } from '../components/Toast';
 import { formatCompletionToast } from '../lib/dateUtils';
@@ -145,6 +147,8 @@ export default function Projects() {
     try {
       const breakdown = await api.projects.breakdown(project.id);
       setAiBreakdown({ projectId: project.id, ...breakdown });
+    } catch (error) {
+      addToast(error.message || 'AI breakdown failed — try again in a minute.', 'error');
     } finally {
       setLoadingAi(false);
     }
@@ -305,6 +309,9 @@ export default function Projects() {
             const isOpen = expandedProject === project.id;
             const tone = toneFor(project.id);
             const tint = (a) => `rgb(var(--${tone}) / ${a})`;
+            // Stalled-project flag (mirrors Weekly Review): an active project
+            // with no task on Next Actions has nothing moving it forward.
+            const needsNextAction = project.status === 'active' && project.next_action?.list !== 'next_actions';
 
             return (
               <GlassCard key={project.id} padded={false}>
@@ -326,6 +333,11 @@ export default function Projects() {
                     )}
                   </div>
                   <div className="hidden sm:flex items-center gap-2 shrink-0">
+                    {needsNextAction && (
+                      <Chip tone="amber">
+                        <AlertTriangle className="w-3 h-3" /> needs next action
+                      </Chip>
+                    )}
                     {project.execution_mode === 'sequential' && (
                       <Chip tone="amber">sequential</Chip>
                     )}
@@ -601,13 +613,14 @@ function ProjectTaskList({ project, expandedData, onComplete, onEdit, onMove }) 
                 <div className="mt-1.5 flex flex-wrap items-center gap-2">
                   {task.context && <Chip tone="violet">{contextLabel(task.context)}</Chip>}
                   {task.due_date && (
-                    <Chip>
+                    <Chip tone={isOverdue(task.due_date) ? 'rose' : 'neutral'}>
                       <Clock className="w-3 h-3" />
+                      {isOverdue(task.due_date) && 'overdue · '}
                       {new Date(task.due_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                     </Chip>
                   )}
                   {task.list && task.list !== 'next_actions' && (
-                    <Chip>{task.list.replace('_', ' ')}</Chip>
+                    <Chip>{listLabel(task.list)}</Chip>
                   )}
                 </div>
               </button>

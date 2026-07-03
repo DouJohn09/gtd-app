@@ -40,7 +40,7 @@ const LIST_CONFIG = {
     emptyTagline: 'No open loops with anyone else.',
   },
   someday_maybe: {
-    title: 'Someday / Maybe',
+    title: 'Someday/Maybe',
     eyebrow: 'incubate',
     icon: CloudSun,
     tone: 'violet',

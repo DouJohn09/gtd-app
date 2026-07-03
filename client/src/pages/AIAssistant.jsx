@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
 import { Sparkles, Inbox, Target, CheckCircle2, ArrowRight, FileText, Upload, Copy, Trash2, Check, Pencil, X } from 'lucide-react';
 import { api } from '../lib/api';
+import { useToast } from '../components/Toast';
 import MonoLabel from '../components/ui/MonoLabel';
 import { linkify } from '../lib/linkify.jsx';
 import { contextLabel } from '../lib/context';
+import { listLabel } from '../lib/listLabel';
 
 const LIST_OPTIONS = [
   { value: 'inbox', label: 'inbox' },
@@ -46,6 +48,7 @@ export default function AIAssistant() {
   const [dupResult, setDupResult] = useState(null);
   const [dupSelected, setDupSelected] = useState(new Set());
   const [dupDone, setDupDone] = useState(null);
+  const { addToast } = useToast();
 
   useEffect(() => {
     api.contexts.getAll().then(setContexts).catch(console.error);
@@ -55,7 +58,7 @@ export default function AIAssistant() {
   const processInbox = async () => {
     setLoading(l => ({ ...l, inbox: true }));
     try { setInboxResult(await api.ai.processInbox()); }
-    catch (error) { console.error('Failed to process inbox:', error); }
+    catch (error) { addToast(error.message || 'AI processing failed — try again in a minute.', 'error'); }
     finally { setLoading(l => ({ ...l, inbox: false })); }
   };
 
@@ -68,7 +71,7 @@ export default function AIAssistant() {
         setPrioritiesKept(new Set(result.suggested_focus.map(f => f.task_index)));
       }
     }
-    catch (error) { console.error('Failed to get priorities:', error); }
+    catch (error) { addToast(error.message || 'AI suggestions failed — try again in a minute.', 'error'); }
     finally { setLoading(l => ({ ...l, priorities: false })); }
   };
 
@@ -125,7 +128,7 @@ export default function AIAssistant() {
       const result = await api.ai.importNotes(importText);
       setImportResult({ ...result, mode: 'ai' });
       if (result?.items) setImportSelected(new Set(result.items.map((_, i) => i)));
-    } catch (error) { console.error('Failed to analyze notes:', error); }
+    } catch (error) { addToast(error.message || 'AI analysis failed — try again in a minute.', 'error'); }
     finally { setLoading(l => ({ ...l, import: false })); }
   };
 
@@ -196,7 +199,7 @@ export default function AIAssistant() {
         });
         setDupSelected(toRemove);
       }
-    } catch (error) { console.error('Failed to scan duplicates:', error); }
+    } catch (error) { addToast(error.message || 'Duplicate scan failed — try again in a minute.', 'error'); }
     finally { setLoading(l => ({ ...l, duplicates: false })); }
   };
 
@@ -279,7 +282,7 @@ export default function AIAssistant() {
                           <div className="flex items-center gap-2 mt-2 flex-wrap">
                             <ArrowRight className="w-3 h-3 text-text-3" />
                             <span className={`gtd-badge list-${item.recommended_list} ${fadeIfMedium(item, 'list')}`}>
-                              {item.recommended_list.replace('_', ' ')}
+                              {listLabel(item.recommended_list)}
                             </span>
                             {item.context && showField(item, 'context') && (
                               <span className={`context-badge ${fadeIfMedium(item, 'context')}`}>{contextLabel(item.context)}</span>
@@ -416,12 +419,12 @@ export default function AIAssistant() {
           )}
         </ToolCard>
 
-        {/* Daily Focus */}
+        {/* Today's Focus */}
         <ToolCard
           tone="mint"
           eyebrow="focus"
-          title="Daily Focus"
-          subtitle="AI suggests today's priorities."
+          title="Today's Focus"
+          subtitle="AI suggests what belongs on Today."
           icon={Target}
         >
           <PrimaryAction
@@ -735,7 +738,7 @@ export default function AIAssistant() {
                         <div className="flex flex-wrap items-center gap-2 mt-2">
                           <ArrowRight className="w-3 h-3 text-text-3" />
                           <span className={`gtd-badge list-${item.recommended_list} ${fadeIfMedium(item, 'list')}`}>
-                            {item.recommended_list.replace('_', ' ')}
+                            {listLabel(item.recommended_list)}
                           </span>
                           {item.context && showField(item, 'context') && (
                             <span className={`context-badge ${fadeIfMedium(item, 'context')}`}>{contextLabel(item.context)}</span>
@@ -907,7 +910,7 @@ export default function AIAssistant() {
                         <div className="flex-1 min-w-0">
                           <div className="text-[12.5px] font-medium text-text-1 inline-flex items-center gap-1.5">
                             <Sparkles className="w-3 h-3" style={{ color: item.is_daily_focus ? 'rgb(var(--amber-glow))' : 'rgb(var(--text-3))' }} />
-                            Add to today's focus
+                            Add to Today
                           </div>
                         </div>
                       </button>

@@ -1,6 +1,8 @@
-import { Check, Clock, Zap, Tag, FolderOpen, User, ExternalLink, Repeat, CalendarClock } from 'lucide-react';
+import { Check, Clock, Zap, Tag, FolderOpen, User, ExternalLink, Repeat, CalendarClock, CalendarDays } from 'lucide-react';
 import { siteLabel, linkify } from '../lib/linkify.jsx';
 import { contextLabel } from '../lib/context';
+import { listLabel } from '../lib/listLabel';
+import { isOverdue } from '../lib/dateUtils';
 
 const ENERGY_TONES = {
   low: 'mint',
@@ -91,7 +93,7 @@ export default function TaskCard({ task, onComplete, onEdit, showList = false, q
 
         <div className="flex flex-wrap items-center gap-1.5 mt-2">
           {showList && (
-            <span className={`gtd-badge list-${task.list}`}>{task.list.replace('_', ' ')}</span>
+            <span className={`gtd-badge list-${task.list}`}>{listLabel(task.list)}</span>
           )}
 
           {task.context && (
@@ -141,6 +143,17 @@ export default function TaskCard({ task, onComplete, onEdit, showList = false, q
             <span className="font-mono text-[10.5px] text-text-3 inline-flex items-center gap-1">
               <Clock className="w-2.5 h-2.5" />
               {task.time_estimate}m
+            </span>
+          )}
+
+          {task.due_date && !isCompleted && (
+            <span
+              className="font-mono text-[10.5px] inline-flex items-center gap-1"
+              style={{ color: isOverdue(task.due_date) ? 'rgb(var(--rose-glow))' : 'rgb(var(--text-3))' }}
+            >
+              <CalendarDays className="w-2.5 h-2.5" />
+              {isOverdue(task.due_date) ? 'overdue · ' : 'due '}
+              {new Date(task.due_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
             </span>
           )}
 

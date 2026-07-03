@@ -142,7 +142,7 @@ export default function CompletedTasks() {
             </span>
           </h1>
           <p className="font-display italic text-[18px] text-text-2 mt-2">
-            {tasks.length === 0 ? 'Nothing finished yet — soon.' : 'A history of things shipped.'}
+            {tasks.length === 0 ? 'Nothing finished yet — soon.' : 'A history of things done.'}
           </p>
         </div>
         {tasks.length > 0 && (

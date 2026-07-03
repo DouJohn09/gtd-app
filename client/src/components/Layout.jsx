@@ -103,7 +103,8 @@ export default function Layout() {
 
   useEffect(() => { refreshCustomLists(); }, [refreshCustomLists]);
 
-  // Cmd/Ctrl + K opens capture
+  // Cmd/Ctrl + K opens capture; 'open-capture' lets pages trigger it too
+  // (e.g. the Dashboard first-run tour's "Start capturing" button).
   useEffect(() => {
     const onKey = (e) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
@@ -111,8 +112,13 @@ export default function Layout() {
         setCaptureOpen(true);
       }
     };
+    const onOpen = () => setCaptureOpen(true);
     window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    window.addEventListener('open-capture', onOpen);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('open-capture', onOpen);
+    };
   }, []);
 
   return (

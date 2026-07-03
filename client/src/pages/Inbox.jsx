@@ -316,7 +316,12 @@ export default function Inbox() {
             oldestDays={oldestDays}
           />
           <ClarifyCard />
-          <AIProcessCard inboxCount={tasks.length} />
+          <AIProcessCard
+            inboxCount={tasks.length}
+            onProcess={runProcessInbox}
+            loading={aiLoading}
+            disabled={!!aiResult}
+          />
         </aside>
       </div>
 
@@ -413,7 +418,7 @@ function ClarifyCard() {
   );
 }
 
-function AIProcessCard({ inboxCount }) {
+function AIProcessCard({ inboxCount, onProcess, loading, disabled }) {
   return (
     <GlassCard className="relative overflow-hidden" padded={false}>
       <div
@@ -433,14 +438,22 @@ function AIProcessCard({ inboxCount }) {
               {inboxCount === 1 ? 'item' : 'items'} in one pass.
             </div>
             <div className="mt-3.5">
-              <Link
-                to="/ai"
-                className="text-[11.5px] font-mono px-3 py-1.5 rounded-lg inline-flex items-center gap-1.5"
+              <button
+                onClick={onProcess}
+                disabled={loading || disabled}
+                className="text-[11.5px] font-mono px-3 py-1.5 rounded-lg inline-flex items-center gap-1.5 disabled:opacity-60"
                 style={{ background: 'rgb(var(--violet) / 0.14)', color: 'rgb(var(--violet-glow))', boxShadow: 'inset 0 0 0 1px rgb(var(--violet) / 0.25)' }}
               >
-                <Sparkles className="w-3 h-3" /> Process with AI
-                <ChevronRight className="w-3 h-3" />
-              </Link>
+                {loading
+                  ? <span className="w-3 h-3 rounded-full border-2 border-violet/30 border-t-violet animate-spin" />
+                  : <Sparkles className="w-3 h-3" />}
+                Process with AI
+              </button>
+              <div className="mt-2">
+                <Link to="/ai" className="font-mono text-[10.5px] text-text-3 hover:text-text-1 inline-flex items-center gap-1 transition-colors">
+                  open AI Assistant <ChevronRight className="w-3 h-3" />
+                </Link>
+              </div>
             </div>
           </>
         ) : (

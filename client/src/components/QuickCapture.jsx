@@ -18,7 +18,7 @@ function formatAiToast(ai) {
     parts.push('due ' + d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
   }
   if (ai.project_name) parts.push(ai.project_name);
-  if (ai.is_daily_focus) parts.push('Daily Focus');
+  if (ai.is_daily_focus) parts.push('Today');
   return `Added to ${parts.join(' · ')}`;
 }
 

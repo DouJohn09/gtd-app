@@ -2,12 +2,13 @@ import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Inbox, ListTodo, Clock, CloudSun, CheckCircle2, Target, Sparkles,
-  ArrowUpRight, ChevronRight, Flame, Plus, EyeOff,
+  ArrowUpRight, ChevronRight, Flame, Plus, EyeOff, X, Command,
 } from 'lucide-react';
 import { api } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import { isOverdue, formatCompletionToast } from '../lib/dateUtils';
 import { contextLabel } from '../lib/context';
+import { listLabel } from '../lib/listLabel';
 import { linkify } from '../lib/linkify.jsx';
 import { useToast } from '../components/Toast';
 import TaskModal from '../components/TaskModal';
@@ -25,13 +26,6 @@ const TONE_BY_LIST = {
   next_actions: 'mint',
   waiting_for: 'rose',
   someday_maybe: 'violet',
-};
-
-const LIST_LABEL = {
-  inbox: 'Inbox',
-  next_actions: 'Next Actions',
-  waiting_for: 'Waiting For',
-  someday_maybe: 'Someday/Maybe',
 };
 
 function greeting() {
@@ -66,9 +60,15 @@ export default function Dashboard() {
   const [filterContext, setFilterContext] = useState(() => localStorage.getItem('filter_context_focus') || '');
   const [filterProject, setFilterProject] = useState(() => localStorage.getItem('filter_project_focus') || '');
   const [hideOverdue, setHideOverdue] = useState(() => localStorage.getItem('hide_overdue_focus') === 'true');
+  const [tourDismissed, setTourDismissed] = useState(() => localStorage.getItem('ct_tour_dismissed') === '1');
   const { user } = useAuth();
   const { addToast } = useToast();
   const { aiLoading, aiResult, run: runAiSuggest, clear: clearAiSuggest } = useAiFocus(dailyFocus, addToast);
+
+  const dismissTour = () => {
+    localStorage.setItem('ct_tour_dismissed', '1');
+    setTourDismissed(true);
+  };
 
   useEffect(() => { localStorage.setItem('hide_overdue_focus', hideOverdue); }, [hideOverdue]);
   useEffect(() => { localStorage.setItem('sort_focus', sortBy); }, [sortBy]);
@@ -162,6 +162,10 @@ export default function Dashboard() {
   const habitsDone = habits.filter(h => h.completed_today).length;
   const habitsPct = habits.length ? Math.round((habitsDone / habits.length) * 100) : 0;
 
+  const statsAllZero = !!stats && ['inbox', 'next_actions', 'waiting_for', 'someday_maybe', 'daily_focus', 'completed_today']
+    .every(k => !stats[k]);
+  const showTour = !tourDismissed && statsAllZero && focusTotal === 0;
+
   const statCards = [
     { key: 'inbox',         label: 'Inbox',         value: stats?.inbox || 0,         icon: Inbox,    link: '/inbox' },
     { key: 'next_actions',  label: 'Next Actions',  value: stats?.next_actions || 0,  icon: ListTodo, link: '/lists/next_actions' },
@@ -188,23 +192,25 @@ export default function Dashboard() {
         <p className="mt-4 text-[15px] max-w-xl text-text-2">
           {focusTotal === 0 ? (
             <>
-              Nothing on your focus list yet —{' '}
+              Nothing on Today yet —{' '}
               <Link to="/ai" className="text-violet-glow underline-offset-4 hover:underline">let AI suggest a few</Link>{' '}
               or pull from your <Link to="/inbox" className="text-violet-glow underline-offset-4 hover:underline">inbox of {stats?.inbox || 0}</Link>.
             </>
           ) : remaining === 0 ? (
             <>
-              <span className="font-display italic text-mint-glow">All clear.</span> Today's focus is done — go close the laptop.
+              <span className="font-display italic text-mint-glow">All clear.</span> Today is done — go close the laptop.
             </>
           ) : (
             <>
               <span className="font-display italic text-mint-glow">{wordifyCount(remaining)}</span>{' '}
-              {remaining === 1 ? 'thing left' : 'things left'} on your focus list today.
-              {stats?.completed_today > 0 && <> You've already shipped <span className="font-mono text-text-1">{stats.completed_today}</span>.</>}
+              {remaining === 1 ? 'thing left' : 'things left'} on Today.
+              {stats?.completed_today > 0 && <> You've already completed <span className="font-mono text-text-1">{stats.completed_today}</span>.</>}
             </>
           )}
         </p>
       </div>
+
+      {showTour && <FirstRunTour onDismiss={dismissTour} />}
 
       {/* Bento */}
       <div className="grid grid-cols-12 gap-5 fresh-stagger">
@@ -214,7 +220,7 @@ export default function Dashboard() {
             <div className="mb-6">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                 <div>
-                  <MonoLabel className="mb-1.5">today's focus</MonoLabel>
+                  <MonoLabel className="mb-1.5">today</MonoLabel>
                   <h2 className="font-display text-[28px] leading-none">What matters now</h2>
                 </div>
                 {focusTotal > 0 && (
@@ -249,7 +255,7 @@ export default function Dashboard() {
                   <div className="font-mono text-[11px] text-text-3 mb-3">no_focus_tasks</div>
                   <div className="font-display italic text-[22px] mb-2">Pick a few things that matter.</div>
                   <p className="text-[13.5px] text-text-2 max-w-sm mx-auto mb-5">
-                    Daily Focus keeps your day intentional. Pull from your inbox, or have AI propose a list.
+                    Today keeps your day intentional. Pull from your inbox, or have AI propose a list.
                   </p>
                   <div className="flex items-center justify-center gap-2">
                     <Link to="/inbox" className="gtd-btn gtd-btn-secondary inline-flex items-center gap-1.5 text-[12.5px]">
@@ -321,7 +327,7 @@ export default function Dashboard() {
                       }}
                     />
                   </div>
-                  <div className="font-mono text-[11px] text-mint-glow">{shippedToday} shipped</div>
+                  <div className="font-mono text-[11px] text-mint-glow">{shippedToday} done</div>
                 </div>
               </>
             )}
@@ -371,6 +377,71 @@ export default function Dashboard() {
 
 /* ============================================================ */
 
+const TOUR_STEPS = [
+  { title: 'Capture', text: 'Dump anything on your mind into the Inbox (⌘K anywhere).' },
+  { title: 'Clarify', text: 'A 30-second sort: do it, schedule it, hand it off, or park it.' },
+  { title: 'Today',   text: 'Star what matters now; AI can suggest.' },
+];
+
+function FirstRunTour({ onDismiss }) {
+  const [step, setStep] = useState(0);
+  const s = TOUR_STEPS[step];
+  const last = step === TOUR_STEPS.length - 1;
+  return (
+    <GlassCard className="mb-5 relative overflow-hidden fresh-stagger" padded={false}>
+      <div
+        className="absolute -top-10 -right-10 w-40 h-40 rounded-full pointer-events-none"
+        style={{ background: 'radial-gradient(circle, rgba(167,139,250,0.16), transparent 70%)' }}
+      />
+      <div className="p-6 relative">
+        <div className="flex items-center justify-between mb-3">
+          <MonoLabel tone="violet">welcome</MonoLabel>
+          <button
+            onClick={onDismiss}
+            aria-label="Dismiss intro"
+            className="grid place-items-center w-7 h-7 rounded-lg text-text-3 hover:text-text-1 hover:bg-white/5 transition-colors"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+        <div className="flex items-baseline gap-3">
+          <span className="font-mono text-[11px] text-text-3">{String(step + 1).padStart(2, '0')}/03</span>
+          <h2 className="font-display text-[26px] leading-none">{s.title}</h2>
+        </div>
+        <p className="mt-2.5 text-[13.5px] text-text-2 max-w-md leading-relaxed">{s.text}</p>
+        <div className="mt-5 flex items-center gap-2">
+          {step > 0 && (
+            <button onClick={() => setStep(step - 1)} className="gtd-btn gtd-btn-secondary text-[12.5px]">
+              Back
+            </button>
+          )}
+          {last ? (
+            <button
+              onClick={() => { onDismiss(); window.dispatchEvent(new Event('open-capture')); }}
+              className="gtd-btn gtd-btn-primary inline-flex items-center gap-1.5 text-[12.5px]"
+            >
+              <Command className="w-3.5 h-3.5" /> Start capturing
+            </button>
+          ) : (
+            <button onClick={() => setStep(step + 1)} className="gtd-btn gtd-btn-primary text-[12.5px]">
+              Next
+            </button>
+          )}
+          <div className="ml-auto flex gap-1.5">
+            {TOUR_STEPS.map((_, i) => (
+              <span
+                key={i}
+                className="w-1.5 h-1.5 rounded-full transition-colors"
+                style={{ background: i === step ? 'rgb(var(--violet-glow))' : 'rgba(255,255,255,0.12)' }}
+              />
+            ))}
+          </div>
+        </div>
+      </div>
+    </GlassCard>
+  );
+}
+
 const CONFIDENCE_COLOR = {
   high: 'rgb(var(--mint-glow))',
   medium: 'rgb(var(--violet-glow))',
@@ -391,13 +462,14 @@ function FocusRow({ task, first, reason, confidence, onToggle, onEdit }) {
         <div className="mt-2 flex flex-wrap items-center gap-2">
           {task.list && (
             <Chip tone={TONE_BY_LIST[task.list] || 'neutral'} dot>
-              {LIST_LABEL[task.list] || task.list}
+              {listLabel(task.list)}
             </Chip>
           )}
           {task.context && <Chip tone="violet">{contextLabel(task.context)}</Chip>}
           {task.due_date && (
-            <Chip>
+            <Chip tone={isOverdue(task.due_date) ? 'rose' : 'neutral'}>
               <Clock className="w-3 h-3" />
+              {isOverdue(task.due_date) && 'overdue · '}
               {new Date(task.due_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
             </Chip>
           )}
@@ -445,7 +517,7 @@ function MomentumCard({ pct, completedToday }) {
             <span className="font-display text-[34px] leading-none">{completedToday}</span>
             <Flame className="w-4 h-4 text-amber" />
           </div>
-          <MonoLabel className="mt-1.5">shipped today</MonoLabel>
+          <MonoLabel className="mt-1.5">done today</MonoLabel>
           <div className="font-mono text-[11px] mt-3 text-text-3">
             focus complete <span className="text-text-2">{pct}%</span>
           </div>

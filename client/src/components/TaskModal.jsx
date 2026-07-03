@@ -45,7 +45,7 @@ export default function TaskModal({ task, projects, onClose, onSave }) {
   const [form, setForm] = useState({
     title: '', notes: '', list: 'inbox', context: '', project_id: '',
     waiting_for_person: '', due_date: '', start_date: '', scheduled_time: '', duration: '',
-    energy_level: '', time_estimate: '',
+    energy_level: '', time_estimate: '', priority: null,
     is_daily_focus: false,
     recurrence_rule: '', recurrence_interval: 1, recurrence_days: '', recurrence_type: 'absolute',
   });
@@ -81,6 +81,7 @@ export default function TaskModal({ task, projects, onClose, onSave }) {
         duration: task.duration || '',
         energy_level: task.energy_level || '',
         time_estimate: task.time_estimate || '',
+        priority: task.priority || null,
         is_daily_focus: !!task.is_daily_focus,
         recurrence_rule: task.recurrence_rule || '',
         recurrence_interval: task.recurrence_interval || 1,
@@ -139,6 +140,7 @@ export default function TaskModal({ task, projects, onClose, onSave }) {
         duration: form.duration ? parseInt(form.duration) : null,
         energy_level: form.energy_level || null,
         time_estimate: form.time_estimate ? parseInt(form.time_estimate) : null,
+        priority: form.priority || null,
         is_daily_focus: form.is_daily_focus ? 1 : 0,
         recurrence_rule: form.recurrence_rule || null,
         recurrence_interval: form.recurrence_rule ? (parseInt(form.recurrence_interval) || 1) : null,
@@ -389,9 +391,56 @@ export default function TaskModal({ task, projects, onClose, onSave }) {
             </div>
           </div>
 
+          {/* Priority as chips */}
+          <div>
+            <label className="gtd-label">Priority</label>
+            <div className="flex flex-wrap gap-1.5">
+              <button
+                type="button"
+                onClick={() => setForm({ ...form, priority: null })}
+                className="font-mono text-[11px] uppercase tracking-wider px-2.5 py-1.5 rounded-lg transition-all"
+                style={
+                  !form.priority
+                    ? { background: 'rgba(255,255,255,0.06)', color: 'rgb(var(--text-1))', boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.16)' }
+                    : { color: 'rgb(var(--text-3))', boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.06)' }
+                }
+              >
+                —
+              </button>
+              {[1, 2, 3, 4, 5].map(p => {
+                const active = form.priority === p;
+                return (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => setForm({ ...form, priority: p })}
+                    className="font-mono text-[11px] uppercase tracking-wider px-2.5 py-1.5 rounded-lg transition-all"
+                    style={
+                      active
+                        ? {
+                            background: 'rgb(var(--violet) / 0.16)',
+                            color: 'rgb(var(--violet-glow))',
+                            boxShadow: 'inset 0 0 0 1px rgb(var(--violet) / 0.32)',
+                          }
+                        : {
+                            color: 'rgb(var(--text-3))',
+                            boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.06)',
+                          }
+                    }
+                  >
+                    p{p}
+                  </button>
+                );
+              })}
+            </div>
+            <p className="font-mono text-[10px] text-text-3 mt-1.5">
+              5 = most important &middot; drives sort order
+            </p>
+          </div>
+
           <div className="grid grid-cols-3 gap-4">
             <div>
-              <label className="gtd-label">Time (min)</label>
+              <label className="gtd-label">Estimate (min)</label>
               <input
                 type="number"
                 value={form.time_estimate}
@@ -433,7 +482,7 @@ export default function TaskModal({ task, projects, onClose, onSave }) {
               </p>
             </div>
             <div>
-              <label className="gtd-label">Duration (min)</label>
+              <label className="gtd-label">Block length (min)</label>
               <input
                 type="number"
                 value={form.duration}
@@ -548,7 +597,7 @@ export default function TaskModal({ task, projects, onClose, onSave }) {
             <div className="flex-1 min-w-0">
               <div className="text-[13px] font-medium text-text-1 inline-flex items-center gap-1.5">
                 <Sparkles className="w-3 h-3" style={{ color: form.is_daily_focus ? 'rgb(var(--amber-glow))' : 'rgb(var(--text-3))' }} />
-                Add to today's focus
+                Add to Today
               </div>
             </div>
           </button>

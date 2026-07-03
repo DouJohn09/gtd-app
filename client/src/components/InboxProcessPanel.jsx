@@ -1,13 +1,6 @@
 import { Sparkles, Check, ArrowRight } from 'lucide-react';
 import { contextLabel } from '../lib/context';
-
-const LIST_LABEL = {
-  inbox: 'Inbox',
-  next_actions: 'Next Actions',
-  waiting_for: 'Waiting For',
-  someday_maybe: 'Someday/Maybe',
-  calendar: 'Calendar',
-};
+import { listLabel } from '../lib/listLabel';
 
 /**
  * Inline preview of AI inbox-processing suggestions. Each row is keep/skip
@@ -65,7 +58,7 @@ export default function InboxProcessPanel({ result, kept, onToggleKept, onApply,
                 <div className="flex items-center gap-2 mt-2 flex-wrap">
                   <ArrowRight className="w-3 h-3 text-text-3" />
                   <span className={`gtd-badge list-${item.recommended_list}`}>
-                    {LIST_LABEL[item.recommended_list] || item.recommended_list?.replace('_', ' ')}
+                    {listLabel(item.recommended_list)}
                   </span>
                   {item.context && <span className="context-badge">{contextLabel(item.context)}</span>}
                   {item.priority != null && <span className="font-mono text-[10.5px] text-text-3">p{item.priority}</span>}

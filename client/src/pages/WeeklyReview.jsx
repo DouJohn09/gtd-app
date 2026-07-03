@@ -354,7 +354,7 @@ export default function WeeklyReview() {
             }
           </CollapsibleSection>
 
-          <CollapsibleSection title="Someday / Maybe" eyebrow="incubate" icon={CloudSun} tone="violet" count={reviewData.somedayMaybe.length}>
+          <CollapsibleSection title="Someday/Maybe" eyebrow="incubate" icon={CloudSun} tone="violet" count={reviewData.somedayMaybe.length}>
             {reviewData.somedayMaybe.length === 0
               ? <p className="font-mono text-[11px] text-text-3 py-2">no_someday_items</p>
               : reviewData.somedayMaybe.map(task => (
@@ -465,7 +465,7 @@ export default function WeeklyReview() {
                   <div className="mono-label" style={{ color: 'rgb(var(--violet-glow))' }}>this_week</div>
                   <p className="font-display text-[40px] leading-none mt-2">
                     {reviewData.completedThisWeek}
-                    <span className="text-[16px] text-text-3 ml-2 align-baseline">tasks shipped</span>
+                    <span className="text-[16px] text-text-3 ml-2 align-baseline">tasks completed</span>
                   </p>
                 </div>
               </div>
