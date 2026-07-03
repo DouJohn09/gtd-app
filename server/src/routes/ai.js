@@ -35,6 +35,33 @@ async function getRecentClassifiedTasks(userId, limit = 10) {
   return rows;
 }
 
+// Recent open tasks, injected into Smart Capture so it can flag "possible
+// duplicate of ..." at capture time instead of after the fact.
+async function getOpenTaskTitles(userId, limit = 15) {
+  const { rows } = await pool.query(
+    `SELECT title FROM tasks
+     WHERE user_id = $1 AND list IN ('inbox', 'next_actions')
+     ORDER BY created_at DESC
+     LIMIT $2`,
+    [userId, limit]
+  );
+  return rows.map(r => r.title);
+}
+
+// Unified AI error contract: 503 = no provider configured, 502 = providers
+// tried and failed. Returns true when the response has been sent.
+function aiFailed(res, result) {
+  if (result?.error) {
+    res.status(503).json({ error: 'AI is not configured on this server' });
+    return true;
+  }
+  if (!result) {
+    res.status(502).json({ error: 'AI processing failed' });
+    return true;
+  }
+  return false;
+}
+
 const router = Router();
 
 router.post('/smart-capture', async (req, res) => {
@@ -45,10 +72,11 @@ router.post('/smart-capture', async (req, res) => {
     }
     const rawText = text.trim();
     const urls = rawText.match(/https?:\/\/[^\s]+/gi) || [];
-    const [contexts, allProjects, history] = await Promise.all([
+    const [contexts, allProjects, history, openTitles] = await Promise.all([
       getUserContexts(req.user.id),
       ProjectModel.getAll(req.user.id),
       getRecentClassifiedTasks(req.user.id, 10),
+      getOpenTaskTitles(req.user.id, 15),
     ]);
     const projects = allProjects.filter(p => p.status === 'active');
     const today = req.today;
@@ -58,7 +86,7 @@ router.post('/smart-capture', async (req, res) => {
     // The task still lands in the inbox as plain text — just without enrichment.
     const budget = await consume(req.user.id);
     const ai = budget.allowed
-      ? await smartCapture(rawText, contexts, projects, today, dayName, history)
+      ? await smartCapture(rawText, contexts, projects, today, dayName, history, openTitles)
       : null;
 
     if (!ai) {
@@ -165,10 +193,30 @@ router.post('/process-inbox', enforceAiLimit, async (req, res) => {
       return res.json({ message: 'Inbox is empty', processed_items: [] });
     }
 
-    const userContexts = await getUserContexts(req.user.id);
-    const result = await processInbox(inboxTasks, userContexts);
-    if (!result) {
-      return res.status(500).json({ error: 'AI processing failed' });
+    const [userContexts, allProjects, history] = await Promise.all([
+      getUserContexts(req.user.id),
+      ProjectModel.getAll(req.user.id),
+      getRecentClassifiedTasks(req.user.id, 10),
+    ]);
+    const projects = allProjects.filter(p => p.status === 'active');
+    const dayName = new Date().toLocaleDateString('en-US', { weekday: 'long', timeZone: req.clientTimezone || 'UTC' });
+    const result = await processInbox(inboxTasks, userContexts, {
+      projects, today: req.today, dayName, history,
+    });
+    if (aiFailed(res, result)) return;
+
+    // Resolve AI project_name suggestions to ids so the client can apply them
+    // directly, and normalize the time field to the apply-route's name (same
+    // contract as import-notes).
+    if (Array.isArray(result.processed_items)) {
+      result.processed_items = result.processed_items.map(item => {
+        let project_id = null;
+        if (item.project_name) {
+          const match = projects.find(p => p.name.toLowerCase() === item.project_name.toLowerCase());
+          if (match) project_id = match.id;
+        }
+        return { ...item, project_id, time_estimate: item.time_estimate ?? item.time_estimate_minutes ?? null };
+      });
     }
 
     result.tasks = inboxTasks;
@@ -222,10 +270,20 @@ router.post('/daily-priorities', enforceAiLimit, async (req, res) => {
     }
 
     const userContexts = await getUserContexts(req.user.id);
-    const result = await getDailyPriorities(nextActions, stats, userContexts);
-    if (!result) {
-      return res.status(500).json({ error: 'AI processing failed' });
-    }
+    // Time already committed today (time-blocked tasks) so the AI can size
+    // its suggestions to the space actually left in the day.
+    const { rows: [load] } = await pool.query(
+      `SELECT COUNT(*)::int AS count, COALESCE(SUM(COALESCE(duration, 60)), 0)::int AS minutes
+       FROM tasks
+       WHERE user_id = $1 AND due_date = $2 AND scheduled_time IS NOT NULL AND list != 'completed'`,
+      [req.user.id, req.today]
+    );
+    const dayName = new Date().toLocaleDateString('en-US', { weekday: 'long', timeZone: req.clientTimezone || 'UTC' });
+    const result = await getDailyPriorities(nextActions, stats, userContexts, {
+      today: req.today, dayName,
+      scheduledToday: load?.count ? load : null,
+    });
+    if (aiFailed(res, result)) return;
 
     result.tasks = nextActions;
     res.json(result);
@@ -250,9 +308,7 @@ router.post('/import-notes', enforceAiLimit, async (req, res) => {
     const today = req.today;
     const dayName = new Date().toLocaleDateString('en-US', { weekday: 'long', timeZone: req.clientTimezone || 'UTC' });
     const result = await importNotes(text, userContexts, projects, today, dayName);
-    if (!result) {
-      return res.status(500).json({ error: 'AI processing failed' });
-    }
+    if (aiFailed(res, result)) return;
 
     if (Array.isArray(result.items)) {
       result.items = result.items.map(item => {
@@ -340,9 +396,7 @@ router.post('/find-duplicates', enforceAiLimit, async (req, res) => {
 
     const userContexts = await getUserContexts(req.user.id);
     const result = await findDuplicates(allTasks, userContexts);
-    if (!result) {
-      return res.status(500).json({ error: 'AI processing failed' });
-    }
+    if (aiFailed(res, result)) return;
 
     res.json(result);
   } catch (error) {

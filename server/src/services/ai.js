@@ -1,6 +1,11 @@
 import OpenAI from 'openai';
 import { lookup } from 'node:dns/promises';
 import net from 'node:net';
+import {
+  validateSmartCapture, validateProcessInbox, validateImportNotes,
+  validateDailyPriorities, validateFindDuplicates, validateWeeklyReview,
+  validateAnalyzeTask, validateProjectBreakdown,
+} from './aiSchema.js';
 
 // Provider clients. OpenAI is the paid/reliable baseline; Groq is the fast,
 // free, privacy-safe (Groq does not train on API data) provider for the
@@ -48,6 +53,24 @@ const ROUTING = {
   'weekly-review':     { primary: { provider: 'groq', model: GROQ }, fallback: { provider: 'openai', model: 'gpt-4o' } },
 };
 
+// Per-task sampling + output caps. Classification/extraction tasks run at
+// temperature 0 — provider defaults (Groq: 1.0) made identical inputs classify
+// differently between runs, which users read as "the AI is flaky". Advisory
+// prose gets mild warmth. max_tokens is sized to each task's worst-case JSON so
+// a runaway response is cut (and caught via finish_reason) instead of hanging
+// or blowing the parse on a 100-item ramble.
+const TASK_PARAMS = {
+  'smart-capture':     { temperature: 0,   max_tokens: 1024 },
+  'process-inbox':     { temperature: 0,   max_tokens: 4096 },
+  'import-notes':      { temperature: 0,   max_tokens: 8192 },
+  'find-duplicates':   { temperature: 0,   max_tokens: 2048 },
+  'url-extract':       { temperature: 0 },
+  'daily-priorities':  { temperature: 0.2, max_tokens: 1500 },
+  'analyze-task':      { temperature: 0.2, max_tokens: 800 },
+  'project-breakdown': { temperature: 0.4, max_tokens: 2048 },
+  'weekly-review':     { temperature: 0.4, max_tokens: 3000 },
+};
+
 // Test-only: force every complete() call onto one {provider, model}, bypassing
 // ROUTING, so scripts/eval-* can A/B models against the real functions. Never set
 // in production code.
@@ -57,17 +80,39 @@ export function __setForceRoute(r) { _forceRoute = r; }
 // Unified chat completion with provider routing + automatic fallback. Returns
 // parsed JSON, or null if every available provider fails (the caller then does
 // its own fallback — e.g. Smart Capture saves the raw text). A JSON.parse failure
-// is treated as a provider failure and advances to the fallback provider.
-async function complete(task, params) {
+// or a truncated response (finish_reason=length) is treated as a provider
+// failure and advances to the fallback provider.
+//
+// `validate` (optional) is a fn(parsed) → array of problem strings. On problems,
+// ONE repair round-trip is made on the same provider (the model sees its own
+// output plus the problem list); if the repair still fails validation, the next
+// provider is tried. Keeps enum/typo-level slop out of the database without a
+// heavyweight schema library.
+async function complete(task, params, validate = null) {
   const route = ROUTING[task];
   const attempts = _forceRoute ? [_forceRoute] : [route?.primary, route?.fallback].filter(Boolean);
+  const tuning = TASK_PARAMS[task] || {};
   let lastErr = null;
   for (const { provider, model } of attempts) {
     const client = PROVIDERS[provider];
     if (!client) continue;
     try {
-      const res = await client.chat.completions.create({ ...params, model });
-      return JSON.parse(res.choices[0].message.content);
+      let messages = params.messages;
+      for (let round = 0; round < 2; round++) {
+        const res = await client.chat.completions.create({ ...tuning, ...params, messages, model });
+        const choice = res.choices[0];
+        if (choice.finish_reason === 'length') throw new Error('response truncated (finish_reason=length)');
+        const parsed = JSON.parse(choice.message.content);
+        const problems = validate ? validate(parsed) : [];
+        if (!problems.length) return parsed;
+        if (round === 1) throw new Error(`schema validation failed after repair: ${problems.slice(0, 5).join('; ')}`);
+        console.warn(`AI[${task}] ${provider}/${model} schema problems, repairing: ${problems.slice(0, 5).join('; ')}`);
+        messages = [
+          ...params.messages,
+          { role: 'assistant', content: choice.message.content },
+          { role: 'user', content: `Your JSON response had these problems:\n- ${problems.join('\n- ')}\n\nReturn the FULL corrected JSON object only — same data, with these problems fixed.` },
+        ];
+      }
     } catch (err) {
       lastErr = err;
       console.error(`AI[${task}] ${provider}/${model} failed: ${err.message}`);
@@ -101,24 +146,47 @@ When analyzing tasks:
 4. Consider energy level (low/medium/high) and time estimate in minutes
 5. Identify if task is clear enough or needs clarification
 
+Priority scale (whenever a "priority" field appears): integer 1-5 where 5 = most urgent/important and 1 = least. Higher numbers sort first in the app.
+
+Any "reasoning" or "reason" field you write is shown to the user in the UI. Write it in plain, friendly language a person who has never heard of GTD understands — say "this is a clear single step you can act on" rather than "this is the next physical action".
+
 Always respond in JSON format as specified in each request.`;
 }
 
-export function buildSmartCaptureMessages(rawText, userContexts, projects, today, dayName, history = []) {
-  const contextOptions = userContexts?.length
+// ---- Shared prompt-building helpers (used by every classifier so all
+// features see the user's world the same way) ----
+
+export function formatContextOptions(userContexts) {
+  return userContexts?.length
     ? userContexts.map(c => c.name || c).join('|')
     : '@home|@work|@errands|@computer|@phone|@anywhere';
-  const projectList = projects?.length
-    ? projects.map(p => p.name).join(', ')
-    : '';
-  // Build a few-shot block from the user's own past classifications so the AI
-  // learns their personal pattern (e.g. "call mom" → Personal, not Phone).
-  const historyBlock = history?.length
+}
+
+// Few-shot block from the user's own past classifications so the AI learns
+// their personal pattern (e.g. "call mom" → Personal, not Phone). Ordered by
+// updated_at upstream, so corrections teach the next call.
+export function formatHistoryBlock(history) {
+  return history?.length
     ? `
 USER'S RECENT CLASSIFICATIONS (mirror this pattern when ambiguous):
 ${history.map(h => `- "${h.title}" → context: ${h.context}${h.list ? `, list: ${h.list}` : ''}`).join('\n')}
 
 Treat these as the strongest hints about how THIS user actually organizes tasks. If a new input is similar to one of these, copy the classification choice.
+`
+    : '';
+}
+
+export function buildSmartCaptureMessages(rawText, userContexts, projects, today, dayName, history = [], existingTitles = []) {
+  const contextOptions = formatContextOptions(userContexts);
+  const projectList = projects?.length
+    ? projects.map(p => p.name).join(', ')
+    : '';
+  const historyBlock = formatHistoryBlock(history);
+  const existingBlock = existingTitles?.length
+    ? `
+DUPLICATE CHECK — the user's current open tasks include:
+${existingTitles.map(t => `- "${t}"`).join('\n')}
+If this input describes the SAME action as one of these (not merely a related one), set possible_duplicate_of to that task's exact title and mention it in reasoning. Otherwise set it to null. Still parse and return the task either way.
 `
     : '';
   return [
@@ -151,7 +219,7 @@ DAILY FOCUS RULES:
 - is_daily_focus = false for tasks due tomorrow or later, or with no urgency signals
 - "tomorrow" does NOT mean daily focus — it's scheduled for tomorrow, not today
 
-${historyBlock}
+${historyBlock}${existingBlock}
 CONTEXT RULES (critical — this is where most mistakes happen):
 - Context must be one of the user's existing contexts (or null): ${contextOptions}.
 - Do NOT invent context names. Only use names from the list above. If none fit, return null.
@@ -245,7 +313,7 @@ Respond with JSON:
   "list": "inbox|next_actions|waiting_for|someday_maybe",
   "list_confidence": "high|medium|low",
   "context": "${contextOptions}|null",
-  "priority": 1-5,
+  "priority": "integer 1-5 (5 = most urgent/important) or null",
   "energy_level": "low|medium|high",
   "time_estimate_minutes": number or null,
   "due_date": "YYYY-MM-DD or null",
@@ -256,72 +324,84 @@ Respond with JSON:
   "is_daily_focus": boolean,
   "waiting_for_person": "name ONLY when the task is genuinely blocked on/delegated to that person (explicit 'waiting for/on X', 'X needs to', 'delegated to X'). null for mere attribution/mentions like 'from X' or 'X said'.",
   "project_name": "exact project name from list or null",
+  "possible_duplicate_of": "exact title of an existing open task this duplicates, or null",
   "recurrence_rule": "daily|weekly|monthly|yearly|weekdays|custom|null",
   "recurrence_interval": number or null,
   "recurrence_days": "mon,wed,fri or null",
-  "reasoning": "brief explanation of what was detected and why"
+  "reasoning": "brief plain-language explanation of what was detected and why"
 }`
     }
   ];
 }
 
-export async function smartCapture(rawText, userContexts, projects, today, dayName, history = []) {
+export async function smartCapture(rawText, userContexts, projects, today, dayName, history = [], existingTitles = []) {
   if (!groq && !openai) return null;
-  const messages = buildSmartCaptureMessages(rawText, userContexts, projects, today, dayName, history);
-  return complete('smart-capture', { messages, response_format: { type: 'json_object' } });
+  const messages = buildSmartCaptureMessages(rawText, userContexts, projects, today, dayName, history, existingTitles);
+  return complete('smart-capture', { messages, response_format: { type: 'json_object' } }, validateSmartCapture);
 }
 
-export async function analyzeTask(task, userContexts) {
+export async function analyzeTask(task, userContexts, projects = [], today = null, dayName = null, history = []) {
   if (!openai && !groq) return { error: 'AI provider not configured' };
-  const contextOptions = userContexts?.length
-    ? userContexts.map(c => c.name || c).join('|')
-    : '@home|@work|@errands|@computer|@phone|@anywhere';
+  const contextOptions = formatContextOptions(userContexts);
+  const projectBlock = projects?.length
+    ? `\nActive projects (suggest the EXACT name if this task belongs to one, otherwise null):\n${projects.map(p => `- ${p.name}`).join('\n')}\n`
+    : '';
+  const dateLine = today ? `Today is ${dayName}, ${today}.\n` : '';
   return complete('analyze-task', {
       messages: [
         { role: 'system', content: getSystemPrompt(userContexts) },
         {
           role: 'user',
-          content: `Analyze this task and provide GTD recommendations:
+          content: `${dateLine}Analyze this task and provide GTD recommendations:
 
 Task: "${task.title}"
 ${task.notes ? `Notes: "${task.notes}"` : ''}
-
+${projectBlock}${formatHistoryBlock(history)}
 Respond with JSON:
 {
   "recommended_list": "inbox|next_actions|waiting_for|someday_maybe",
   "is_actionable": boolean,
   "is_project": boolean,
   "suggested_context": "${contextOptions}|null",
+  "suggested_project": "exact project name from the list above, or null",
   "energy_level": "low|medium|high",
   "time_estimate_minutes": number,
   "clarification_needed": boolean,
   "clarification_questions": ["question1", "question2"],
   "suggested_title": "improved action-oriented title if needed",
-  "next_action_if_project": "the very next physical action if this is a project",
-  "reasoning": "brief explanation of your analysis"
+  "next_action_if_project": "if this is a project, the first concrete step to take",
+  "reasoning": "brief plain-language explanation of your analysis"
 }`
         }
       ],
       response_format: { type: 'json_object' }
-    });
+    }, validateAnalyzeTask);
 }
 
-export async function suggestProjectBreakdown(project, userContexts) {
+export async function suggestProjectBreakdown(project, userContexts, existingTasks = []) {
   if (!openai && !groq) return { error: 'AI provider not configured' };
-  const contextOptions = userContexts?.length
-    ? userContexts.map(c => c.name || c).join('|')
-    : '@home|@work|@errands|@computer|@phone|@anywhere';
+  const contextOptions = formatContextOptions(userContexts);
+  const existingBlock = existingTasks?.length
+    ? `
+The project ALREADY has these tasks — do NOT suggest duplicates or near-duplicates of them. Suggest only the missing steps:
+${existingTasks.map(t => `- "${t.title}"${t.list === 'completed' ? ' (done)' : ''}`).join('\n')}
+`
+    : '';
+  const modeLine = project.execution_mode === 'sequential'
+    ? 'This project runs SEQUENTIALLY (one task at a time, in order) — make the "order" values a sensible step-by-step sequence.'
+    : 'This project runs in PARALLEL (all tasks active at once) — suggest independent actions that can be started in any order.';
   return complete('project-breakdown', {
       messages: [
         { role: 'system', content: getSystemPrompt(userContexts) },
         {
           role: 'user',
-          content: `Break down this project into actionable next actions:
+          content: `Break down this project into actionable next actions (3-7 suggestions):
 
 Project: "${project.name}"
 ${project.description ? `Description: "${project.description}"` : ''}
 ${project.outcome ? `Desired Outcome: "${project.outcome}"` : ''}
-
+${modeLine}
+${existingBlock}
 Respond with JSON:
 {
   "suggested_outcome": "clear outcome statement if not provided",
@@ -335,20 +415,24 @@ Respond with JSON:
     }
   ],
   "potential_waiting_for": ["people or things you might need to wait for"],
-  "reasoning": "brief explanation"
+  "reasoning": "brief plain-language explanation"
 }`
         }
       ],
       response_format: { type: 'json_object' }
-    });
+    }, validateProjectBreakdown);
 }
 
-export async function processInbox(tasks, userContexts) {
+export async function processInbox(tasks, userContexts, { projects = [], today = null, dayName = null, history = [] } = {}) {
   if (!openai && !groq) return { error: 'AI provider not configured' };
-  const contextOptions = userContexts?.length
-    ? userContexts.map(c => c.name || c).join('|')
-    : '@home|@work|@errands|@computer|@phone|@anywhere';
+  const contextOptions = formatContextOptions(userContexts);
   const taskList = tasks.map((t, i) => `${i + 1}. "${t.title}"${t.notes ? ` (Notes: ${t.notes})` : ''}`).join('\n');
+  const projectBlock = projects?.length
+    ? `\nActive projects (use the EXACT name when an item clearly belongs to one, otherwise null):\n${projects.map(p => `- ${p.name}`).join('\n')}\n`
+    : '';
+  const dateLine = today
+    ? `Today is ${dayName}, ${today}. Resolve relative dates in items ("tomorrow", "Friday", "before it lapses this month") to absolute YYYY-MM-DD due dates when the item clearly implies one; otherwise leave due_date null.\n`
+    : '';
 
   return complete('process-inbox', {
       messages: [
@@ -359,6 +443,7 @@ export async function processInbox(tasks, userContexts) {
 
 ${taskList}
 
+${dateLine}${projectBlock}${formatHistoryBlock(history)}
 CONFIDENCE RULES — be honest about uncertainty:
 - "high": the answer is explicitly stated or unambiguously implied by the title/notes
 - "medium": a reasonable inference from clear signals (verb form, named entities)
@@ -373,13 +458,20 @@ For each item, respond with JSON:
       "is_project": boolean,
       "suggested_title": "improved title if needed",
       "context": "${contextOptions}|null",
-      "priority": 1-5,
+      "project_name": "exact project name from the list above, or null",
+      "priority": "integer 1-5 (5 = most urgent/important) or null",
+      "due_date": "YYYY-MM-DD or null",
+      "energy_level": "low|medium|high|null",
+      "time_estimate_minutes": number or null,
+      "waiting_for_person": "name ONLY when genuinely blocked on/delegated to that person AND recommended_list is waiting_for, else null",
       "confidence": {
         "list": "high|medium|low",
         "context": "high|medium|low",
-        "priority": "high|medium|low"
+        "priority": "high|medium|low",
+        "due_date": "high|medium|low",
+        "project": "high|medium|low"
       },
-      "reasoning": "brief explanation"
+      "reasoning": "brief plain-language explanation"
     }
   ],
   "suggested_daily_focus": [indexes of items that should be today's focus]
@@ -387,7 +479,7 @@ For each item, respond with JSON:
         }
       ],
       response_format: { type: 'json_object' }
-    });
+    }, validateProcessInbox(tasks.length));
 }
 
 export async function importNotes(rawText, userContexts, projects = [], today, dayName) {
@@ -438,7 +530,7 @@ Respond with JSON:
       "due_date": "YYYY-MM-DD or null",
       "waiting_for_person": "name ONLY when genuinely blocked on/delegated to that person (explicit 'waiting for/on X', 'X needs to', 'delegated to X') AND recommended_list is waiting_for. null for mere attribution/mentions like 'from X' or 'X said'.",
       "is_daily_focus": boolean (true only if clearly urgent/today),
-      "priority": 1-5,
+      "priority": "integer 1-5 (5 = most urgent/important) or null",
       "energy_level": "low|medium|high|null",
       "time_estimate": null or number in minutes,
       "is_project": boolean,
@@ -452,38 +544,70 @@ Respond with JSON:
         "waiting_for": "high|medium|low",
         "daily_focus": "high|medium|low"
       },
-      "reasoning": "brief explanation of categorization"
+      "reasoning": "brief plain-language explanation of categorization"
     }
   ]
 }`
         }
       ],
       response_format: { type: 'json_object' }
-    });
+    }, validateImportNotes);
 }
 
-export async function getDailyPriorities(tasks, stats, userContexts) {
+export async function getDailyPriorities(tasks, stats, userContexts, { today = null, dayName = null, scheduledToday = null } = {}) {
   if (!openai && !groq) return { error: 'AI provider not configured' };
-    const taskList = tasks.map((t, i) => 
-      `${i + 1}. "${t.title}" [${t.context || 'no context'}] ${t.project_name ? `(Project: ${t.project_name})` : ''} Energy: ${t.energy_level || 'unknown'}, Time: ${t.time_estimate || 'unknown'}min`
-    ).join('\n');
-    
+    // Every date signal the model needs to reason about urgency: due date,
+    // days overdue, deferred-until, priority. Without these it was picking
+    // "today's focus" by title vibes alone.
+    const taskList = tasks.map((t, i) => {
+      const parts = [`${i + 1}. "${t.title}" [${t.context || 'no context'}]`];
+      if (t.project_name) parts.push(`(Project: ${t.project_name})`);
+      if (t.due_date) {
+        const due = String(t.due_date).slice(0, 10);
+        if (today && due < today) {
+          const overdueDays = Math.round((new Date(today) - new Date(due)) / 86400000);
+          parts.push(`Due: ${due} (OVERDUE by ${overdueDays} day${overdueDays === 1 ? '' : 's'})`);
+        } else if (today && due === today) {
+          parts.push(`Due: TODAY`);
+        } else {
+          parts.push(`Due: ${due}`);
+        }
+      }
+      if (t.start_date) parts.push(`Starts: ${String(t.start_date).slice(0, 10)}`);
+      if (t.priority) parts.push(`Priority: ${t.priority}/5`);
+      parts.push(`Energy: ${t.energy_level || 'unknown'}, Time: ${t.time_estimate || 'unknown'}min`);
+      return parts.join(' ');
+    }).join('\n');
+
+    const dateLine = today ? `Today is ${dayName}, ${today}.` : '';
+    const loadLine = scheduledToday
+      ? `- Already time-blocked today: ${scheduledToday.count} task(s), ~${scheduledToday.minutes} minutes committed`
+      : '';
+
     return complete('daily-priorities', {
       messages: [
         { role: 'system', content: getSystemPrompt(userContexts) },
         {
           role: 'user',
-          content: `Given these next actions, suggest which should be the daily focus (max 5-7 items for a productive day):
+          content: `${dateLine}
+Given these next actions, suggest which should be the daily focus (max 5-7 items for a productive day):
 
 Current Stats:
 - Inbox items: ${stats.inbox}
 - Completed today: ${stats.completed_today}
+${loadLine}
 
 Available Next Actions:
 ${taskList}
 
+SELECTION RULES:
+- Tasks due TODAY or OVERDUE are the strongest candidates — surface them first unless clearly superseded.
+- Respect the time already committed: if hours are time-blocked, suggest fewer additional items.
+- A task with "Starts:" in the future is deferred — do NOT suggest it.
+- Balance the day: avoid suggesting 5 high-energy deep-work items at once.
+
 CONFIDENCE RULES — be honest about uncertainty for each suggestion:
-- "high": clear signal it belongs in today's focus (due today, urgent, blocking other work, perfectly matches available energy/time)
+- "high": clear signal it belongs in today's focus (due today, overdue, urgent, blocking other work)
 - "medium": good candidate based on context, but not the strongest pick
 - "low": filler — only suggest if the user clearly needs more items. Prefer fewer high-confidence picks over padding the list with low-confidence ones.
 - It is OK to return fewer than 5 items if only a few are truly worth focusing on today.
@@ -494,22 +618,22 @@ Respond with JSON:
     {
       "task_index": number,
       "confidence": "high|medium|low",
-      "reason": "why this should be a focus today"
+      "reason": "plain-language reason this belongs on today's list"
     }
   ],
-  "productivity_tip": "a GTD-based tip for the day",
+  "productivity_tip": "a practical tip for the day, in plain language",
   "warning": "any concerns about overload or inbox buildup"
 }`
         }
       ],
       response_format: { type: 'json_object' }
-    });
+    }, validateDailyPriorities(tasks.length));
 }
 
 export async function findDuplicates(tasks, userContexts) {
   if (!openai && !groq) return { error: 'AI provider not configured' };
     const taskList = tasks.map(t =>
-      `[ID:${t.id}] "${t.title}"${t.notes ? ` (Notes: ${t.notes})` : ''} [List: ${t.list}]${t.context ? ` [Context: ${t.context}]` : ''}`
+      `[ID:${t.id}] "${t.title}"${t.notes ? ` (Notes: ${t.notes})` : ''} [List: ${t.list}]${t.context ? ` [Context: ${t.context}]` : ''}${t.recurrence_rule ? ` [Recurring: ${t.recurrence_rule}]` : ''}`
     ).join('\n');
 
     return complete('find-duplicates', {
@@ -518,6 +642,8 @@ export async function findDuplicates(tasks, userContexts) {
         {
           role: 'user',
           content: `Analyze these tasks and find groups of duplicate or very similar items. Two tasks are duplicates if they refer to the same action, even if worded differently. Do NOT flag tasks that are merely related but distinct actions.
+A task marked [Recurring: ...] repeats by design — never flag it as a duplicate of its own past/future occurrences or of a similar one-off task.
+When choosing which task to keep, prefer the one whose title/notes carry the most information; if the others contain unique details, say so in "reason" so the user can copy them over before deleting.
 
 Tasks:
 ${taskList}
@@ -540,11 +666,13 @@ If no duplicates exist, return an empty duplicate_groups array.`
         }
       ],
       response_format: { type: 'json_object' }
-    });
+    }, validateFindDuplicates);
 }
 
 export async function weeklyReviewAnalysis(data, userContexts) {
   if (!openai && !groq) return { error: 'AI provider not configured' };
+    const nextActionsShown = Math.min(data.nextActions.length, 30);
+    const waitingShown = Math.min(data.waitingFor.length, 20);
     const nextActionsList = data.nextActions.slice(0, 30).map(t => {
       const age = Math.floor((Date.now() - new Date(t.created_at).getTime()) / (1000 * 60 * 60 * 24));
       return `[ID:${t.id}] "${t.title}" [Context: ${t.context || 'none'}]${t.project_name ? ` [Project: ${t.project_name}]` : ''}${t.due_date ? ` [Due: ${t.due_date}]` : ''} (${age} days old)`;
@@ -568,6 +696,13 @@ export async function weeklyReviewAnalysis(data, userContexts) {
       `"${h.name}" — ${h.completionRate}% completion, ${h.streak} day streak`
     ).join('\n') || 'No habits tracked';
 
+    // A sample of someday/maybe items makes the "Get Creative" step real:
+    // without it the model can only do health/stale analysis.
+    const somedayList = (data.somedayMaybe || []).slice(0, 15).map(t =>
+      `[ID:${t.id}] "${t.title}"`
+    ).join('\n');
+    const somedayShown = Math.min((data.somedayMaybe || []).length, 15);
+
     return complete('weekly-review', {
       messages: [
         { role: 'system', content: getSystemPrompt(userContexts) },
@@ -583,10 +718,10 @@ System State:
 - Completed this week: ${data.completedThisWeek}
 - Last review: ${data.lastReviewDate || 'Never'}
 
-Next Actions:
+Next Actions (showing ${nextActionsShown} of ${data.stats.next_actions} — judge patterns, not totals, from this sample):
 ${nextActionsList || 'None'}
 
-Waiting For:
+Waiting For (showing ${waitingShown} of ${data.stats.waiting_for}):
 ${waitingForList || 'None'}
 
 Projects (${data.projects.length}):
@@ -594,6 +729,9 @@ ${projectsList || 'None'}
 
 Stale Items (unchanged 14+ days):
 ${staleList || 'None'}
+
+Someday/Maybe (showing ${somedayShown} of ${data.stats.someday_maybe}):
+${somedayList || 'None'}
 
 Habits:
 ${habitSummary}
@@ -603,13 +741,16 @@ Respond with JSON:
   "weekly_summary": "2-3 sentence overview of the week's productivity and system state",
   "tasks_completed_insight": "observation about completion patterns",
   "stale_items": [
-    { "id": number, "title": "...", "list": "...", "days_stale": number, "suggestion": "delete|move_to_someday|follow_up|keep", "reason": "why this suggestion" }
+    { "id": number, "title": "...", "list": "...", "days_stale": number, "suggestion": "delete|move_to_someday|follow_up|keep", "reason": "why this suggestion, in plain language" }
   ],
   "projects_needing_attention": [
     { "name": "...", "issue": "no_next_action|stalled|too_many_tasks", "suggestion": "specific actionable suggestion" }
   ],
   "waiting_for_followups": [
     { "id": number, "title": "...", "waiting_for_person": "...", "days_waiting": number, "suggestion": "specific follow-up action" }
+  ],
+  "someday_candidates": [
+    { "id": number, "title": "...", "reason": "why now might be the season to activate this parked idea (pick 0-3 that genuinely fit the week ahead; empty array if none do)" }
   ],
   "recommendations": ["3-5 actionable recommendations for next week"],
   "motivational_insight": "encouraging observation about progress or habits",
@@ -618,7 +759,7 @@ Respond with JSON:
         }
       ],
       response_format: { type: 'json_object' }
-    });
+    }, validateWeeklyReview);
 }
 
 function extractMeta(html, property, attr = 'property') {

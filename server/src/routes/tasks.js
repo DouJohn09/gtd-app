@@ -1,7 +1,8 @@
 import { Router } from 'express';
-import { TaskModel } from '../db/models.js';
+import { TaskModel, ProjectModel } from '../db/models.js';
 import { pool } from '../db/pool.js';
 import { analyzeTask } from '../services/ai.js';
+import { enforceAiLimit } from '../middleware/aiLimit.js';
 import { getCalendarEvents, syncTaskToCalendar, deleteTaskFromCalendar } from '../services/googleCalendar.js';
 
 const router = Router();
@@ -144,17 +145,21 @@ router.post('/:id/complete', async (req, res) => {
   }
 });
 
-router.post('/:id/analyze', async (req, res) => {
+router.post('/:id/analyze', enforceAiLimit, async (req, res) => {
   try {
     const task = await TaskModel.getById(req.params.id, req.user.id);
     if (!task) {
       return res.status(404).json({ error: 'Task not found' });
     }
-    const { rows: userContexts } = await pool.query(
-      'SELECT name FROM contexts WHERE user_id = $1 ORDER BY name',
-      [req.user.id]
-    );
-    const analysis = await analyzeTask(task, userContexts);
+    const [{ rows: userContexts }, allProjects] = await Promise.all([
+      pool.query('SELECT name FROM contexts WHERE user_id = $1 ORDER BY name', [req.user.id]),
+      ProjectModel.getAll(req.user.id),
+    ]);
+    const projects = allProjects.filter(p => p.status === 'active');
+    const dayName = new Date().toLocaleDateString('en-US', { weekday: 'long', timeZone: req.clientTimezone || 'UTC' });
+    const analysis = await analyzeTask(task, userContexts, projects, req.today, dayName);
+    if (analysis?.error) return res.status(503).json({ error: 'AI is not configured on this server' });
+    if (!analysis) return res.status(502).json({ error: 'AI processing failed' });
     res.json(analysis);
   } catch (error) {
     console.error(error);

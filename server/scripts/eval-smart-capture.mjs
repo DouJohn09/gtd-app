@@ -68,6 +68,12 @@ const CASES = [
   // --- scheduling intent ---
   { input: 'find me 30 minutes tomorrow to review the deck', expect: { find_free_slot: true, due: d(1) } },
   { input: 'lunch with Alex at noon tomorrow', expect: { scheduled_time: '12:00', due: d(1) } },
+  // --- priority direction (5 = most important; a wrong-direction model fails these) ---
+  { input: 'URGENT: renew car insurance today before it lapses', expect: { priority_min: 4, due: d(0) } },
+  { input: 'maybe alphabetize my spice rack one day', expect: { list: 'someday_maybe', priority_max: 3 } },
+  // --- duplicate detection against existing open tasks ---
+  { input: 'renew the car insurance', existingTitles: ['Renew car insurance before it lapses', 'Draft Q3 planning doc'], expect: { dup: 'insurance' } },
+  { input: 'wash the car this weekend', existingTitles: ['Renew car insurance before it lapses', 'Draft Q3 planning doc'], expect: { dup: 'null' } },
 ];
 
 function check(expect, ai) {
@@ -90,6 +96,13 @@ function check(expect, ai) {
   }
   if (expect.find_free_slot !== undefined) out.push({ f: 'free_slot', ok: !!ai.find_free_slot === expect.find_free_slot, got: ai.find_free_slot, want: expect.find_free_slot });
   if (expect.scheduled_time !== undefined) out.push({ f: 'sched_time', ok: ai.scheduled_time === expect.scheduled_time, got: ai.scheduled_time, want: expect.scheduled_time });
+  if (expect.priority_min !== undefined) out.push({ f: 'priority>=', ok: typeof ai.priority === 'number' && ai.priority >= expect.priority_min, got: ai.priority, want: `>=${expect.priority_min}` });
+  if (expect.priority_max !== undefined) out.push({ f: 'priority<=', ok: ai.priority == null || ai.priority <= expect.priority_max, got: ai.priority, want: `<=${expect.priority_max}` });
+  if (expect.dup !== undefined) {
+    const got = (ai.possible_duplicate_of || '').toLowerCase();
+    const ok = expect.dup === 'null' ? !got : got.includes(expect.dup.toLowerCase());
+    out.push({ f: 'dup', ok, got: ai.possible_duplicate_of, want: expect.dup });
+  }
   if (expect.waiting_for_person !== undefined) {
     const got = (ai.waiting_for_person || '').toLowerCase();
     const ok = expect.waiting_for_person === 'null' ? !got : got.includes(expect.waiting_for_person.toLowerCase());
@@ -103,11 +116,11 @@ async function runModel({ label, client, model }) {
   const latencies = [];
   const failures = [];
   for (const c of CASES) {
-    const messages = buildSmartCaptureMessages(c.input, CONTEXTS, PROJECTS, TODAY, dayName, []);
+    const messages = buildSmartCaptureMessages(c.input, CONTEXTS, PROJECTS, TODAY, dayName, [], c.existingTitles || []);
     let ai = null;
     const t0 = Date.now();
     try {
-      const res = await client.chat.completions.create({ model, messages, response_format: { type: 'json_object' } });
+      const res = await client.chat.completions.create({ model, messages, response_format: { type: 'json_object' }, temperature: 0, max_tokens: 1024 });
       latencies.push(Date.now() - t0);
       ai = JSON.parse(res.choices[0].message.content);
     } catch (e) {

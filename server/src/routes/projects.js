@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { ProjectModel, TaskModel } from '../db/models.js';
 import { pool } from '../db/pool.js';
 import { suggestProjectBreakdown } from '../services/ai.js';
+import { enforceAiLimit } from '../middleware/aiLimit.js';
 import { assertWithinLimit, LimitError } from '../services/billing.js';
 
 const router = Router();
@@ -66,17 +67,22 @@ router.delete('/:id', async (req, res) => {
   }
 });
 
-router.post('/:id/breakdown', async (req, res) => {
+router.post('/:id/breakdown', enforceAiLimit, async (req, res) => {
   try {
     const project = await ProjectModel.getById(req.params.id, req.user.id);
     if (!project) {
       return res.status(404).json({ error: 'Project not found' });
     }
-    const { rows: userContexts } = await pool.query(
-      'SELECT name FROM contexts WHERE user_id = $1 ORDER BY name',
-      [req.user.id]
-    );
-    const breakdown = await suggestProjectBreakdown(project, userContexts);
+    const [{ rows: userContexts }, { rows: existingTasks }] = await Promise.all([
+      pool.query('SELECT name FROM contexts WHERE user_id = $1 ORDER BY name', [req.user.id]),
+      pool.query(
+        'SELECT title, list FROM tasks WHERE project_id = $1 AND user_id = $2 ORDER BY created_at',
+        [req.params.id, req.user.id]
+      ),
+    ]);
+    const breakdown = await suggestProjectBreakdown(project, userContexts, existingTasks);
+    if (breakdown?.error) return res.status(503).json({ error: 'AI is not configured on this server' });
+    if (!breakdown) return res.status(502).json({ error: 'AI processing failed' });
     res.json(breakdown);
   } catch (error) {
     console.error(error);
