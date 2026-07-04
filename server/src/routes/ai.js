@@ -6,6 +6,7 @@ import { syncTaskToCalendar } from '../services/googleCalendar.js';
 import { findFreeSlot } from '../services/scheduling.js';
 import { consume, getStatus } from '../services/aiUsage.js';
 import { enforceAiLimit } from '../middleware/aiLimit.js';
+import { getAiMode } from '../services/userPrefs.js';
 
 async function getUserContexts(userId) {
   const { rows } = await pool.query(
@@ -66,12 +67,16 @@ const router = Router();
 
 router.post('/smart-capture', async (req, res) => {
   try {
-    const { text, routing } = req.body;
+    const { text } = req.body;
     if (!text?.trim()) {
       return res.status(400).json({ error: 'Text is required' });
     }
     const rawText = text.trim();
     const urls = rawText.match(/https?:\/\/[^\s]+/gi) || [];
+    // The user's ai_mode (not a client param) decides whether AI runs and how
+    // aggressively it routes — a stale client can't re-enable AI for a user
+    // who turned it off.
+    const aiMode = await getAiMode(req.user.id);
     const [contexts, allProjects, history, openTitles] = await Promise.all([
       getUserContexts(req.user.id),
       ProjectModel.getAll(req.user.id),
@@ -84,28 +89,36 @@ router.post('/smart-capture', async (req, res) => {
     // Soft throttle: when the user is over their daily AI budget, skip the
     // OpenAI call entirely and fall back to raw capture rather than hard-blocking.
     // The task still lands in the inbox as plain text — just without enrichment.
-    const budget = await consume(req.user.id);
-    const ai = budget.allowed
-      ? await smartCapture(rawText, contexts, projects, today, dayName, history, openTitles)
-      : null;
+    let ai = null;
+    let throttled = false;
+    if (aiMode !== 'off') {
+      const budget = await consume(req.user.id);
+      throttled = !budget.allowed;
+      if (budget.allowed) {
+        ai = await smartCapture(rawText, contexts, projects, today, dayName, history, openTitles);
+        // No provider configured → same graceful raw-capture fallback as the
+        // budget path, not an error. The capture must never fail.
+        if (ai?.error) ai = null;
+      }
+    }
 
     if (!ai) {
       const taskData = { title: rawText };
       if (urls.length) taskData.notes = urls.join('\n');
       const task = await TaskModel.create(taskData, req.user.id);
-      return res.json({ task, ai: null, fallback: true, throttled: !budget.allowed });
+      return res.json({ task, ai: null, fallback: aiMode !== 'off', aiOff: aiMode === 'off', throttled });
     }
 
     // Confidence-gated routing: trust AI's list when confident, fall back to
-    // inbox when ambiguous (or when user opted into always-inbox mode).
-    // All other AI parsing (context, due date, project, etc.) is preserved
-    // regardless — the inbox becomes a triage holding bay with metadata
-    // pre-filled, not a re-do from scratch.
+    // inbox when ambiguous (or always, in assisted mode). All other AI parsing
+    // (context, due date, project, etc.) is preserved regardless — the inbox
+    // becomes a triage holding bay with metadata pre-filled, not a re-do from
+    // scratch.
     let routedToInbox = false;
-    if (routing === 'always_inbox' && ai.list !== 'inbox') {
+    if (aiMode === 'assisted' && ai.list !== 'inbox') {
       ai.list = 'inbox';
       routedToInbox = true;
-    } else if (routing !== 'always_inbox' && ai.list_confidence === 'low' && ai.list !== 'inbox') {
+    } else if (aiMode !== 'assisted' && ai.list_confidence === 'low' && ai.list !== 'inbox') {
       ai.list = 'inbox';
       routedToInbox = true;
     }
@@ -463,9 +476,22 @@ async function getHabitStats(userId) {
   };
 }
 
-router.post('/weekly-review', enforceAiLimit, async (req, res) => {
+// Not behind enforceAiLimit: this route auto-fires on page mount and must
+// serve the review data (lists, stats, habits) even when AI is off or over
+// budget — only the analysis itself is gated.
+router.post('/weekly-review', async (req, res) => {
   try {
     const userId = req.user.id;
+    const aiMode = await getAiMode(userId);
+    let aiAllowed = aiMode !== 'off';
+    if (aiAllowed) {
+      try {
+        const status = await consume(userId);
+        aiAllowed = status.allowed;
+      } catch (err) {
+        console.error('weekly-review metering error (failing open):', err);
+      }
+    }
     const [stats, inboxItems, nextActions, waitingFor, somedayMaybe, projects, staleItems, lastReview, streak, habitStats, userContexts] = await Promise.all([
       TaskModel.getStats(userId, req.today),
       TaskModel.getAll('inbox', userId, req.today),
@@ -483,16 +509,20 @@ router.post('/weekly-review', enforceAiLimit, async (req, res) => {
     const since = lastReview?.completed_at || new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
     const completedThisWeek = await WeeklyReviewModel.getCompletedTasksSince(userId, since);
 
-    const aiAnalysis = await weeklyReviewAnalysis({
-      stats, nextActions, waitingFor, somedayMaybe, projects,
-      staleItems, habitStats, completedThisWeek,
-      lastReviewDate: lastReview?.completed_at || null,
-    }, userContexts);
+    const aiAnalysis = aiAllowed
+      ? await weeklyReviewAnalysis({
+          stats, nextActions, waitingFor, somedayMaybe, projects,
+          staleItems, habitStats, completedThisWeek,
+          lastReviewDate: lastReview?.completed_at || null,
+        }, userContexts)
+      : null;
 
     res.json({
       stats, inboxItems, nextActions, waitingFor, somedayMaybe,
       projects, habitStats, lastReview, streak, completedThisWeek,
-      aiAnalysis: aiAnalysis || { error: 'AI analysis unavailable' },
+      aiAnalysis: aiAnalysis && !aiAnalysis.error
+        ? aiAnalysis
+        : { error: aiMode === 'off' ? 'ai_off' : 'AI analysis unavailable' },
     });
   } catch (error) {
     console.error(error);

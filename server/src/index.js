@@ -19,6 +19,7 @@ import importRouter from './routes/import.js';
 import customListsRouter from './routes/customLists.js';
 import waitlistRouter from './routes/waitlist.js';
 import billingRouter, { paddleWebhookHandler } from './routes/billing.js';
+import preferencesRouter from './routes/preferences.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -76,6 +77,7 @@ app.use('/api/export', requireAuth, exportRouter);
 app.use('/api/import', requireAuth, importRouter);
 app.use('/api/custom-lists', requireAuth, customListsRouter);
 app.use('/api/billing', requireAuth, billingRouter);
+app.use('/api/preferences', requireAuth, preferencesRouter);
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });

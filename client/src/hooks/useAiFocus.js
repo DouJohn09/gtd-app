@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { api } from '../lib/api';
+import { aiToast } from '../lib/aiError';
 
 /**
  * Shared "AI suggest" behavior for focus/next-actions surfaces. Calls
@@ -43,7 +44,7 @@ export function useAiFocus(items, addToast) {
       );
     } catch (e) {
       console.error('AI suggest failed:', e);
-      addToast(e?.message?.includes('limit') ? 'Daily AI limit reached.' : 'Could not get AI suggestions.', 'error');
+      addToast(...aiToast(e, 'Could not get AI suggestions.'));
     } finally {
       setAiLoading(false);
     }

@@ -10,6 +10,7 @@ import SortDropdown, { sortTasks } from '../components/SortDropdown';
 import { useTaskFilters, applyFilters } from '../components/FilterDropdown';
 import FiltersMenu, { ActiveFilters } from '../components/FiltersMenu';
 import { useAiFocus, partitionByAi } from '../hooks/useAiFocus';
+import { useAiMode } from '../hooks/useAiMode';
 import MonoLabel from '../components/ui/MonoLabel';
 
 const CONFIDENCE_COLOR = {
@@ -68,7 +69,8 @@ export default function Lists() {
   const [filterContext, setFilterContext] = useState(() => localStorage.getItem(`filter_context_list_${list}`) || '');
   const [filterProject, setFilterProject] = useState(() => localStorage.getItem(`filter_project_list_${list}`) || '');
   const { addToast } = useToast();
-  const aiEnabled = list === 'next_actions';
+  const { aiOff } = useAiMode();
+  const aiEnabled = list === 'next_actions' && !aiOff;
   const { aiLoading, aiResult, run: runAiSuggest, clear: clearAiSuggest } = useAiFocus(tasks, addToast);
 
   // Per-list scoping for all view state — each list (next_actions, waiting_for,

@@ -1,7 +1,11 @@
 import { useState, useEffect } from 'react';
-import { Sparkles, Inbox, Target, CheckCircle2, ArrowRight, FileText, Upload, Copy, Trash2, Check, Pencil, X } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Sparkles, Inbox, Target, CheckCircle2, ArrowRight, FileText, Upload, Copy, Trash2, Check, Pencil, X, Settings as SettingsIcon } from 'lucide-react';
 import { api } from '../lib/api';
+import { aiToast } from '../lib/aiError';
 import { useToast } from '../components/Toast';
+import { useAuth } from '../contexts/AuthContext';
+import { useAiMode } from '../hooks/useAiMode';
 import MonoLabel from '../components/ui/MonoLabel';
 import { linkify } from '../lib/linkify.jsx';
 import { contextLabel } from '../lib/context';
@@ -48,7 +52,10 @@ export default function AIAssistant() {
   const [dupResult, setDupResult] = useState(null);
   const [dupSelected, setDupSelected] = useState(new Set());
   const [dupDone, setDupDone] = useState(null);
+  const [inboxEdited, setInboxEdited] = useState(new Set());
   const { addToast } = useToast();
+  const { aiOff } = useAiMode();
+  const { patchUser } = useAuth();
 
   useEffect(() => {
     api.contexts.getAll().then(setContexts).catch(console.error);
@@ -57,8 +64,9 @@ export default function AIAssistant() {
 
   const processInbox = async () => {
     setLoading(l => ({ ...l, inbox: true }));
+    setInboxEdited(new Set());
     try { setInboxResult(await api.ai.processInbox()); }
-    catch (error) { addToast(error.message || 'AI processing failed — try again in a minute.', 'error'); }
+    catch (error) { addToast(...aiToast(error, 'AI processing failed — try again in a minute.')); }
     finally { setLoading(l => ({ ...l, inbox: false })); }
   };
 
@@ -71,7 +79,7 @@ export default function AIAssistant() {
         setPrioritiesKept(new Set(result.suggested_focus.map(f => f.task_index)));
       }
     }
-    catch (error) { addToast(error.message || 'AI suggestions failed — try again in a minute.', 'error'); }
+    catch (error) { addToast(...aiToast(error, 'AI suggestions failed — try again in a minute.')); }
     finally { setLoading(l => ({ ...l, priorities: false })); }
   };
 
@@ -92,12 +100,20 @@ export default function AIAssistant() {
         ...item,
       })).filter(item => item.task_id);
       await api.ai.applyInboxProcessing(items);
+      // Trust signal for the Autopilot nudge: suggestions applied untouched
+      // count toward the clean-accept streak; any edited row resets it.
+      const adjusted = inboxEdited.size;
+      api.preferences.aiFeedback(Math.max(0, items.length - adjusted), adjusted)
+        .then(r => patchUser({ ai_accept_streak: r.ai_accept_streak }))
+        .catch(() => {});
       setInboxResult(null);
       setEditingInboxIndex(null);
+      setInboxEdited(new Set());
     } finally { setApplying(false); }
   };
 
   const updateInboxItem = (index, patch) => {
+    setInboxEdited(prev => new Set(prev).add(index));
     setInboxResult(prev => {
       if (!prev) return prev;
       const processed_items = prev.processed_items.map((it, i) => (i === index ? { ...it, ...patch } : it));
@@ -128,7 +144,7 @@ export default function AIAssistant() {
       const result = await api.ai.importNotes(importText);
       setImportResult({ ...result, mode: 'ai' });
       if (result?.items) setImportSelected(new Set(result.items.map((_, i) => i)));
-    } catch (error) { addToast(error.message || 'AI analysis failed — try again in a minute.', 'error'); }
+    } catch (error) { addToast(...aiToast(error, 'AI analysis failed — try again in a minute.')); }
     finally { setLoading(l => ({ ...l, import: false })); }
   };
 
@@ -199,7 +215,7 @@ export default function AIAssistant() {
         });
         setDupSelected(toRemove);
       }
-    } catch (error) { addToast(error.message || 'Duplicate scan failed — try again in a minute.', 'error'); }
+    } catch (error) { addToast(...aiToast(error, 'Duplicate scan failed — try again in a minute.')); }
     finally { setLoading(l => ({ ...l, duplicates: false })); }
   };
 
@@ -220,6 +236,33 @@ export default function AIAssistant() {
       setDupResult(null); setDupSelected(new Set());
     } finally { setApplying(false); }
   };
+
+  // AI is off: the page has nothing to run, so say so calmly instead of
+  // showing four dead tools. (The nav entry is hidden too — this covers
+  // direct links and bookmarks.)
+  if (aiOff) {
+    return (
+      <div className="px-6 lg:px-12 pt-10 pb-20 max-w-3xl">
+        <div className="mb-8">
+          <MonoLabel tone="violet" className="mb-3">intelligence</MonoLabel>
+          <h1 className="font-display text-[52px] md:text-[60px] leading-[1] tracking-tight">AI Assistant</h1>
+        </div>
+        <div className="rounded-2xl glass p-8">
+          <div className="mono-label mb-3">ai_is_off</div>
+          <p className="font-display italic text-[22px] mb-2">You're running fully manual.</p>
+          <p className="text-[13.5px] text-text-2 leading-relaxed max-w-prose mb-5">
+            AI assistance is turned off, so nothing here is active — and your
+            task text is never sent to an AI provider. If you'd like suggestions
+            back (Smart Capture, inbox processing, focus picks), flip the dial
+            in Settings any time.
+          </p>
+          <Link to="/settings" className="gtd-btn gtd-btn-primary inline-flex items-center gap-2 text-[12.5px]">
+            <SettingsIcon className="w-3.5 h-3.5" /> Open Settings
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="px-6 lg:px-12 pt-10 pb-20 max-w-5xl">

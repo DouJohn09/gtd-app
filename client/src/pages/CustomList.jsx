@@ -3,6 +3,7 @@ import { useParams, useOutletContext, useNavigate } from 'react-router-dom';
 import { Plus, GripVertical, Star, ExternalLink, Pencil, Trash2, ListTodo, ChevronUp, ChevronDown, Loader2 } from 'lucide-react';
 import { api } from '../lib/api';
 import { useToast } from '../components/Toast';
+import { useAiMode } from '../hooks/useAiMode';
 import { ICON_MAP } from '../components/NewListModal';
 import ListItemModal from '../components/ListItemModal';
 import NewListModal from '../components/NewListModal';
@@ -19,6 +20,7 @@ export default function CustomList() {
   const { listId } = useParams();
   const navigate = useNavigate();
   const { addToast } = useToast();
+  const { aiOff } = useAiMode();
   const outletCtx = useOutletContext() || {};
   const refreshCustomLists = outletCtx.refreshCustomLists;
 
@@ -63,11 +65,13 @@ export default function CustomList() {
     try {
       if (isUrl(value)) {
         let itemData = { title: value, url: value };
-        try {
-          const result = await api.customLists.extractUrl(value);
-          if (result?.title) itemData.title = result.title;
-          if (result?.notes) itemData.notes = result.notes;
-        } catch { /* use URL as title fallback */ }
+        if (!aiOff) {
+          try {
+            const result = await api.customLists.extractUrl(value);
+            if (result?.title) itemData.title = result.title;
+            if (result?.notes) itemData.notes = result.notes;
+          } catch { /* use URL as title fallback */ }
+        }
         await api.customLists.createItem(listId, itemData);
       } else {
         await api.customLists.createItem(listId, { title: value });

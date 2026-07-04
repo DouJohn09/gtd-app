@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { X, AlertCircle, Star, ExternalLink, Trash2, ListTodo, Loader2 } from 'lucide-react';
 import { api } from '../lib/api';
 import { useToast } from './Toast';
+import { useAiMode } from '../hooks/useAiMode';
 import ConfirmModal from './ui/ConfirmModal';
 
 const STATUS_OPTIONS = [
@@ -12,6 +13,7 @@ const STATUS_OPTIONS = [
 
 export default function ListItemModal({ item, listId, listColor = 'violet', onClose, onSave }) {
   const { addToast } = useToast();
+  const { aiOff } = useAiMode();
   const [title, setTitle] = useState('');
   const [notes, setNotes] = useState('');
   const [url, setUrl] = useState('');
@@ -46,6 +48,7 @@ export default function ListItemModal({ item, listId, listColor = 'violet', onCl
   const handleUrlChange = (newUrl) => {
     setUrl(newUrl);
     if (extractRef.current) clearTimeout(extractRef.current);
+    if (aiOff) return;
     try { new URL(newUrl); } catch { return; }
     if (!newUrl.startsWith('http')) return;
     extractRef.current = setTimeout(async () => {

@@ -84,7 +84,12 @@ router.post('/google', loginLimiter, async (req, res) => {
 
     res.json({
       token,
-      user: { id: user.id, email: user.email, name: user.name, picture: user.picture }
+      user: {
+        id: user.id, email: user.email, name: user.name, picture: user.picture,
+        ai_mode: user.ai_mode || 'assisted',
+        ai_accept_streak: user.ai_accept_streak || 0,
+        created_at: user.created_at || null,
+      }
     });
   } catch (error) {
     console.error('Google auth error:', error);
@@ -100,10 +105,11 @@ router.get('/me', async (req, res) => {
   try {
     const payload = jwt.verify(authHeader.split(' ')[1], process.env.JWT_SECRET);
     const { rows } = await pool.query(
-      `SELECT id, email, name, picture,
+      `SELECT id, email, name, picture, created_at,
               (google_calendar_refresh_token IS NOT NULL OR google_calendar_access_token IS NOT NULL) AS google_calendar_connected,
               google_calendar_scopes,
-              plan, subscription_status, current_period_end
+              plan, subscription_status, current_period_end,
+              ai_mode, ai_accept_streak, ai_nudge_autopilot_at, ai_nudge_reminder_at
        FROM users WHERE id = $1`,
       [payload.userId]
     );

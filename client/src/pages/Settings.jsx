@@ -3,6 +3,7 @@ import { Settings as SettingsIcon, FileJson, FileSpreadsheet, Upload, X, Tag, Pl
 import { api } from '../lib/api';
 import { useToast } from '../components/Toast';
 import { useAuth } from '../contexts/AuthContext';
+import { useAiMode } from '../hooks/useAiMode';
 import MonoLabel from '../components/ui/MonoLabel';
 import ConfirmModal from '../components/ui/ConfirmModal';
 import BillingSection from '../components/BillingSection';
@@ -20,7 +21,7 @@ export default function Settings() {
   const [newContextName, setNewContextName] = useState('');
   const [addingContext, setAddingContext] = useState(false);
   const [contextToDelete, setContextToDelete] = useState(null);
-  const [routing, setRouting] = useState(() => localStorage.getItem('smart_capture_routing') || 'auto_route');
+  const { mode, setMode } = useAiMode();
 
   useEffect(() => {
     api.contexts.getAll().then(setContexts).catch(err => {
@@ -28,15 +29,19 @@ export default function Settings() {
     });
   }, []);
 
-  function updateRouting(next) {
-    setRouting(next);
-    localStorage.setItem('smart_capture_routing', next);
-    addToast(
-      next === 'auto_route'
-        ? 'Smart Capture: auto-route confident tasks'
-        : 'Smart Capture: every task lands in Inbox',
-      'success'
-    );
+  async function updateMode(next) {
+    if (next === mode) return;
+    try {
+      await setMode(next);
+      addToast(
+        next === 'off' ? 'AI is off — you run everything manually.'
+          : next === 'assisted' ? 'Assisted: AI suggests, you confirm in the Inbox.'
+          : 'Autopilot: confident tasks file themselves.',
+        'success'
+      );
+    } catch (err) {
+      addToast(err.message || 'Could not save — try again.', 'error');
+    }
   }
 
   async function addContext(e) {
@@ -275,72 +280,58 @@ export default function Settings() {
         <MonoLabel className="mb-2">ai</MonoLabel>
         <h2 className="font-display text-xl mb-1 flex items-center gap-2">
           <Sparkles className="w-4 h-4" style={{ color: 'rgb(var(--violet-glow))' }} />
-          Smart Capture
+          AI assistance
         </h2>
         <p className="text-text-3 text-sm mb-5 leading-relaxed">
-          When you capture a task with Smart Capture on, the AI parses its
-          metadata (context, due date, project, energy, recurrence) and decides
-          which list it belongs in. Choose how aggressive that routing should be.
-          Either way, Smart Capture learns from how you organize tasks — your
-          recent classifications and corrections shape every future capture.
+          One dial for how much Cleartable acts on its own. You can change it
+          any time — nothing you've already organized is touched.
         </p>
 
         <div className="space-y-2">
-          <label
-            className="flex items-start gap-3 p-3 rounded-xl cursor-pointer transition-all"
-            style={
-              routing === 'auto_route'
-                ? { background: 'rgb(var(--violet) / 0.08)', boxShadow: 'inset 0 0 0 1px rgb(var(--violet) / 0.30)' }
-                : { boxShadow: 'inset 0 0 0 1px rgb(255 255 255 / 0.06)' }
-            }
-          >
-            <input
-              type="radio"
-              name="routing"
-              value="auto_route"
-              checked={routing === 'auto_route'}
-              onChange={() => updateRouting('auto_route')}
-              className="mt-1 accent-violet-400"
-            />
-            <div className="flex-1">
-              <div className="text-[13px] font-medium text-text-1">
-                Auto-route confident tasks <span className="text-text-3 font-normal">(recommended)</span>
+          {[
+            {
+              value: 'off',
+              title: 'Off — fully manual',
+              desc: 'Pure GTD. No AI anywhere: you capture, clarify and organize everything yourself. With AI off, your task text is never sent to an AI provider.',
+            },
+            {
+              value: 'assisted',
+              title: 'Assisted — AI suggests, you decide',
+              badge: 'recommended',
+              desc: 'Smart Capture pre-fills details (context, dates, project) and every new task waits in your Inbox with suggestions you confirm. Other AI tools run only when you ask.',
+            },
+            {
+              value: 'auto',
+              title: 'Autopilot — AI organizes for you',
+              desc: 'Tasks the AI is confident about land directly in their final list (Next Actions, Waiting For, etc.). Only ambiguous ones wait in the Inbox for your call.',
+            },
+          ].map(opt => (
+            <label
+              key={opt.value}
+              className="flex items-start gap-3 p-3 rounded-xl cursor-pointer transition-all"
+              style={
+                mode === opt.value
+                  ? { background: 'rgb(var(--violet) / 0.08)', boxShadow: 'inset 0 0 0 1px rgb(var(--violet) / 0.30)' }
+                  : { boxShadow: 'inset 0 0 0 1px rgb(255 255 255 / 0.06)' }
+              }
+            >
+              <input
+                type="radio"
+                name="ai_mode"
+                value={opt.value}
+                checked={mode === opt.value}
+                onChange={() => updateMode(opt.value)}
+                className="mt-1 accent-violet-400"
+              />
+              <div className="flex-1">
+                <div className="text-[13px] font-medium text-text-1">
+                  {opt.title}
+                  {opt.badge && <span className="text-text-3 font-normal"> ({opt.badge})</span>}
+                </div>
+                <p className="text-[12px] text-text-3 mt-0.5 leading-relaxed">{opt.desc}</p>
               </div>
-              <p className="text-[12px] text-text-3 mt-0.5 leading-relaxed">
-                Tasks the AI is confident about land directly in their final list
-                (Next Actions, Waiting For, etc.). Ambiguous tasks fall back to
-                Inbox so you can review them.
-              </p>
-            </div>
-          </label>
-
-          <label
-            className="flex items-start gap-3 p-3 rounded-xl cursor-pointer transition-all"
-            style={
-              routing === 'always_inbox'
-                ? { background: 'rgb(var(--violet) / 0.08)', boxShadow: 'inset 0 0 0 1px rgb(var(--violet) / 0.30)' }
-                : { boxShadow: 'inset 0 0 0 1px rgb(255 255 255 / 0.06)' }
-            }
-          >
-            <input
-              type="radio"
-              name="routing"
-              value="always_inbox"
-              checked={routing === 'always_inbox'}
-              onChange={() => updateRouting('always_inbox')}
-              className="mt-1 accent-violet-400"
-            />
-            <div className="flex-1">
-              <div className="text-[13px] font-medium text-text-1">
-                Always send to Inbox
-              </div>
-              <p className="text-[12px] text-text-3 mt-0.5 leading-relaxed">
-                Strict GTD mode: AI fills in metadata but every task lands in
-                Inbox first so you can review and triage before it joins your
-                active lists.
-              </p>
-            </div>
-          </label>
+            </label>
+          ))}
         </div>
       </section>
 

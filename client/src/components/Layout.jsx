@@ -6,6 +6,7 @@ import {
   Command, Settings, MoreHorizontal, X, Plus, List,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { useAiMode } from '../hooks/useAiMode';
 import { api } from '../lib/api';
 import { ICON_MAP } from './NewListModal';
 import NewListModal from './NewListModal';
@@ -92,6 +93,12 @@ function NavItem({ to, icon: Icon, label, end, onClick }) {
 
 export default function Layout() {
   const { user, logout } = useAuth();
+  const { aiOff } = useAiMode();
+  // With AI off, the AI Assistant page has nothing to offer — drop it from
+  // navigation entirely rather than showing a dead entry.
+  const groups = aiOff
+    ? navGroups.map(g => ({ ...g, items: g.items.filter(i => i.to !== '/ai') }))
+    : navGroups;
   const [captureOpen, setCaptureOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const [customLists, setCustomLists] = useState([]);
@@ -172,7 +179,7 @@ export default function Layout() {
         </button>
 
         <nav className="flex-1 overflow-y-auto -mx-1 px-1">
-          {navGroups.map((group, gi) => (
+          {groups.map((group, gi) => (
             <div key={group.label} className={gi > 0 ? 'mt-6' : ''}>
               <div className="mono-label px-3 mb-2">{group.label}</div>
               <div className="flex flex-col gap-0.5">
@@ -298,7 +305,7 @@ export default function Layout() {
               </button>
             </div>
             <div className="flex flex-col gap-1">
-              {navGroups.flatMap(g => g.items)
+              {groups.flatMap(g => g.items)
                 .filter(i => !mobileTabs.some(m => m.to === i.to))
                 .map(i => <NavItem key={i.to} {...i} onClick={() => setMoreOpen(false)} />)}
 

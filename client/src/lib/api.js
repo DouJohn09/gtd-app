@@ -156,7 +156,13 @@ export const api = {
     applyDuplicates: (taskIds) => fetchApi('/ai/apply-duplicates', { method: 'POST', body: JSON.stringify({ taskIds }) }),
     weeklyReview: () => fetchApi('/ai/weekly-review', { method: 'POST' }),
     completeReview: (data) => fetchApi('/ai/complete-review', { method: 'POST', body: JSON.stringify(data) }),
-    smartCapture: (text, routing = 'auto_route') => fetchApi('/ai/smart-capture', { method: 'POST', body: JSON.stringify({ text, routing }) }),
+    smartCapture: (text) => fetchApi('/ai/smart-capture', { method: 'POST', body: JSON.stringify({ text }) }),
+  },
+
+  preferences: {
+    setAiMode: (mode) => fetchApi('/preferences/ai-mode', { method: 'PUT', body: JSON.stringify({ mode }) }),
+    aiFeedback: (accepted, adjusted) => fetchApi('/preferences/ai-feedback', { method: 'POST', body: JSON.stringify({ accepted, adjusted }) }),
+    aiNudgeSeen: (nudge) => fetchApi('/preferences/ai-nudge-seen', { method: 'POST', body: JSON.stringify({ nudge }) }),
   },
 
   customLists: {

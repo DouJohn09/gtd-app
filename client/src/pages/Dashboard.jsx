@@ -16,6 +16,7 @@ import SortDropdown, { sortTasks } from '../components/SortDropdown';
 import { useTaskFilters, applyFilters } from '../components/FilterDropdown';
 import FiltersMenu, { ActiveFilters } from '../components/FiltersMenu';
 import { useAiFocus, partitionByAi } from '../hooks/useAiFocus';
+import { useAiMode } from '../hooks/useAiMode';
 import GlassCard from '../components/ui/GlassCard';
 import Chip from '../components/ui/Chip';
 import FreshCheck from '../components/ui/FreshCheck';
@@ -62,6 +63,7 @@ export default function Dashboard() {
   const [hideOverdue, setHideOverdue] = useState(() => localStorage.getItem('hide_overdue_focus') === 'true');
   const [tourDismissed, setTourDismissed] = useState(() => localStorage.getItem('ct_tour_dismissed') === '1');
   const { user } = useAuth();
+  const { aiOff } = useAiMode();
   const { addToast } = useToast();
   const { aiLoading, aiResult, run: runAiSuggest, clear: clearAiSuggest } = useAiFocus(dailyFocus, addToast);
 
@@ -191,11 +193,18 @@ export default function Dashboard() {
         </h1>
         <p className="mt-4 text-[15px] max-w-xl text-text-2">
           {focusTotal === 0 ? (
-            <>
-              Nothing on Today yet —{' '}
-              <Link to="/ai" className="text-violet-glow underline-offset-4 hover:underline">let AI suggest a few</Link>{' '}
-              or pull from your <Link to="/inbox" className="text-violet-glow underline-offset-4 hover:underline">inbox of {stats?.inbox || 0}</Link>.
-            </>
+            aiOff ? (
+              <>
+                Nothing on Today yet — pull from your{' '}
+                <Link to="/inbox" className="text-violet-glow underline-offset-4 hover:underline">inbox of {stats?.inbox || 0}</Link>.
+              </>
+            ) : (
+              <>
+                Nothing on Today yet —{' '}
+                <Link to="/ai" className="text-violet-glow underline-offset-4 hover:underline">let AI suggest a few</Link>{' '}
+                or pull from your <Link to="/inbox" className="text-violet-glow underline-offset-4 hover:underline">inbox of {stats?.inbox || 0}</Link>.
+              </>
+            )
           ) : remaining === 0 ? (
             <>
               <span className="font-display italic text-mint-glow">All clear.</span> Today is done — go close the laptop.
@@ -211,6 +220,7 @@ export default function Dashboard() {
       </div>
 
       {showTour && <FirstRunTour onDismiss={dismissTour} />}
+      {!showTour && <AutopilotNudge />}
 
       {/* Bento */}
       <div className="grid grid-cols-12 gap-5 fresh-stagger">
@@ -227,17 +237,19 @@ export default function Dashboard() {
                   <div className="flex items-center gap-2 shrink-0">
                     <FiltersMenu toggles={filterToggles} filters={filterFilters} />
                     <SortDropdown value={sortBy} onChange={setSortBy} compact />
-                    <button
-                      onClick={runAiSuggest}
-                      disabled={aiLoading}
-                      title="AI — suggest what to focus on"
-                      aria-label="AI suggest focus"
-                      className="gtd-btn gtd-btn-primary !px-2.5 !py-1.5 grid place-items-center disabled:opacity-70"
-                    >
-                      {aiLoading
-                        ? <span className="w-4 h-4 rounded-full border-2 border-white/40 border-t-white animate-spin" />
-                        : <Sparkles className="w-4 h-4" />}
-                    </button>
+                    {!aiOff && (
+                      <button
+                        onClick={runAiSuggest}
+                        disabled={aiLoading}
+                        title="AI — suggest what to focus on"
+                        aria-label="AI suggest focus"
+                        className="gtd-btn gtd-btn-primary !px-2.5 !py-1.5 grid place-items-center disabled:opacity-70"
+                      >
+                        {aiLoading
+                          ? <span className="w-4 h-4 rounded-full border-2 border-white/40 border-t-white animate-spin" />
+                          : <Sparkles className="w-4 h-4" />}
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
@@ -255,15 +267,19 @@ export default function Dashboard() {
                   <div className="font-mono text-[11px] text-text-3 mb-3">no_focus_tasks</div>
                   <div className="font-display italic text-[22px] mb-2">Pick a few things that matter.</div>
                   <p className="text-[13.5px] text-text-2 max-w-sm mx-auto mb-5">
-                    Today keeps your day intentional. Pull from your inbox, or have AI propose a list.
+                    {aiOff
+                      ? 'Today keeps your day intentional. Pull from your inbox or your Next Actions.'
+                      : 'Today keeps your day intentional. Pull from your inbox, or have AI propose a list.'}
                   </p>
                   <div className="flex items-center justify-center gap-2">
-                    <Link to="/inbox" className="gtd-btn gtd-btn-secondary inline-flex items-center gap-1.5 text-[12.5px]">
+                    <Link to="/inbox" className={`gtd-btn ${aiOff ? 'gtd-btn-primary' : 'gtd-btn-secondary'} inline-flex items-center gap-1.5 text-[12.5px]`}>
                       <Inbox className="w-3.5 h-3.5" /> Open inbox
                     </Link>
-                    <Link to="/ai" className="gtd-btn gtd-btn-primary inline-flex items-center gap-1.5 text-[12.5px]">
-                      <Sparkles className="w-3.5 h-3.5" /> AI suggest
-                    </Link>
+                    {!aiOff && (
+                      <Link to="/ai" className="gtd-btn gtd-btn-primary inline-flex items-center gap-1.5 text-[12.5px]">
+                        <Sparkles className="w-3.5 h-3.5" /> AI suggest
+                      </Link>
+                    )}
                   </div>
                 </div>
               </div>
@@ -343,7 +359,7 @@ export default function Dashboard() {
             pct={habitsPct}
             onToggle={async (id) => { await api.habits.toggle(id); fetchData(); }}
           />
-          <SmartActionCard inboxCount={stats?.inbox || 0} />
+          <SmartActionCard inboxCount={stats?.inbox || 0} aiOff={aiOff} />
           <WorkflowCard />
         </aside>
 
@@ -377,16 +393,65 @@ export default function Dashboard() {
 
 /* ============================================================ */
 
-const TOUR_STEPS = [
-  { title: 'Capture', text: 'Dump anything on your mind into the Inbox (⌘K anywhere).' },
-  { title: 'Clarify', text: 'A 30-second sort: do it, schedule it, hand it off, or park it.' },
-  { title: 'Today',   text: 'Star what matters now; AI can suggest.' },
+// The mode question doubles as the "how do I use this app?" explanation:
+// each card is a one-sentence mental model of the whole workflow, and the
+// three tour steps that follow are written for the mode the user picked.
+// Skipping (X) keeps the server default: assisted.
+const TOUR_MODES = [
+  {
+    key: 'off',
+    title: "I'll organize myself",
+    desc: 'Pure GTD, no AI. You capture, clarify and file everything by hand.',
+  },
+  {
+    key: 'assisted',
+    title: 'Suggest — I decide',
+    badge: 'recommended',
+    desc: 'AI pre-sorts new tasks and fills in the details; nothing moves until you confirm it.',
+  },
+  {
+    key: 'auto',
+    title: 'Organize for me',
+    desc: 'Just type. Confident tasks file themselves — only unclear ones wait for you.',
+  },
 ];
 
+const TOUR_STEPS_BY_MODE = {
+  off: [
+    { title: 'Capture', text: 'Dump anything on your mind into the Inbox (⌘K anywhere).' },
+    { title: 'Clarify', text: 'A 30-second sort: do it, schedule it, hand it off, or park it.' },
+    { title: 'Today',   text: 'Star what matters now — that’s your day.' },
+  ],
+  assisted: [
+    { title: 'Capture', text: 'Type anything (⌘K). AI reads it and pre-fills the details — list, date, project.' },
+    { title: 'Confirm', text: 'New items wait in your Inbox with AI suggestions. One tap approves them.' },
+    { title: 'Today',   text: 'Star what matters now, or let AI propose your day.' },
+  ],
+  auto: [
+    { title: 'Capture', text: 'Just type (⌘K) — AI files each task where it belongs, dates and projects set.' },
+    { title: 'Inbox',   text: 'Only the tasks AI wasn’t sure about wait here for a quick decision.' },
+    { title: 'Today',   text: 'Check Today each morning — AI can build the list for you.' },
+  ],
+};
+
 function FirstRunTour({ onDismiss }) {
+  const { mode, setMode } = useAiMode();
+  const { addToast } = useToast();
+  const [chosen, setChosen] = useState(null); // null = still on the mode question
   const [step, setStep] = useState(0);
-  const s = TOUR_STEPS[step];
-  const last = step === TOUR_STEPS.length - 1;
+
+  const chooseMode = async (key) => {
+    setChosen(key); // advance immediately; the save is fire-and-forget
+    if (key !== mode) {
+      try { await setMode(key); }
+      catch { addToast('Could not save your choice — you can set it later in Settings.', 'info'); }
+    }
+  };
+
+  const steps = TOUR_STEPS_BY_MODE[chosen] || TOUR_STEPS_BY_MODE.assisted;
+  const s = steps[step];
+  const last = step === steps.length - 1;
+
   return (
     <GlassCard className="mb-5 relative overflow-hidden fresh-stagger" padded={false}>
       <div
@@ -404,38 +469,166 @@ function FirstRunTour({ onDismiss }) {
             <X className="w-3.5 h-3.5" />
           </button>
         </div>
-        <div className="flex items-baseline gap-3">
-          <span className="font-mono text-[11px] text-text-3">{String(step + 1).padStart(2, '0')}/03</span>
-          <h2 className="font-display text-[26px] leading-none">{s.title}</h2>
+
+        {chosen === null ? (
+          <>
+            <h2 className="font-display text-[26px] leading-none">How should Cleartable work for you?</h2>
+            <p className="mt-2.5 text-[13.5px] text-text-2 max-w-md leading-relaxed">
+              One dial, changeable any time in Settings.
+            </p>
+            <div className="mt-4 grid gap-2 sm:grid-cols-3">
+              {TOUR_MODES.map(m => (
+                <button
+                  key={m.key}
+                  onClick={() => chooseMode(m.key)}
+                  className="text-left rounded-xl p-3.5 transition-all hover:bg-white/[0.04]"
+                  style={{ boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.08)' }}
+                >
+                  <div className="text-[13.5px] font-medium text-text-1">{m.title}</div>
+                  {m.badge && (
+                    <div className="font-mono text-[9.5px] uppercase tracking-wider mt-0.5" style={{ color: 'rgb(var(--violet-glow))' }}>
+                      {m.badge}
+                    </div>
+                  )}
+                  <p className="text-[12px] text-text-3 mt-1.5 leading-relaxed">{m.desc}</p>
+                </button>
+              ))}
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="flex items-baseline gap-3">
+              <span className="font-mono text-[11px] text-text-3">{String(step + 1).padStart(2, '0')}/03</span>
+              <h2 className="font-display text-[26px] leading-none">{s.title}</h2>
+            </div>
+            <p className="mt-2.5 text-[13.5px] text-text-2 max-w-md leading-relaxed">{s.text}</p>
+            <div className="mt-5 flex items-center gap-2">
+              <button
+                onClick={() => (step > 0 ? setStep(step - 1) : (setChosen(null), setStep(0)))}
+                className="gtd-btn gtd-btn-secondary text-[12.5px]"
+              >
+                Back
+              </button>
+              {last ? (
+                <button
+                  onClick={() => { onDismiss(); window.dispatchEvent(new Event('open-capture')); }}
+                  className="gtd-btn gtd-btn-primary inline-flex items-center gap-1.5 text-[12.5px]"
+                >
+                  <Command className="w-3.5 h-3.5" /> Start capturing
+                </button>
+              ) : (
+                <button onClick={() => setStep(step + 1)} className="gtd-btn gtd-btn-primary text-[12.5px]">
+                  Next
+                </button>
+              )}
+              <div className="ml-auto flex gap-1.5">
+                {steps.map((_, i) => (
+                  <span
+                    key={i}
+                    className="w-1.5 h-1.5 rounded-full transition-colors"
+                    style={{ background: i === step ? 'rgb(var(--violet-glow))' : 'rgba(255,255,255,0.12)' }}
+                  />
+                ))}
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+    </GlassCard>
+  );
+}
+
+// Autopilot nudges for assisted-mode users, shown at most once each, ever:
+//  · streak — after AUTOPILOT_STREAK_TARGET AI suggestions applied in a row
+//    without a correction, the AI has earned autonomy; offer it.
+//  · reminder — a month in, with some evidence AI has been right, remind the
+//    user Autopilot exists (they may never revisit Settings).
+// Users in 'off' or 'auto' mode never see either — one chose manual, the
+// other is already there.
+const AUTOPILOT_STREAK_TARGET = 20;
+const REMINDER_MIN_STREAK = 5;
+const REMINDER_MIN_DAYS = 30;
+
+function AutopilotNudge() {
+  const { user, patchUser } = useAuth();
+  const { mode, setMode } = useAiMode();
+  const { addToast } = useToast();
+  const [busy, setBusy] = useState(false);
+
+  if (!user || mode !== 'assisted') return null;
+  const streak = user.ai_accept_streak || 0;
+  const accountDays = user.created_at
+    ? Math.floor((Date.now() - new Date(user.created_at).getTime()) / 86400000)
+    : 0;
+  const showStreak = streak >= AUTOPILOT_STREAK_TARGET && !user.ai_nudge_autopilot_at;
+  const showReminder = !showStreak
+    && !user.ai_nudge_reminder_at
+    && streak >= REMINDER_MIN_STREAK
+    && accountDays >= REMINDER_MIN_DAYS;
+  if (!showStreak && !showReminder) return null;
+
+  const nudge = showStreak ? 'autopilot' : 'reminder';
+  const seenField = showStreak ? 'ai_nudge_autopilot_at' : 'ai_nudge_reminder_at';
+  const markSeen = () => {
+    patchUser({ [seenField]: new Date().toISOString() });
+    api.preferences.aiNudgeSeen(nudge).catch(() => {});
+  };
+  const turnOn = async () => {
+    setBusy(true);
+    try {
+      await setMode('auto');
+      markSeen();
+      addToast('Autopilot on — confident tasks now file themselves.', 'success');
+    } catch {
+      addToast('Could not switch — try again, or use Settings.', 'error');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <GlassCard className="mb-5 relative overflow-hidden" padded={false}>
+      <div
+        className="absolute -top-10 -right-10 w-40 h-40 rounded-full pointer-events-none"
+        style={{ background: 'radial-gradient(circle, rgba(94,234,212,0.14), transparent 70%)' }}
+      />
+      <div className="p-5 relative">
+        <div className="flex items-center justify-between mb-2">
+          <MonoLabel tone="violet">{showStreak ? 'earned it' : 'did you know'}</MonoLabel>
+          <button
+            onClick={markSeen}
+            aria-label="Dismiss"
+            className="grid place-items-center w-7 h-7 rounded-lg text-text-3 hover:text-text-1 hover:bg-white/5 transition-colors"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
         </div>
-        <p className="mt-2.5 text-[13.5px] text-text-2 max-w-md leading-relaxed">{s.text}</p>
-        <div className="mt-5 flex items-center gap-2">
-          {step > 0 && (
-            <button onClick={() => setStep(step - 1)} className="gtd-btn gtd-btn-secondary text-[12.5px]">
-              Back
-            </button>
-          )}
-          {last ? (
-            <button
-              onClick={() => { onDismiss(); window.dispatchEvent(new Event('open-capture')); }}
-              className="gtd-btn gtd-btn-primary inline-flex items-center gap-1.5 text-[12.5px]"
-            >
-              <Command className="w-3.5 h-3.5" /> Start capturing
-            </button>
+        <p className="text-[13.5px] text-text-1 leading-relaxed max-w-xl">
+          {showStreak ? (
+            <>
+              AI has sorted <span className="font-mono">{streak}</span> tasks in a row and you kept
+              every one. Want confident tasks to skip the Inbox and file themselves? Anything
+              uncertain still waits for you.
+            </>
           ) : (
-            <button onClick={() => setStep(step + 1)} className="gtd-btn gtd-btn-primary text-[12.5px]">
-              Next
-            </button>
+            <>
+              Cleartable has an <span className="font-display italic">Autopilot</span> mode: confident
+              tasks file themselves, and only unclear ones wait in your Inbox. You can switch back
+              any time in Settings.
+            </>
           )}
-          <div className="ml-auto flex gap-1.5">
-            {TOUR_STEPS.map((_, i) => (
-              <span
-                key={i}
-                className="w-1.5 h-1.5 rounded-full transition-colors"
-                style={{ background: i === step ? 'rgb(var(--violet-glow))' : 'rgba(255,255,255,0.12)' }}
-              />
-            ))}
-          </div>
+        </p>
+        <div className="mt-3.5 flex items-center gap-2">
+          <button
+            onClick={turnOn}
+            disabled={busy}
+            className="gtd-btn gtd-btn-primary inline-flex items-center gap-1.5 text-[12.5px] disabled:opacity-60"
+          >
+            <Sparkles className="w-3.5 h-3.5" /> {busy ? 'Switching…' : 'Turn on Autopilot'}
+          </button>
+          <button onClick={markSeen} className="gtd-btn gtd-btn-secondary text-[12.5px]">
+            Not now
+          </button>
         </div>
       </div>
     </GlassCard>
@@ -583,7 +776,7 @@ function HabitsCard({ habits, done, pct, onToggle }) {
   );
 }
 
-function SmartActionCard({ inboxCount }) {
+function SmartActionCard({ inboxCount, aiOff }) {
   return (
     <GlassCard className="relative overflow-hidden" padded={false}>
       <div
@@ -592,8 +785,8 @@ function SmartActionCard({ inboxCount }) {
       />
       <div className="p-5 relative">
         <div className="flex items-center gap-2 mb-2.5">
-          <Sparkles className="w-3.5 h-3.5 text-violet" />
-          <MonoLabel tone="violet">smart suggestion</MonoLabel>
+          {!aiOff && <Sparkles className="w-3.5 h-3.5 text-violet" />}
+          <MonoLabel tone="violet">{aiOff ? 'suggestion' : 'smart suggestion'}</MonoLabel>
         </div>
         {inboxCount > 0 ? (
           <>
@@ -602,16 +795,28 @@ function SmartActionCard({ inboxCount }) {
               <span className="font-display italic">process them now</span> while you're warmed up.
             </div>
             <div className="mt-3.5 flex gap-2">
-              <Link
-                to="/ai"
-                className="text-[11.5px] font-mono px-3 py-1.5 rounded-lg inline-flex items-center gap-1.5"
-                style={{ background: 'rgba(167,139,250,0.14)', color: '#ede9fe', border: '1px solid rgba(167,139,250,0.25)' }}
-              >
-                <Sparkles className="w-3 h-3" /> AI process
-              </Link>
-              <Link to="/inbox" className="text-[11.5px] font-mono px-3 py-1.5 rounded-lg text-text-3 hover:text-text-1">
-                manual
-              </Link>
+              {aiOff ? (
+                <Link
+                  to="/inbox"
+                  className="text-[11.5px] font-mono px-3 py-1.5 rounded-lg inline-flex items-center gap-1.5"
+                  style={{ background: 'rgba(167,139,250,0.14)', color: '#ede9fe', border: '1px solid rgba(167,139,250,0.25)' }}
+                >
+                  open inbox <ChevronRight className="w-3 h-3" />
+                </Link>
+              ) : (
+                <>
+                  <Link
+                    to="/ai"
+                    className="text-[11.5px] font-mono px-3 py-1.5 rounded-lg inline-flex items-center gap-1.5"
+                    style={{ background: 'rgba(167,139,250,0.14)', color: '#ede9fe', border: '1px solid rgba(167,139,250,0.25)' }}
+                  >
+                    <Sparkles className="w-3 h-3" /> AI process
+                  </Link>
+                  <Link to="/inbox" className="text-[11.5px] font-mono px-3 py-1.5 rounded-lg text-text-3 hover:text-text-1">
+                    manual
+                  </Link>
+                </>
+              )}
             </div>
           </>
         ) : (

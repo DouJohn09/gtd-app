@@ -225,6 +225,9 @@ export default function WeeklyReview() {
   }
 
   const ai = reviewData.aiAnalysis || {};
+  // 'ai_off' = the user chose manual mode (reflect on your own); any other
+  // error = AI was expected but unavailable.
+  const aiIsOff = ai.error === 'ai_off';
 
   return (
     <div className="px-6 lg:px-12 pt-10 pb-20 max-w-5xl">
@@ -284,9 +287,11 @@ export default function WeeklyReview() {
                     </p>
                     <div className="flex gap-2 mt-3">
                       <Link to="/inbox" className="gtd-btn gtd-btn-secondary text-[12px]">Go to Inbox</Link>
-                      <Link to="/ai" className="gtd-btn gtd-btn-secondary text-[12px] inline-flex items-center gap-1">
-                        <Sparkles className="w-3 h-3" /> AI Process
-                      </Link>
+                      {!aiIsOff && (
+                        <Link to="/ai" className="gtd-btn gtd-btn-secondary text-[12px] inline-flex items-center gap-1">
+                          <Sparkles className="w-3 h-3" /> AI Process
+                        </Link>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -401,7 +406,7 @@ export default function WeeklyReview() {
           <div className="flex justify-between">
             <button onClick={() => setStep(1)} className="gtd-btn gtd-btn-secondary text-[12.5px]">Back</button>
             <button onClick={() => setStep(3)} className="gtd-btn gtd-btn-primary inline-flex items-center gap-2 text-[12.5px]">
-              Next: AI Insights <ArrowRight className="w-3.5 h-3.5" />
+              {aiIsOff ? 'Next: Reflect' : 'Next: AI Insights'} <ArrowRight className="w-3.5 h-3.5" />
             </button>
           </div>
         </div>
@@ -413,12 +418,57 @@ export default function WeeklyReview() {
           <div className="mb-3">
             <div className="mono-label mb-2" style={{ color: 'rgb(var(--violet-glow))' }}>step_03</div>
             <h2 className="font-display text-[28px] leading-none flex items-center gap-2">
-              AI Insights
-              <Sparkles className="w-5 h-5" style={{ color: 'rgb(var(--violet-glow))' }} />
+              {aiIsOff ? 'Reflect' : 'AI Insights'}
+              {!aiIsOff && <Sparkles className="w-5 h-5" style={{ color: 'rgb(var(--violet-glow))' }} />}
             </h2>
           </div>
 
-          {ai.error ? (
+          {aiIsOff ? (
+            <div className="space-y-4">
+              <div className="rounded-2xl glass p-6">
+                <p className="font-display italic text-[20px] mb-2">Your week, your read.</p>
+                <p className="text-[13px] text-text-2 leading-relaxed max-w-prose">
+                  AI is off, so this step is yours: look back over what moved and
+                  what stalled. What went well? What kept slipping — and does it
+                  still belong on a list? Anything you're waiting on for too long?
+                </p>
+              </div>
+              <div
+                className="rounded-2xl glass p-5 relative overflow-hidden"
+                style={{ boxShadow: '0 8px 32px -12px rgba(0,0,0,0.45), inset 0 1px 0 rgb(255 255 255 / 0.04), inset 0 0 0 1px rgb(var(--violet) / 0.18)' }}
+              >
+                <div className="mono-label" style={{ color: 'rgb(var(--violet-glow))' }}>this_week</div>
+                <p className="font-display text-[40px] leading-none mt-2">
+                  {reviewData.completedThisWeek}
+                  <span className="text-[16px] text-text-3 ml-2 align-baseline">tasks completed</span>
+                </p>
+              </div>
+              {reviewData.habitStats?.habits?.length > 0 && (
+                <div className="rounded-2xl glass p-5">
+                  <div className="mono-label mb-3">habits</div>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                    {reviewData.habitStats.habits.map(h => (
+                      <div
+                        key={h.id}
+                        className="text-center p-3 rounded-xl"
+                        style={{ background: 'rgba(255,255,255,0.02)', boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.05)' }}
+                      >
+                        <p className="text-[11.5px] font-medium text-text-1 truncate">{h.name}</p>
+                        <p className="font-display text-[24px] leading-tight mt-1" style={{ color: h.color }}>
+                          {h.completionRate}<span className="text-[12px] text-text-3">%</span>
+                        </p>
+                        {h.streak > 0 && (
+                          <p className="font-mono text-[10px] mt-0.5 inline-flex items-center justify-center gap-1" style={{ color: 'rgb(var(--amber-glow))' }}>
+                            <Flame className="w-3 h-3" /> {h.streak}
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : ai.error ? (
             <div className="rounded-2xl glass p-8 text-center text-text-2 text-[13px]">
               AI analysis unavailable. You can still complete your review.
             </div>

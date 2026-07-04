@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { ArrowRight, Sparkles } from 'lucide-react';
 import { api } from '../lib/api';
 import { useToast } from './Toast';
+import { useAiMode } from '../hooks/useAiMode';
 
 const LIST_LABELS = {
   inbox: 'Inbox',
@@ -35,6 +36,8 @@ function formatBookedToast(bookedSlot) {
 export default function QuickCapture({ onCapture, placeholder = "Quick capture — what's on your mind?", autoFocus = false }) {
   const [title, setTitle] = useState('');
   const [smartMode, setSmartMode] = useState(true);
+  const { mode, aiOff } = useAiMode();
+  const useAi = smartMode && !aiOff;
   const { addToast } = useToast();
 
   // Fire-and-forget capture: clear the input the moment the user submits so
@@ -49,13 +52,12 @@ export default function QuickCapture({ onCapture, placeholder = "Quick capture �
 
     (async () => {
       try {
-        if (smartMode) {
-          const routing = localStorage.getItem('smart_capture_routing') || 'auto_route';
-          const { ai, fallback, bookedSlot, slotSearchFailed, routedToInbox } = await api.ai.smartCapture(text, routing);
+        if (useAi) {
+          const { ai, fallback, bookedSlot, slotSearchFailed, routedToInbox } = await api.ai.smartCapture(text);
           if (fallback || !ai) addToast('Captured to inbox (AI unavailable)', 'info');
           else if (bookedSlot) addToast(formatBookedToast(bookedSlot), 'success');
           else if (slotSearchFailed) addToast('No free slot found — captured without booking', 'info');
-          else if (routedToInbox && routing === 'always_inbox') addToast(formatAiToast(ai), 'success');
+          else if (routedToInbox && mode === 'assisted') addToast(formatAiToast(ai), 'success');
           else if (routedToInbox) addToast(`Added to Inbox · AI wasn't sure where`, 'info');
           else addToast(formatAiToast(ai), 'success');
         } else {
@@ -79,23 +81,25 @@ export default function QuickCapture({ onCapture, placeholder = "Quick capture �
           type="text"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          placeholder={smartMode ? '"call mom tomorrow" · "buy groceries Friday"' : placeholder}
-          className="gtd-input w-full pl-10 pr-3"
+          placeholder={useAi ? '"call mom tomorrow" · "buy groceries Friday"' : placeholder}
+          className={`gtd-input w-full ${aiOff ? 'pl-3' : 'pl-10'} pr-3`}
           autoFocus={autoFocus}
         />
-        <button
-          type="button"
-          onClick={() => setSmartMode(!smartMode)}
-          className="absolute left-2 top-1/2 -translate-y-1/2 grid place-items-center w-7 h-7 rounded-lg transition-all"
-          style={
-            smartMode
-              ? { color: 'rgb(var(--violet-glow))', background: 'rgb(var(--violet) / 0.10)', boxShadow: 'inset 0 0 0 1px rgb(var(--violet) / 0.22)' }
-              : { color: 'rgb(var(--text-3))' }
-          }
-          title={smartMode ? 'Smart Capture on — click to disable' : 'Smart Capture off — click to enable'}
-        >
-          <Sparkles className="w-3.5 h-3.5" />
-        </button>
+        {!aiOff && (
+          <button
+            type="button"
+            onClick={() => setSmartMode(!smartMode)}
+            className="absolute left-2 top-1/2 -translate-y-1/2 grid place-items-center w-7 h-7 rounded-lg transition-all"
+            style={
+              smartMode
+                ? { color: 'rgb(var(--violet-glow))', background: 'rgb(var(--violet) / 0.10)', boxShadow: 'inset 0 0 0 1px rgb(var(--violet) / 0.22)' }
+                : { color: 'rgb(var(--text-3))' }
+            }
+            title={smartMode ? 'Smart Capture on — click to disable' : 'Smart Capture off — click to enable'}
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+          </button>
+        )}
       </div>
       <button
         type="submit"

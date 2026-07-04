@@ -5,6 +5,8 @@ import {
   Trash2, ArrowRightLeft, Clock, X, Check, Pencil, AlertTriangle,
 } from 'lucide-react';
 import { api } from '../lib/api';
+import { aiToast } from '../lib/aiError';
+import { useAiMode } from '../hooks/useAiMode';
 import { contextLabel } from '../lib/context';
 import { listLabel } from '../lib/listLabel';
 import { isOverdue } from '../lib/dateUtils';
@@ -23,6 +25,7 @@ const toneFor = (id) => TONE_CYCLE[(Number(id) || 0) % TONE_CYCLE.length];
 
 export default function Projects() {
   const { addToast } = useToast();
+  const { aiOff } = useAiMode();
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showNewProject, setShowNewProject] = useState(false);
@@ -148,7 +151,7 @@ export default function Projects() {
       const breakdown = await api.projects.breakdown(project.id);
       setAiBreakdown({ projectId: project.id, ...breakdown });
     } catch (error) {
-      addToast(error.message || 'AI breakdown failed — try again in a minute.', 'error');
+      addToast(...aiToast(error, 'AI breakdown failed — try again in a minute.'));
     } finally {
       setLoadingAi(false);
     }
@@ -432,14 +435,16 @@ export default function Projects() {
                       >
                         <Pencil className="w-3.5 h-3.5" /> Edit
                       </button>
-                      <button
-                        onClick={() => handleAiBreakdown(project)}
-                        disabled={loadingAi}
-                        className="gtd-btn gtd-btn-secondary inline-flex items-center gap-1.5 text-[12.5px] disabled:opacity-50"
-                      >
-                        <Sparkles className="w-3.5 h-3.5" />
-                        {loadingAi ? 'Analyzing…' : 'AI breakdown'}
-                      </button>
+                      {!aiOff && (
+                        <button
+                          onClick={() => handleAiBreakdown(project)}
+                          disabled={loadingAi}
+                          className="gtd-btn gtd-btn-secondary inline-flex items-center gap-1.5 text-[12.5px] disabled:opacity-50"
+                        >
+                          <Sparkles className="w-3.5 h-3.5" />
+                          {loadingAi ? 'Analyzing…' : 'AI breakdown'}
+                        </button>
+                      )}
                       <button
                         onClick={() => handleToggleMode(project)}
                         className="gtd-btn gtd-btn-secondary inline-flex items-center gap-1.5 text-[12.5px]"
@@ -533,6 +538,7 @@ export default function Projects() {
 /* ============================================================ */
 
 function ProjectTaskList({ project, expandedData, onComplete, onEdit, onMove }) {
+  const { aiOff } = useAiMode();
   const [optimisticDone, setOptimisticDone] = useState(new Set());
   const tasks = (expandedData.tasks || []).filter(t => t.list !== 'completed');
   const isSequential = expandedData.execution_mode === 'sequential';
@@ -545,7 +551,9 @@ function ProjectTaskList({ project, expandedData, onComplete, onEdit, onMove }) 
     return (
       <div className="text-center py-6">
         <div className="font-mono text-[11px] text-text-3 mb-1.5">no_active_tasks</div>
-        <div className="text-[13px] text-text-2">All caught up — add a next action or run an AI breakdown.</div>
+        <div className="text-[13px] text-text-2">
+          {aiOff ? 'All caught up — add a next action.' : 'All caught up — add a next action or run an AI breakdown.'}
+        </div>
       </div>
     );
   }

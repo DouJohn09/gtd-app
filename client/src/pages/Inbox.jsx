@@ -2,7 +2,10 @@ import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { Inbox as InboxIcon, Sparkles, Trash2, Clock, ChevronRight, Zap, CalendarClock } from 'lucide-react';
 import { api } from '../lib/api';
+import { aiToast } from '../lib/aiError';
 import { useToast } from '../components/Toast';
+import { useAuth } from '../contexts/AuthContext';
+import { useAiMode } from '../hooks/useAiMode';
 import QuickCapture from '../components/QuickCapture';
 import TaskCard from '../components/TaskCard';
 import TaskModal from '../components/TaskModal';
@@ -47,6 +50,8 @@ export default function Inbox() {
   const [aiKept, setAiKept] = useState(() => new Set());
   const [applying, setApplying] = useState(false);
   const { addToast } = useToast();
+  const { aiOff } = useAiMode();
+  const { patchUser } = useAuth();
 
   useEffect(() => { localStorage.setItem('sort_inbox', sortBy); }, [sortBy]);
   useEffect(() => { localStorage.setItem('deferred_inbox', showDeferred); }, [showDeferred]);
@@ -110,7 +115,7 @@ export default function Inbox() {
       setAiKept(new Set(items.map(it => it.original_index)));
     } catch (err) {
       console.error('Process inbox failed:', err);
-      addToast(err?.message?.includes('limit') ? 'Daily AI limit reached.' : 'Could not process inbox.', 'error');
+      addToast(...aiToast(err, 'Could not process inbox.'));
     } finally {
       setAiLoading(false);
     }
@@ -130,6 +135,13 @@ export default function Inbox() {
         .map(it => ({ task_id: aiResult.tasks[it.original_index - 1]?.id, ...it }))
         .filter(it => it.task_id);
       await api.ai.applyInboxProcessing(items);
+      // Trust signal for the Autopilot nudge: suggestions applied as-is count
+      // toward the clean-accept streak; a skipped row is a correction and
+      // resets it. Fire-and-forget — never block the apply.
+      const skipped = aiResult.processed_items.length - items.length;
+      api.preferences.aiFeedback(items.length, skipped)
+        .then(r => patchUser({ ai_accept_streak: r.ai_accept_streak }))
+        .catch(() => {});
       addToast(`Processed ${items.length} ${items.length === 1 ? 'item' : 'items'}.`, 'success');
       setAiResult(null);
       setAiKept(new Set());
@@ -209,7 +221,7 @@ export default function Inbox() {
                 <div className="flex items-center gap-2 shrink-0">
                   <FiltersMenu toggles={inboxToggles} filters={inboxFilters} />
                   <SortDropdown value={sortBy} onChange={setSortBy} compact />
-                  {tasks.length > 0 && (
+                  {tasks.length > 0 && !aiOff && (
                     <button
                       onClick={runProcessInbox}
                       disabled={aiLoading || !!aiResult}
@@ -316,12 +328,14 @@ export default function Inbox() {
             oldestDays={oldestDays}
           />
           <ClarifyCard />
-          <AIProcessCard
-            inboxCount={tasks.length}
-            onProcess={runProcessInbox}
-            loading={aiLoading}
-            disabled={!!aiResult}
-          />
+          {!aiOff && (
+            <AIProcessCard
+              inboxCount={tasks.length}
+              onProcess={runProcessInbox}
+              loading={aiLoading}
+              disabled={!!aiResult}
+            />
+          )}
         </aside>
       </div>
 

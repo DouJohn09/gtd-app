@@ -1,10 +1,28 @@
 import { createContext, useContext, useState, useEffect } from 'react';
+import { api } from '../lib/api';
 
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+
+  // One-time migration: the old per-device Smart Capture routing preference
+  // becomes the server-side ai_mode ('always_inbox' → assisted, 'auto_route'
+  // → auto). The key is removed only on success, so a failed request retries
+  // on the next load.
+  useEffect(() => {
+    if (!user?.id) return;
+    const legacy = localStorage.getItem('smart_capture_routing');
+    if (!legacy) return;
+    const mode = legacy === 'always_inbox' ? 'assisted' : 'auto';
+    api.preferences.setAiMode(mode)
+      .then(() => {
+        localStorage.removeItem('smart_capture_routing');
+        setUser(prev => (prev ? { ...prev, ai_mode: mode } : prev));
+      })
+      .catch(() => { /* retry next load */ });
+  }, [user?.id]);
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -60,8 +78,12 @@ export function AuthProvider({ children }) {
     }
   };
 
+  // Merge a partial update into the cached user (e.g. after changing ai_mode
+  // or receiving a fresh accept-streak) without a /me round-trip.
+  const patchUser = (patch) => setUser(prev => (prev ? { ...prev, ...patch } : prev));
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, refreshUser }}>
+    <AuthContext.Provider value={{ user, loading, login, logout, refreshUser, patchUser }}>
       {children}
     </AuthContext.Provider>
   );
