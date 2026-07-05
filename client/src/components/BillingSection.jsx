@@ -115,7 +115,7 @@ export default function BillingSection() {
       ) : (
         <>
           <p className="text-text-3 text-sm mb-4 leading-relaxed">
-            You're on the <span className="text-text-1 font-medium">Free</span> plan — full GTD,
+            You're on the <span className="text-text-1 font-medium">Free</span> plan — the full workflow,
             calendar, and AI capture with a daily limit, up to 8 projects · 1 list · 3 habits.
             Upgrade for:
           </p>

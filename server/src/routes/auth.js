@@ -89,6 +89,7 @@ router.post('/google', loginLimiter, async (req, res) => {
         ai_mode: user.ai_mode || 'assisted',
         ai_accept_streak: user.ai_accept_streak || 0,
         created_at: user.created_at || null,
+        onboarded_at: user.onboarded_at || null,
       }
     });
   } catch (error) {
@@ -109,7 +110,8 @@ router.get('/me', async (req, res) => {
               (google_calendar_refresh_token IS NOT NULL OR google_calendar_access_token IS NOT NULL) AS google_calendar_connected,
               google_calendar_scopes,
               plan, subscription_status, current_period_end,
-              ai_mode, ai_accept_streak, ai_nudge_autopilot_at, ai_nudge_reminder_at
+              ai_mode, ai_accept_streak, ai_nudge_autopilot_at, ai_nudge_reminder_at,
+              onboarded_at
        FROM users WHERE id = $1`,
       [payload.userId]
     );

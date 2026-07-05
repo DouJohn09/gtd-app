@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Inbox, ListTodo, Clock, CloudSun, CheckCircle2, Target, Sparkles,
-  ArrowUpRight, ChevronRight, Flame, Plus, EyeOff, X, Command,
+  ArrowUpRight, ChevronRight, Flame, EyeOff, X,
 } from 'lucide-react';
 import { api } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
@@ -61,16 +61,10 @@ export default function Dashboard() {
   const [filterContext, setFilterContext] = useState(() => localStorage.getItem('filter_context_focus') || '');
   const [filterProject, setFilterProject] = useState(() => localStorage.getItem('filter_project_focus') || '');
   const [hideOverdue, setHideOverdue] = useState(() => localStorage.getItem('hide_overdue_focus') === 'true');
-  const [tourDismissed, setTourDismissed] = useState(() => localStorage.getItem('ct_tour_dismissed') === '1');
   const { user } = useAuth();
   const { aiOff } = useAiMode();
   const { addToast } = useToast();
   const { aiLoading, aiResult, run: runAiSuggest, clear: clearAiSuggest } = useAiFocus(dailyFocus, addToast);
-
-  const dismissTour = () => {
-    localStorage.setItem('ct_tour_dismissed', '1');
-    setTourDismissed(true);
-  };
 
   useEffect(() => { localStorage.setItem('hide_overdue_focus', hideOverdue); }, [hideOverdue]);
   useEffect(() => { localStorage.setItem('sort_focus', sortBy); }, [sortBy]);
@@ -164,10 +158,6 @@ export default function Dashboard() {
   const habitsDone = habits.filter(h => h.completed_today).length;
   const habitsPct = habits.length ? Math.round((habitsDone / habits.length) * 100) : 0;
 
-  const statsAllZero = !!stats && ['inbox', 'next_actions', 'waiting_for', 'someday_maybe', 'daily_focus', 'completed_today']
-    .every(k => !stats[k]);
-  const showTour = !tourDismissed && statsAllZero && focusTotal === 0;
-
   const statCards = [
     { key: 'inbox',         label: 'Inbox',         value: stats?.inbox || 0,         icon: Inbox,    link: '/inbox' },
     { key: 'next_actions',  label: 'Next Actions',  value: stats?.next_actions || 0,  icon: ListTodo, link: '/lists/next_actions' },
@@ -219,8 +209,7 @@ export default function Dashboard() {
         </p>
       </div>
 
-      {showTour && <FirstRunTour onDismiss={dismissTour} />}
-      {!showTour && <AutopilotNudge />}
+      <AutopilotNudge />
 
       {/* Bento */}
       <div className="grid grid-cols-12 gap-5 fresh-stagger">
@@ -392,151 +381,6 @@ export default function Dashboard() {
 }
 
 /* ============================================================ */
-
-// The mode question doubles as the "how do I use this app?" explanation:
-// each card is a one-sentence mental model of the whole workflow, and the
-// three tour steps that follow are written for the mode the user picked.
-// Skipping (X) keeps the server default: assisted.
-const TOUR_MODES = [
-  {
-    key: 'off',
-    title: "I'll organize myself",
-    desc: 'Pure GTD, no AI. You capture, clarify and file everything by hand.',
-  },
-  {
-    key: 'assisted',
-    title: 'Suggest — I decide',
-    badge: 'recommended',
-    desc: 'AI pre-sorts new tasks and fills in the details; nothing moves until you confirm it.',
-  },
-  {
-    key: 'auto',
-    title: 'Organize for me',
-    desc: 'Just type. Confident tasks file themselves — only unclear ones wait for you.',
-  },
-];
-
-const TOUR_STEPS_BY_MODE = {
-  off: [
-    { title: 'Capture', text: 'Dump anything on your mind into the Inbox (⌘K anywhere).' },
-    { title: 'Clarify', text: 'A 30-second sort: do it, schedule it, hand it off, or park it.' },
-    { title: 'Today',   text: 'Star what matters now — that’s your day.' },
-  ],
-  assisted: [
-    { title: 'Capture', text: 'Type anything (⌘K). AI reads it and pre-fills the details — list, date, project.' },
-    { title: 'Confirm', text: 'New items wait in your Inbox with AI suggestions. One tap approves them.' },
-    { title: 'Today',   text: 'Star what matters now, or let AI propose your day.' },
-  ],
-  auto: [
-    { title: 'Capture', text: 'Just type (⌘K) — AI files each task where it belongs, dates and projects set.' },
-    { title: 'Inbox',   text: 'Only the tasks AI wasn’t sure about wait here for a quick decision.' },
-    { title: 'Today',   text: 'Check Today each morning — AI can build the list for you.' },
-  ],
-};
-
-function FirstRunTour({ onDismiss }) {
-  const { mode, setMode } = useAiMode();
-  const { addToast } = useToast();
-  const [chosen, setChosen] = useState(null); // null = still on the mode question
-  const [step, setStep] = useState(0);
-
-  const chooseMode = async (key) => {
-    setChosen(key); // advance immediately; the save is fire-and-forget
-    if (key !== mode) {
-      try { await setMode(key); }
-      catch { addToast('Could not save your choice — you can set it later in Settings.', 'info'); }
-    }
-  };
-
-  const steps = TOUR_STEPS_BY_MODE[chosen] || TOUR_STEPS_BY_MODE.assisted;
-  const s = steps[step];
-  const last = step === steps.length - 1;
-
-  return (
-    <GlassCard className="mb-5 relative overflow-hidden fresh-stagger" padded={false}>
-      <div
-        className="absolute -top-10 -right-10 w-40 h-40 rounded-full pointer-events-none"
-        style={{ background: 'radial-gradient(circle, rgba(167,139,250,0.16), transparent 70%)' }}
-      />
-      <div className="p-6 relative">
-        <div className="flex items-center justify-between mb-3">
-          <MonoLabel tone="violet">welcome</MonoLabel>
-          <button
-            onClick={onDismiss}
-            aria-label="Dismiss intro"
-            className="grid place-items-center w-7 h-7 rounded-lg text-text-3 hover:text-text-1 hover:bg-white/5 transition-colors"
-          >
-            <X className="w-3.5 h-3.5" />
-          </button>
-        </div>
-
-        {chosen === null ? (
-          <>
-            <h2 className="font-display text-[26px] leading-none">How should Cleartable work for you?</h2>
-            <p className="mt-2.5 text-[13.5px] text-text-2 max-w-md leading-relaxed">
-              One dial, changeable any time in Settings.
-            </p>
-            <div className="mt-4 grid gap-2 sm:grid-cols-3">
-              {TOUR_MODES.map(m => (
-                <button
-                  key={m.key}
-                  onClick={() => chooseMode(m.key)}
-                  className="text-left rounded-xl p-3.5 transition-all hover:bg-white/[0.04]"
-                  style={{ boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.08)' }}
-                >
-                  <div className="text-[13.5px] font-medium text-text-1">{m.title}</div>
-                  {m.badge && (
-                    <div className="font-mono text-[9.5px] uppercase tracking-wider mt-0.5" style={{ color: 'rgb(var(--violet-glow))' }}>
-                      {m.badge}
-                    </div>
-                  )}
-                  <p className="text-[12px] text-text-3 mt-1.5 leading-relaxed">{m.desc}</p>
-                </button>
-              ))}
-            </div>
-          </>
-        ) : (
-          <>
-            <div className="flex items-baseline gap-3">
-              <span className="font-mono text-[11px] text-text-3">{String(step + 1).padStart(2, '0')}/03</span>
-              <h2 className="font-display text-[26px] leading-none">{s.title}</h2>
-            </div>
-            <p className="mt-2.5 text-[13.5px] text-text-2 max-w-md leading-relaxed">{s.text}</p>
-            <div className="mt-5 flex items-center gap-2">
-              <button
-                onClick={() => (step > 0 ? setStep(step - 1) : (setChosen(null), setStep(0)))}
-                className="gtd-btn gtd-btn-secondary text-[12.5px]"
-              >
-                Back
-              </button>
-              {last ? (
-                <button
-                  onClick={() => { onDismiss(); window.dispatchEvent(new Event('open-capture')); }}
-                  className="gtd-btn gtd-btn-primary inline-flex items-center gap-1.5 text-[12.5px]"
-                >
-                  <Command className="w-3.5 h-3.5" /> Start capturing
-                </button>
-              ) : (
-                <button onClick={() => setStep(step + 1)} className="gtd-btn gtd-btn-primary text-[12.5px]">
-                  Next
-                </button>
-              )}
-              <div className="ml-auto flex gap-1.5">
-                {steps.map((_, i) => (
-                  <span
-                    key={i}
-                    className="w-1.5 h-1.5 rounded-full transition-colors"
-                    style={{ background: i === step ? 'rgb(var(--violet-glow))' : 'rgba(255,255,255,0.12)' }}
-                  />
-                ))}
-              </div>
-            </div>
-          </>
-        )}
-      </div>
-    </GlassCard>
-  );
-}
 
 // Autopilot nudges for assisted-mode users, shown at most once each, ever:
 //  · streak — after AUTOPILOT_STREAK_TARGET AI suggestions applied in a row
@@ -850,7 +694,7 @@ function WorkflowCard() {
   ];
   return (
     <GlassCard>
-      <MonoLabel className="mb-3">gtd workflow</MonoLabel>
+      <MonoLabel className="mb-3">the workflow</MonoLabel>
       <ul className="space-y-1.5">
         {steps.map(s => (
           <li key={s.num} className="flex gap-2 text-[12px] leading-relaxed">

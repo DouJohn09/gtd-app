@@ -156,7 +156,7 @@ export default function Settings() {
           tasks, projects, contexts, and habits — and is re-importable into
           Cleartable. <span className="text-text-2">CSV</span> exports tasks
           only, using Todoist-compatible columns so you can open it in a
-          spreadsheet or migrate to another GTD app.
+          spreadsheet or migrate to another task app.
         </p>
 
         <div className="flex flex-col sm:flex-row gap-3">
@@ -292,7 +292,7 @@ export default function Settings() {
             {
               value: 'off',
               title: 'Off — fully manual',
-              desc: 'Pure GTD. No AI anywhere: you capture, clarify and organize everything yourself. With AI off, your task text is never sent to an AI provider.',
+              desc: 'No AI anywhere: you capture, clarify and organize everything yourself. With AI off, your task text is never sent to an AI provider.',
             },
             {
               value: 'assisted',

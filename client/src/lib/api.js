@@ -163,6 +163,7 @@ export const api = {
     setAiMode: (mode) => fetchApi('/preferences/ai-mode', { method: 'PUT', body: JSON.stringify({ mode }) }),
     aiFeedback: (accepted, adjusted) => fetchApi('/preferences/ai-feedback', { method: 'POST', body: JSON.stringify({ accepted, adjusted }) }),
     aiNudgeSeen: (nudge) => fetchApi('/preferences/ai-nudge-seen', { method: 'POST', body: JSON.stringify({ nudge }) }),
+    completeOnboarding: () => fetchApi('/preferences/onboarding-complete', { method: 'POST' }),
   },
 
   customLists: {

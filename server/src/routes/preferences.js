@@ -18,6 +18,21 @@ router.put('/ai-mode', async (req, res) => {
   }
 });
 
+// Marks the welcome onboarding as done (completed or skipped — either way it
+// never shows again). COALESCE keeps the original timestamp on repeat calls.
+router.post('/onboarding-complete', async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      'UPDATE users SET onboarded_at = COALESCE(onboarded_at, NOW()) WHERE id = $1 RETURNING onboarded_at',
+      [req.user.id]
+    );
+    res.json({ onboarded_at: rows[0]?.onboarded_at ?? null });
+  } catch (error) {
+    console.error('Onboarding-complete error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // Clean-accept streak behind the "turn on Autopilot?" nudge. Any adjustment
 // (a deselected or edited suggestion) resets the streak rather than
 // disqualifying the user forever — one correction in week one shouldn't

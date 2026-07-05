@@ -12,6 +12,7 @@ import { ICON_MAP } from './NewListModal';
 import NewListModal from './NewListModal';
 import AuroraBackground from './AuroraBackground';
 import CommandCapture from './CommandCapture';
+import WelcomeOnboarding from './WelcomeOnboarding';
 
 const navGroups = [
   {
@@ -357,6 +358,8 @@ export default function Layout() {
       )}
 
       <CommandCapture open={captureOpen} onClose={() => setCaptureOpen(false)} />
+
+      {user && !user.onboarded_at && <WelcomeOnboarding />}
 
       {showNewList && (
         <NewListModal
