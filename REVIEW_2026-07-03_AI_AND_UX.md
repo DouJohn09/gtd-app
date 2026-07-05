@@ -21,6 +21,8 @@ Findings, ranked by how much they confused:
 
 **Deferred (deliberate):** Smart Capture routing preference still lives in localStorage (not synced cross-device); the "ritual" wording overload.
 
+> **Update 2026-07-04:** the routing-preference item above shipped as a broader fix — see `PROJECT_KNOWLEDGE.md` feature #61 (AI Mode dial). It's now a server-side `off`/`assisted`/`auto` setting on the user, also addressing the separate long-standing gap that there was no way to fully disable AI for GTD purists. "ritual" wording overload is still open.
+
 ---
 
 ## Part 2 — AI prompt audit + overhaul
