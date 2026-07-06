@@ -111,10 +111,24 @@ const TESTS = {
   },
 };
 
-const MODELS = [
+// Models come from argv as provider:model (e.g. `node scripts/eval-heavy-ops.mjs
+// openai:gpt-4.1-mini groq:llama-3.3-70b-versatile`); no args = the original
+// baseline pair.
+const DEFAULT_MODELS = [
   { label: 'gpt-4o (baseline)', route: { provider: 'openai', model: 'gpt-4o' } },
   { label: 'llama-3.3-70b (groq)', route: { provider: 'groq', model: 'llama-3.3-70b-versatile' } },
 ];
+const MODELS = process.argv.slice(2).length
+  ? process.argv.slice(2).map(spec => {
+      const [provider, ...rest] = spec.split(':');
+      const model = rest.join(':');
+      if (!['openai', 'groq'].includes(provider) || !model) {
+        console.error(`Bad model spec "${spec}" — use provider:model, e.g. openai:gpt-4.1-mini`);
+        process.exit(1);
+      }
+      return { label: `${model} (${provider})`, route: { provider, model } };
+    })
+  : DEFAULT_MODELS;
 
 console.log('Eval: heavy ops — schema validity + ground-truth + latency\n');
 for (const m of MODELS) {

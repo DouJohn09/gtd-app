@@ -4,8 +4,9 @@ import net from 'node:net';
 import {
   validateSmartCapture, validateProcessInbox, validateImportNotes,
   validateDailyPriorities, validateFindDuplicates, validateWeeklyReview,
-  validateAnalyzeTask, validateProjectBreakdown,
+  validateAnalyzeTask, validateProjectBreakdown, validatePlanDay,
 } from './aiSchema.js';
+import { packPlan, timeToMinutes, minutesToTime } from './scheduling.js';
 
 // Provider clients. OpenAI is the paid/reliable baseline; Groq is the fast,
 // free, privacy-safe (Groq does not train on API data) provider for the
@@ -48,6 +49,7 @@ const ROUTING = {
   // gpt-4o stays as the fallback and auto-resumes as the path of choice once
   // OpenAI credit is restored (swap primary/fallback back to revert).
   'daily-priorities':  { primary: { provider: 'groq', model: GROQ }, fallback: { provider: 'openai', model: 'gpt-4o' } },
+  'plan-day':          { primary: { provider: 'groq', model: GROQ }, fallback: { provider: 'openai', model: 'gpt-4.1-mini' } },
   'analyze-task':      { primary: { provider: 'groq', model: GROQ }, fallback: { provider: 'openai', model: 'gpt-4o' } },
   'project-breakdown': { primary: { provider: 'groq', model: GROQ }, fallback: { provider: 'openai', model: 'gpt-4o' } },
   'weekly-review':     { primary: { provider: 'groq', model: GROQ }, fallback: { provider: 'openai', model: 'gpt-4o' } },
@@ -66,6 +68,7 @@ const TASK_PARAMS = {
   'find-duplicates':   { temperature: 0,   max_tokens: 2048 },
   'url-extract':       { temperature: 0 },
   'daily-priorities':  { temperature: 0.2, max_tokens: 1500 },
+  'plan-day':          { temperature: 0.2, max_tokens: 2000 },
   'analyze-task':      { temperature: 0.2, max_tokens: 800 },
   'project-breakdown': { temperature: 0.4, max_tokens: 2048 },
   'weekly-review':     { temperature: 0.4, max_tokens: 3000 },
@@ -628,6 +631,141 @@ Respond with JSON:
       ],
       response_format: { type: 'json_object' }
     }, validateDailyPriorities(tasks.length));
+}
+
+const nextDay = (dateStr) => {
+  const d = new Date(dateStr + 'T12:00:00');
+  d.setDate(d.getDate() + 1);
+  return d.toISOString().slice(0, 10);
+};
+
+// The day planner: given candidate tasks and the day's real shape (free
+// windows, meetings, habits), the model selects + orders + defers + explains;
+// it never does the slot arithmetic unsupervised. After the model responds,
+// packPlan deterministically re-places every block into the actual free
+// ranges — proposals that fit are kept, conflicts are moved, and what can't
+// fit is deferred to tomorrow. The returned plan is guaranteed conflict-free.
+//
+// `day` = { today, dayName, freeRanges, totalFreeMins, workStart, workEnd,
+//           meetings: [{title, start, end}]  (minutes-of-day),
+//           habits: [{name, completed_today}] }
+export async function planDay(tasks, day, userContexts) {
+  if (!openai && !groq) return { error: 'AI provider not configured' };
+
+  const taskList = tasks.map((t, i) => {
+    const parts = [`${i + 1}. "${t.title}" [${t.context || 'no context'}]`];
+    if (t.project_name) parts.push(`(Project: ${t.project_name})`);
+    if (t.due_date) {
+      const due = String(t.due_date).slice(0, 10);
+      if (due < day.today) {
+        const overdueDays = Math.round((new Date(day.today) - new Date(due)) / 86400000);
+        parts.push(`Due: ${due} (OVERDUE by ${overdueDays} day${overdueDays === 1 ? '' : 's'})`);
+      } else if (due === day.today) {
+        parts.push('Due: TODAY');
+      } else {
+        parts.push(`Due: ${due}`);
+      }
+    }
+    if (t.start_date) parts.push(`Starts: ${String(t.start_date).slice(0, 10)}`);
+    if (t.priority) parts.push(`Priority: ${t.priority}/5`);
+    parts.push(`Energy: ${t.energy_level || 'unknown'}, Time: ${t.time_estimate || 'unknown'}min`);
+    return parts.join(' ');
+  }).join('\n');
+
+  const meetingsLine = day.meetings.length
+    ? day.meetings.map(m => `${minutesToTime(m.start)}-${minutesToTime(m.end)} "${m.title}"`).join(', ')
+    : 'none';
+  const freeLine = day.freeRanges.length
+    ? day.freeRanges.map(r => `${minutesToTime(r.start)}-${minutesToTime(r.end)} (${r.end - r.start}m)`).join(', ')
+    : 'none';
+  const habitsLine = day.habits.length
+    ? day.habits.map(h => `${h.name}${h.completed_today ? ' (done)' : ''}`).join(', ')
+    : 'none';
+
+  const parsed = await complete('plan-day', {
+    messages: [
+      { role: 'system', content: getSystemPrompt(userContexts) },
+      {
+        role: 'user',
+        content: `Today is ${day.dayName}, ${day.today}. Build a realistic, calm plan for today from the candidate tasks below.
+
+THE DAY:
+- Working hours: ${minutesToTime(day.workStart)}-${minutesToTime(day.workEnd)}
+- Busy (meetings + already-scheduled blocks): ${meetingsLine}
+- Free windows: ${freeLine} — ${day.totalFreeMins} free minutes in total
+- Habits today (context only — never schedule habits as blocks): ${habitsLine}
+
+CANDIDATE TASKS:
+${taskList}
+
+PLANNING RULES:
+- Place blocks INSIDE the free windows only; blocks must not overlap each other or the busy times.
+- Be realistic, not ambitious: plan at most ~80% of the free minutes. 3-6 blocks is a good day; fewer is fine.
+- duration_mins comes from the task's time estimate; when unknown, guess honestly (30 is a sane default).
+- Tasks due TODAY or OVERDUE come first unless clearly superseded.
+- Match energy to the day: high-energy/deep work in the longest early windows, shallow tasks in short gaps.
+- A task with "Starts:" in the future is deferred by the user — never plan it.
+- Everything worth doing that does NOT fit goes in "deferred" with a concrete date (tomorrow or the next sensible day) and an honest reason. Deferring is the plan protecting the day, not failing.
+- Set "overloaded": true when meaningful work didn't fit today.
+- "summary": ONE calm sentence about the shape of the day (e.g. "Three focused blocks around your two meetings; two things moved to Thursday.").
+
+Respond with JSON:
+{
+  "plan": [{ "task_index": number, "start": "HH:MM", "duration_mins": number, "reason": "why now, plain language" }],
+  "deferred": [{ "task_index": number, "move_to": "YYYY-MM-DD", "reason": "honest reason it moved" }],
+  "summary": "one calm sentence",
+  "overloaded": boolean
+}`
+      }
+    ],
+    response_format: { type: 'json_object' }
+  }, validatePlanDay(tasks.length));
+
+  if (!parsed || parsed.error) return parsed;
+
+  // Deterministic reconciliation — the guarantee layer.
+  // Belt and braces: a task the user deferred (start_date in the future) is
+  // never planned, even if the model ignores the rule. The route's candidate
+  // query already excludes these; this covers direct callers and model slip.
+  const deferredByUser = (idx) => {
+    const t = tasks[idx - 1];
+    return t?.start_date && String(t.start_date).slice(0, 10) > day.today;
+  };
+  const blocks = (parsed.plan || [])
+    .filter(b => !deferredByUser(b.task_index))
+    .map(b => ({
+      task_index: b.task_index,
+      start: timeToMinutes(b.start),
+      duration: b.duration_mins,
+      reason: b.reason || '',
+    }));
+  const { placed, overflow } = packPlan(blocks, day.freeRanges);
+
+  const deferred = (Array.isArray(parsed.deferred) ? parsed.deferred : [])
+    .filter(d => !placed.some(p => p.task_index === d.task_index))
+    .map(d => ({
+      task_index: d.task_index,
+      move_to: d.move_to || nextDay(day.today),
+      reason: d.reason || '',
+    }));
+  for (const o of overflow) {
+    if (!deferred.some(d => d.task_index === o.task_index)) {
+      deferred.push({ task_index: o.task_index, move_to: nextDay(day.today), reason: 'No room left in today’s free windows.' });
+    }
+  }
+
+  return {
+    plan: placed.map(p => ({
+      task_index: p.task_index,
+      start: minutesToTime(p.start),
+      duration_mins: p.duration,
+      reason: p.reason,
+      moved: !!p.moved,
+    })),
+    deferred,
+    summary: typeof parsed.summary === 'string' ? parsed.summary : '',
+    overloaded: parsed.overloaded === true || overflow.length > 0,
+  };
 }
 
 export async function findDuplicates(tasks, userContexts) {

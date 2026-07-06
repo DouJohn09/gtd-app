@@ -6,7 +6,9 @@
 
 ---
 
-## Slice 1 — "Plan my day" (core, ship first)
+## Slice 1 — "Plan my day" (core, ship first) — ✅ BUILT 2026-07-06
+
+*All parts below implemented and verified: eval 6/6 on Groq (`scripts/eval-plan-day.mjs`; gpt-4.1-mini leg pending OpenAI credit), E2E via agent-browser on the demo user (plan → review panel → apply → 5 conflict-free blocks + 9 dated deferrals in DB), free-gate 402 on 4th distinct day + 200 on same-day replan. One deviation from the sketch: the future-`start_date` exclusion is enforced in `planDay` itself (post-model filter), not just the candidate query.*
 
 One tap on Today: AI proposes a realistic plan (which tasks, when, for how long, what gets deferred and why); user reviews and applies; applied plan = `is_daily_focus` + `scheduled_time`/`duration` blocks synced to Google Calendar.
 

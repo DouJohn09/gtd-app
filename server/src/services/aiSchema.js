@@ -175,6 +175,42 @@ export function validateAnalyzeTask(r) {
   return problems;
 }
 
+// Schema-shape validation only. Whether blocks actually fit the day's free
+// windows is enforced deterministically AFTER the model responds (packPlan in
+// scheduling.js) — a repair round-trip is reserved for things a model can fix
+// by re-emitting (bad indexes, malformed times), not for slot arithmetic.
+export function validatePlanDay(taskCount) {
+  return (r) => {
+    const problems = [];
+    if (!Array.isArray(r.plan)) return ['plan must be an array'];
+    if (r.deferred != null && !Array.isArray(r.deferred)) problems.push('deferred must be an array or omitted');
+    r.plan.forEach((b, i) => {
+      const label = `plan[${i}].`;
+      coerce(b, 'task_index', { numeric: true });
+      if (!Number.isInteger(b.task_index) || b.task_index < 1 || b.task_index > taskCount) {
+        problems.push(`${label}task_index must be an integer 1-${taskCount}`);
+      }
+      coerce(b, 'start');
+      if (b.start == null || !TIME_RE.test(b.start)) problems.push(`${label}start is "${b.start}" but must be HH:MM 24-hour`);
+      coerce(b, 'duration_mins', { numeric: true });
+      if (!Number.isInteger(b.duration_mins) || b.duration_mins < 15 || b.duration_mins > 480) {
+        problems.push(`${label}duration_mins must be an integer 15-480`);
+      }
+    });
+    (Array.isArray(r.deferred) ? r.deferred : []).forEach((d, i) => {
+      const label = `deferred[${i}].`;
+      coerce(d, 'task_index', { numeric: true });
+      if (!Number.isInteger(d.task_index) || d.task_index < 1 || d.task_index > taskCount) {
+        problems.push(`${label}task_index must be an integer 1-${taskCount}`);
+      }
+      checkDate(d, 'move_to', problems, label);
+    });
+    const planIdx = r.plan.map(b => b.task_index);
+    if (new Set(planIdx).size !== planIdx.length) problems.push('plan contains the same task_index twice');
+    return problems;
+  };
+}
+
 export function validateProjectBreakdown(r) {
   const problems = [];
   if (!Array.isArray(r.next_actions)) return ['next_actions must be an array'];

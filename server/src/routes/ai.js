@@ -1,12 +1,13 @@
 import { Router } from 'express';
 import { TaskModel, ProjectModel, WeeklyReviewModel } from '../db/models.js';
 import { pool } from '../db/pool.js';
-import { processInbox, getDailyPriorities, importNotes, findDuplicates, weeklyReviewAnalysis, smartCapture } from '../services/ai.js';
+import { processInbox, getDailyPriorities, importNotes, findDuplicates, weeklyReviewAnalysis, smartCapture, planDay } from '../services/ai.js';
 import { syncTaskToCalendar } from '../services/googleCalendar.js';
-import { findFreeSlot } from '../services/scheduling.js';
+import { findFreeSlot, freeRangesFor, timeToMinutes, isoToMinutesOfDay } from '../services/scheduling.js';
 import { consume, getStatus } from '../services/aiUsage.js';
 import { enforceAiLimit } from '../middleware/aiLimit.js';
 import { getAiMode } from '../services/userPrefs.js';
+import { assertPlanWithinLimit, LimitError } from '../services/billing.js';
 
 async function getUserContexts(userId) {
   const { rows } = await pool.query(
@@ -300,6 +301,141 @@ router.post('/daily-priorities', enforceAiLimit, async (req, res) => {
 
     result.tasks = nextActions;
     res.json(result);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// The day planner. Candidates are next actions only — inbox is unclarified,
+// waiting_for is blocked on someone else, someday is parked; none belong in a
+// time-blocked day. Tasks already time-blocked today are busy ranges, not
+// candidates. The AI proposes; packPlan (inside planDay) guarantees the
+// result is conflict-free; the user reviews before anything is applied.
+router.post('/plan-day', enforceAiLimit, async (req, res) => {
+  try {
+    await assertPlanWithinLimit(req.user.id, req.today);
+
+    const [nextActions, dayShape, userContexts] = await Promise.all([
+      TaskModel.getAll('next_actions', req.user.id, req.today),
+      freeRangesFor(req.user.id, req.today),
+      getUserContexts(req.user.id),
+    ]);
+
+    const candidates = nextActions
+      .filter(t => !(t.due_date === req.today && t.scheduled_time)) // already blocked today
+      .slice(0, 40); // bound the prompt; getAll orders by priority DESC first
+
+    if (candidates.length === 0) {
+      return res.json({
+        plan: [], deferred: [], overloaded: false, tasks: [],
+        summary: 'Nothing to plan — no unscheduled next actions right now.',
+      });
+    }
+
+    // Busy items with names, for the prompt ("around your two meetings").
+    const meetings = [
+      ...dayShape.gcalEvents
+        .filter(e => e.due_date === req.today && !e.all_day && e.start_time && e.end_time)
+        .map(e => ({
+          title: e.title,
+          start: isoToMinutesOfDay(e.start_time, req.today),
+          end: isoToMinutesOfDay(e.end_time, req.today),
+        })),
+      ...dayShape.ownTasks
+        .filter(t => t.due_date === req.today && t.scheduled_time)
+        .map(t => ({
+          title: t.title,
+          start: timeToMinutes(t.scheduled_time),
+          end: timeToMinutes(t.scheduled_time) + (t.duration || 60),
+        })),
+    ].filter(m => m.start != null && m.end != null).sort((a, b) => a.start - b.start);
+
+    const { rows: habits } = await pool.query(
+      `SELECT h.name, (hl.id IS NOT NULL) AS completed_today
+       FROM habits h
+       LEFT JOIN habit_logs hl ON hl.habit_id = h.id AND hl.completed_date = $2 AND hl.status = 'done'
+       WHERE h.user_id = $1 AND h.active = true
+       ORDER BY h.name`,
+      [req.user.id, req.today]
+    );
+
+    const dayName = new Date().toLocaleDateString('en-US', { weekday: 'long', timeZone: req.clientTimezone || 'UTC' });
+    const result = await planDay(candidates, {
+      today: req.today,
+      dayName,
+      freeRanges: dayShape.free,
+      totalFreeMins: dayShape.totalFreeMins,
+      workStart: dayShape.workStart,
+      workEnd: dayShape.workEnd,
+      meetings,
+      habits,
+    }, userContexts);
+    if (aiFailed(res, result)) return;
+
+    await pool.query(
+      `INSERT INTO daily_plans (user_id, plan_date, payload)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (user_id, plan_date) DO UPDATE SET payload = $3, created_at = NOW(), applied_at = NULL`,
+      [req.user.id, req.today, JSON.stringify(result)]
+    );
+
+    result.tasks = candidates;
+    res.json(result);
+  } catch (error) {
+    if (error instanceof LimitError) {
+      return res.status(402).json({ error: error.message, code: error.code, resource: error.resource, limit: error.limit });
+    }
+    console.error(error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Applies a reviewed plan: chosen blocks become today's time-blocked focus,
+// deferred items move to their new date. Mirrors apply-daily-focus's "clear
+// then set" so the plan IS the day's focus list. No AI call → no aiLimit.
+router.post('/apply-plan', async (req, res) => {
+  try {
+    const items = Array.isArray(req.body.items) ? req.body.items : [];
+    const deferred = Array.isArray(req.body.deferred) ? req.body.deferred : [];
+    if (items.length === 0 && deferred.length === 0) {
+      return res.status(400).json({ error: 'Nothing to apply' });
+    }
+
+    const nextActions = await TaskModel.getAll('next_actions', req.user.id, req.today);
+    await Promise.all(nextActions.map(task =>
+      TaskModel.update(task.id, { is_daily_focus: false }, req.user.id)
+    ));
+
+    const updated = [];
+    for (const item of items) {
+      const task = await TaskModel.update(item.taskId, {
+        due_date: req.today,
+        scheduled_time: item.start,
+        duration: item.duration || 30,
+        is_daily_focus: true,
+      }, req.user.id);
+      if (task) {
+        updated.push(task);
+        syncTaskToCalendar(req.user.id, task, req.clientTimezone).catch(err => console.error('syncTaskToCalendar (apply-plan):', err));
+      }
+    }
+    for (const d of deferred) {
+      if (!d.moveTo) continue;
+      const task = await TaskModel.update(d.taskId, {
+        due_date: d.moveTo,
+        scheduled_time: null,
+        is_daily_focus: false,
+      }, req.user.id);
+      if (task) syncTaskToCalendar(req.user.id, task, req.clientTimezone).catch(err => console.error('syncTaskToCalendar (apply-plan defer):', err));
+    }
+
+    await pool.query(
+      'UPDATE daily_plans SET applied_at = NOW() WHERE user_id = $1 AND plan_date = $2',
+      [req.user.id, req.today]
+    );
+
+    res.json({ applied: updated.length, deferred: deferred.length, tasks: updated });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Internal server error' });

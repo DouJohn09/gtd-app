@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Inbox, ListTodo, Clock, CloudSun, CheckCircle2, Target, Sparkles,
-  ArrowUpRight, ChevronRight, Flame, EyeOff, X,
+  ArrowUpRight, ChevronRight, Flame, EyeOff, X, CalendarClock,
 } from 'lucide-react';
 import { api } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
@@ -17,6 +17,8 @@ import { useTaskFilters, applyFilters } from '../components/FilterDropdown';
 import FiltersMenu, { ActiveFilters } from '../components/FiltersMenu';
 import { useAiFocus, partitionByAi } from '../hooks/useAiFocus';
 import { useAiMode } from '../hooks/useAiMode';
+import { aiToast } from '../lib/aiError';
+import PlanReviewPanel from '../components/PlanReviewPanel';
 import GlassCard from '../components/ui/GlassCard';
 import Chip from '../components/ui/Chip';
 import FreshCheck from '../components/ui/FreshCheck';
@@ -65,6 +67,25 @@ export default function Dashboard() {
   const { aiOff } = useAiMode();
   const { addToast } = useToast();
   const { aiLoading, aiResult, run: runAiSuggest, clear: clearAiSuggest } = useAiFocus(dailyFocus, addToast);
+  const [planResult, setPlanResult] = useState(null);
+  const [planLoading, setPlanLoading] = useState(false);
+
+  const runPlanDay = async () => {
+    setPlanLoading(true);
+    try {
+      const result = await api.ai.planDay();
+      if ((result.plan || []).length === 0 && (result.deferred || []).length === 0) {
+        addToast(result.summary || 'Nothing to plan right now.', 'info');
+      } else {
+        setPlanResult(result);
+      }
+    } catch (err) {
+      // 402 limit_reached already opened the global upgrade prompt.
+      if (err.code !== 'limit_reached') addToast(...aiToast(err, 'Could not plan the day. Try again in a moment.'));
+    } finally {
+      setPlanLoading(false);
+    }
+  };
 
   useEffect(() => { localStorage.setItem('hide_overdue_focus', hideOverdue); }, [hideOverdue]);
   useEffect(() => { localStorage.setItem('sort_focus', sortBy); }, [sortBy]);
@@ -207,7 +228,27 @@ export default function Dashboard() {
             </>
           )}
         </p>
+        {!aiOff && !planResult && (
+          <button
+            onClick={runPlanDay}
+            disabled={planLoading}
+            className="gtd-btn gtd-btn-primary mt-5 inline-flex items-center gap-1.5 text-[12.5px] disabled:opacity-70"
+          >
+            {planLoading
+              ? <span className="w-3.5 h-3.5 rounded-full border-2 border-white/40 border-t-white animate-spin" />
+              : <CalendarClock className="w-3.5 h-3.5" />}
+            {planLoading ? 'Planning…' : 'Plan my day'}
+          </button>
+        )}
       </div>
+
+      {planResult && (
+        <PlanReviewPanel
+          result={planResult}
+          onApplied={() => { setPlanResult(null); fetchData(); }}
+          onCancel={() => setPlanResult(null)}
+        />
+      )}
 
       <AutopilotNudge />
 

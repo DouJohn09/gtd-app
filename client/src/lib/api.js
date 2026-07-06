@@ -157,6 +157,8 @@ export const api = {
     weeklyReview: () => fetchApi('/ai/weekly-review', { method: 'POST' }),
     completeReview: (data) => fetchApi('/ai/complete-review', { method: 'POST', body: JSON.stringify(data) }),
     smartCapture: (text) => fetchApi('/ai/smart-capture', { method: 'POST', body: JSON.stringify({ text }) }),
+    planDay: () => fetchApi('/ai/plan-day', { method: 'POST' }),
+    applyPlan: (items, deferred) => fetchApi('/ai/apply-plan', { method: 'POST', body: JSON.stringify({ items, deferred }) }),
   },
 
   preferences: {

@@ -60,3 +60,24 @@ export async function assertWithinLimit(userId, resource) {
   const { rows } = await pool.query(COUNT_SQL[resource], [userId]);
   if (rows[0].cnt >= limit) throw new LimitError(resource, limit);
 }
+
+// Daily-planning gate: Free gets PLAN_DAYS_FREE_PER_MONTH distinct planned
+// days per calendar month (a taste of the ritual), Pro plans every day.
+// Re-planning the SAME day is free — the daily_plans upsert means one row per
+// day, so the count only grows when a new day is planned.
+export const PLAN_DAYS_FREE_PER_MONTH = 3;
+
+export async function assertPlanWithinLimit(userId, planDate) {
+  if ((await getUserPlan(userId)) === 'pro') return;
+  const { rows } = await pool.query(
+    `SELECT COUNT(*)::int AS cnt FROM daily_plans
+     WHERE user_id = $1
+       AND plan_date >= date_trunc('month', $2::date)
+       AND plan_date < date_trunc('month', $2::date) + interval '1 month'
+       AND plan_date != $2::date`,
+    [userId, planDate]
+  );
+  if (rows[0].cnt >= PLAN_DAYS_FREE_PER_MONTH) {
+    throw new LimitError('planned days this month', PLAN_DAYS_FREE_PER_MONTH);
+  }
+}
