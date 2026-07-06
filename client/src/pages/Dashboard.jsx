@@ -19,6 +19,7 @@ import { useAiFocus, partitionByAi } from '../hooks/useAiFocus';
 import { useAiMode } from '../hooks/useAiMode';
 import { aiToast } from '../lib/aiError';
 import PlanReviewPanel from '../components/PlanReviewPanel';
+import DayBrief from '../components/DayBrief';
 import GlassCard from '../components/ui/GlassCard';
 import Chip from '../components/ui/Chip';
 import FreshCheck from '../components/ui/FreshCheck';
@@ -69,6 +70,7 @@ export default function Dashboard() {
   const { aiLoading, aiResult, run: runAiSuggest, clear: clearAiSuggest } = useAiFocus(dailyFocus, addToast);
   const [planResult, setPlanResult] = useState(null);
   const [planLoading, setPlanLoading] = useState(false);
+  const [briefBump, setBriefBump] = useState(0);
 
   const runPlanDay = async () => {
     setPlanLoading(true);
@@ -242,10 +244,19 @@ export default function Dashboard() {
         )}
       </div>
 
+      {!aiOff && (
+        <DayBrief
+          onPlan={runPlanDay}
+          planning={planLoading}
+          hidden={!!planResult}
+          refreshKey={`${stats?.completed_today ?? 0}-${briefBump}`}
+        />
+      )}
+
       {planResult && (
         <PlanReviewPanel
           result={planResult}
-          onApplied={() => { setPlanResult(null); fetchData(); }}
+          onApplied={() => { setPlanResult(null); setBriefBump(b => b + 1); fetchData(); }}
           onCancel={() => setPlanResult(null)}
         />
       )}

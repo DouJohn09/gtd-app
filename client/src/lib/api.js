@@ -158,6 +158,7 @@ export const api = {
     completeReview: (data) => fetchApi('/ai/complete-review', { method: 'POST', body: JSON.stringify(data) }),
     smartCapture: (text) => fetchApi('/ai/smart-capture', { method: 'POST', body: JSON.stringify({ text }) }),
     planDay: () => fetchApi('/ai/plan-day', { method: 'POST' }),
+    dayBrief: () => fetchApi('/ai/day-brief'),
     applyPlan: (items, deferred) => fetchApi('/ai/apply-plan', { method: 'POST', body: JSON.stringify({ items, deferred }) }),
   },
 

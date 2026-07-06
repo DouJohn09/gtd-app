@@ -193,8 +193,11 @@ export function validatePlanDay(taskCount) {
       coerce(b, 'start');
       if (b.start == null || !TIME_RE.test(b.start)) problems.push(`${label}start is "${b.start}" but must be HH:MM 24-hour`);
       coerce(b, 'duration_mins', { numeric: true });
-      if (!Number.isInteger(b.duration_mins) || b.duration_mins < 15 || b.duration_mins > 480) {
-        problems.push(`${label}duration_mins must be an integer 15-480`);
+      // Min 5, not 15: tasks legitimately carry 10-minute estimates and the
+      // prompt tells the model to use them — a validator floor above real
+      // estimates makes the repair loop unwinnable (seen live 2026-07-06).
+      if (!Number.isInteger(b.duration_mins) || b.duration_mins < 5 || b.duration_mins > 480) {
+        problems.push(`${label}duration_mins must be an integer 5-480`);
       }
     });
     (Array.isArray(r.deferred) ? r.deferred : []).forEach((d, i) => {

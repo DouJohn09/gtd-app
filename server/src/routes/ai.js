@@ -3,7 +3,7 @@ import { TaskModel, ProjectModel, WeeklyReviewModel } from '../db/models.js';
 import { pool } from '../db/pool.js';
 import { processInbox, getDailyPriorities, importNotes, findDuplicates, weeklyReviewAnalysis, smartCapture, planDay } from '../services/ai.js';
 import { syncTaskToCalendar } from '../services/googleCalendar.js';
-import { findFreeSlot, freeRangesFor, timeToMinutes, isoToMinutesOfDay } from '../services/scheduling.js';
+import { findFreeSlot, freeRangesFor, timeToMinutes, isoToMinutesOfDay, clampRangesToNow } from '../services/scheduling.js';
 import { consume, getStatus } from '../services/aiUsage.js';
 import { enforceAiLimit } from '../middleware/aiLimit.js';
 import { getAiMode } from '../services/userPrefs.js';
@@ -307,6 +307,81 @@ router.post('/daily-priorities', enforceAiLimit, async (req, res) => {
   }
 });
 
+// Minutes-of-day right now in the user's timezone, so today's planning never
+// places blocks in the past (open the app at 16:00 → morning windows are gone).
+function minutesNowIn(tz) {
+  try {
+    const [h, m] = new Intl.DateTimeFormat('en-GB', { timeZone: tz || 'UTC', hour: '2-digit', minute: '2-digit', hour12: false })
+      .format(new Date()).split(':').map(Number);
+    return h * 60 + m;
+  } catch {
+    return null;
+  }
+}
+
+// Named busy items for the prompt and the brief ("around your two meetings"):
+// today's Google events plus the user's own already-time-blocked tasks.
+function buildMeetings(dayShape, today) {
+  return [
+    ...dayShape.gcalEvents
+      .filter(e => e.due_date === today && !e.all_day && e.start_time && e.end_time)
+      .map(e => ({
+        title: e.title,
+        start: isoToMinutesOfDay(e.start_time, today),
+        end: isoToMinutesOfDay(e.end_time, today),
+      })),
+    ...dayShape.ownTasks
+      .filter(t => t.due_date === today && t.scheduled_time)
+      .map(t => ({
+        title: t.title,
+        start: timeToMinutes(t.scheduled_time),
+        end: timeToMinutes(t.scheduled_time) + (t.duration || 60),
+      })),
+  ].filter(m => m.start != null && m.end != null).sort((a, b) => a.start - b.start);
+}
+
+// Unscheduled next actions — what the planner would plan. Shared by plan-day
+// and the brief so their counts agree.
+async function planCandidates(userId, today) {
+  const nextActions = await TaskModel.getAll('next_actions', userId, today);
+  return nextActions.filter(t => !(t.due_date === today && t.scheduled_time));
+}
+
+// The morning brief: the deterministic half of the planning ritual. No AI
+// call and no aiLimit — just the shape of the day (free time left, meetings,
+// candidates) or, once a plan is applied, its progress. The client renders
+// this as the "Plan my day?" banner on first open of the day.
+router.get('/day-brief', async (req, res) => {
+  try {
+    const [dayShape, candidates, planRow] = await Promise.all([
+      freeRangesFor(req.user.id, req.today),
+      planCandidates(req.user.id, req.today),
+      pool.query('SELECT applied_at FROM daily_plans WHERE user_id = $1 AND plan_date = $2', [req.user.id, req.today]),
+    ]);
+    const free = clampRangesToNow(dayShape.free, minutesNowIn(req.clientTimezone));
+    const freeMins = free.reduce((sum, r) => sum + (r.end - r.start), 0);
+    const meetings = buildMeetings(dayShape, req.today).length;
+
+    let plan = null;
+    const row = planRow.rows[0];
+    if (row) {
+      const { rows: [blocks] } = await pool.query(
+        `SELECT COUNT(*) FILTER (WHERE list != 'completed' AND is_daily_focus = true)::int AS remaining,
+                COUNT(*) FILTER (WHERE list = 'completed')::int AS done
+         FROM tasks
+         WHERE user_id = $1 AND due_date = $2 AND scheduled_time IS NOT NULL`,
+        [req.user.id, req.today]
+      );
+      plan = { applied: !!row.applied_at, done: blocks.done, total: blocks.done + blocks.remaining };
+    }
+
+    res.json({ date: req.today, freeMins, meetings, candidates: candidates.length, plan });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // The day planner. Candidates are next actions only — inbox is unclarified,
 // waiting_for is blocked on someone else, someday is parked; none belong in a
 // time-blocked day. Tasks already time-blocked today are busy ranges, not
@@ -316,15 +391,13 @@ router.post('/plan-day', enforceAiLimit, async (req, res) => {
   try {
     await assertPlanWithinLimit(req.user.id, req.today);
 
-    const [nextActions, dayShape, userContexts] = await Promise.all([
-      TaskModel.getAll('next_actions', req.user.id, req.today),
+    const [allCandidates, dayShape, userContexts] = await Promise.all([
+      planCandidates(req.user.id, req.today),
       freeRangesFor(req.user.id, req.today),
       getUserContexts(req.user.id),
     ]);
 
-    const candidates = nextActions
-      .filter(t => !(t.due_date === req.today && t.scheduled_time)) // already blocked today
-      .slice(0, 40); // bound the prompt; getAll orders by priority DESC first
+    const candidates = allCandidates.slice(0, 40); // bound the prompt; ordered by priority DESC
 
     if (candidates.length === 0) {
       return res.json({
@@ -333,23 +406,10 @@ router.post('/plan-day', enforceAiLimit, async (req, res) => {
       });
     }
 
-    // Busy items with names, for the prompt ("around your two meetings").
-    const meetings = [
-      ...dayShape.gcalEvents
-        .filter(e => e.due_date === req.today && !e.all_day && e.start_time && e.end_time)
-        .map(e => ({
-          title: e.title,
-          start: isoToMinutesOfDay(e.start_time, req.today),
-          end: isoToMinutesOfDay(e.end_time, req.today),
-        })),
-      ...dayShape.ownTasks
-        .filter(t => t.due_date === req.today && t.scheduled_time)
-        .map(t => ({
-          title: t.title,
-          start: timeToMinutes(t.scheduled_time),
-          end: timeToMinutes(t.scheduled_time) + (t.duration || 60),
-        })),
-    ].filter(m => m.start != null && m.end != null).sort((a, b) => a.start - b.start);
+    // Only the part of the day that's still ahead is plannable.
+    const freeRanges = clampRangesToNow(dayShape.free, minutesNowIn(req.clientTimezone));
+    const totalFreeMins = freeRanges.reduce((sum, r) => sum + (r.end - r.start), 0);
+    const meetings = buildMeetings(dayShape, req.today);
 
     const { rows: habits } = await pool.query(
       `SELECT h.name, (hl.id IS NOT NULL) AS completed_today
@@ -364,8 +424,8 @@ router.post('/plan-day', enforceAiLimit, async (req, res) => {
     const result = await planDay(candidates, {
       today: req.today,
       dayName,
-      freeRanges: dayShape.free,
-      totalFreeMins: dayShape.totalFreeMins,
+      freeRanges,
+      totalFreeMins,
       workStart: dayShape.workStart,
       workEnd: dayShape.workEnd,
       meetings,

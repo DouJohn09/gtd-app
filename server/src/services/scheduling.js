@@ -106,6 +106,17 @@ export async function freeRangesFor(userId, dateStr) {
   return { free, busy, workStart, workEnd, totalFreeMins, gcalEvents, ownTasks };
 }
 
+// Drop the part of the day that's already gone: ranges ending before `now`
+// vanish, a range straddling `now` starts at the next 15-min mark. Planning
+// at 16:00 must not produce 09:00 blocks.
+export function clampRangesToNow(ranges, nowMins) {
+  if (nowMins == null) return ranges;
+  const aligned = Math.ceil(nowMins / SLOT_STEP_MINS) * SLOT_STEP_MINS;
+  return ranges
+    .filter(r => r.end - Math.max(r.start, aligned) >= SLOT_STEP_MINS)
+    .map(r => (r.start >= aligned ? r : { start: aligned, end: r.end }));
+}
+
 // Deterministic backstop for the AI day-planner: takes the model's proposed
 // blocks ({ start: minutes-of-day, duration, ...meta }) and the day's free
 // ranges, and returns { placed, overflow }. A block keeps its proposed start

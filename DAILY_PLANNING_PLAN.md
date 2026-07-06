@@ -58,7 +58,9 @@ Powers: free-tier monthly gate (count distinct plan_date this month), evening-sh
 
 ---
 
-## Slice 2 — Morning brief (the ritual)
+## Slice 2 — Morning brief (the ritual) — ✅ BUILT 2026-07-06
+
+*Implemented as planned: `GET /ai/day-brief` (no AI call, no aiLimit) + `DayBrief` banner (CTA state → progress state after apply, per-day localStorage dismiss). Two additions the build surfaced: (1) `clampRangesToNow` — free windows now start at the user's current local time, which also fixed plan-day proposing blocks in the past when planning mid-afternoon; (2) validator floor for `duration_mins` relaxed 15→5 after a live repair-loop deadlock: seeded tasks carry 10-minute estimates, the prompt says use them, and a validator floor above real estimates makes repair unwinnable.*
 
 The daily hook, and it's mostly free: the deterministic half (free minutes, meeting load, candidate count) needs **no AI call**.
 
