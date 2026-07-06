@@ -1,5 +1,7 @@
 # Cleartable — 60-Second Landing Page Video
 
+> **SHIPPED 2026-07-06 (adapted):** a 33s silent cut with burned-in captions is live on the landing page (`landing-page/demo.mp4`), recorded via a scripted agent-browser take on the seeded demo user. Beats: morning brief → plain-language capture → **Plan my day (the hero — didn't exist when this doc was written)** → apply → close. The calendar-drag and inbox-AI beats were cut (Groq daily quota died mid-take; capture degraded to raw). This doc remains the spec for the fuller voiceover version — reshoot checklist: fund OpenAI first so AI beats can't fail; `record start` (warmup) → auth → `record restart` (real take); inject the repaint spinner so the CDP screencast records in real time; captions via PIL pills + ffmpeg `overlay` (homebrew ffmpeg lacks drawtext).
+
 Target length: **60s exactly**. Lands above the fold on cleartable.app. One unbroken screen recording, voiceover added in post.
 Resolution: 1920×1080. Browser zoom 110% so text reads on small embeds.
 
