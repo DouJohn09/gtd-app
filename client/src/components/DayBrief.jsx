@@ -1,6 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { CalendarClock, X, Check } from 'lucide-react';
-import { api } from '../lib/api';
 
 const fmtMins = (mins) => {
   const h = Math.floor(mins / 60);
@@ -15,29 +14,17 @@ const fmtMins = (mins) => {
  * once per day on first open. No AI call: just the shape of the day (free
  * time left, meetings, candidates) with the "Plan my day" CTA; once a plan
  * is applied it turns into a quiet progress line. Dismiss hides it until
- * tomorrow (per device, localStorage).
+ * tomorrow (per device, localStorage). The brief itself is fetched once by
+ * the Dashboard and shared with the evening shutdown card.
  */
-export default function DayBrief({ onPlan, planning, hidden, refreshKey }) {
-  const [brief, setBrief] = useState(null);
-  const [dismissed, setDismissed] = useState(false);
+export default function DayBrief({ brief, onPlan, planning, hidden }) {
+  const [dismissedDate, setDismissedDate] = useState(() => localStorage.getItem('ct_brief_dismissed'));
 
-  useEffect(() => {
-    let alive = true;
-    api.ai.dayBrief()
-      .then(b => {
-        if (!alive) return;
-        setBrief(b);
-        setDismissed(localStorage.getItem('ct_brief_dismissed') === b.date);
-      })
-      .catch(() => { /* the brief is decoration — fail silent */ });
-    return () => { alive = false; };
-  }, [refreshKey]);
-
-  if (hidden || dismissed || !brief) return null;
+  if (hidden || !brief || dismissedDate === brief.date) return null;
 
   const dismiss = () => {
     localStorage.setItem('ct_brief_dismissed', brief.date);
-    setDismissed(true);
+    setDismissedDate(brief.date);
   };
 
   // Progress state: a plan is applied — show how the day is going.

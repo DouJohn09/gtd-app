@@ -159,6 +159,7 @@ export const api = {
     smartCapture: (text) => fetchApi('/ai/smart-capture', { method: 'POST', body: JSON.stringify({ text }) }),
     planDay: () => fetchApi('/ai/plan-day', { method: 'POST' }),
     dayBrief: () => fetchApi('/ai/day-brief'),
+    shutdownDefer: (taskId, mode) => fetchApi('/ai/shutdown-defer', { method: 'POST', body: JSON.stringify({ taskId, mode }) }),
     applyPlan: (items, deferred) => fetchApi('/ai/apply-plan', { method: 'POST', body: JSON.stringify({ items, deferred }) }),
   },
 

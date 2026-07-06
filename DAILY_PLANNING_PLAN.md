@@ -73,7 +73,9 @@ The daily hook, and it's mostly free: the deterministic half (free minutes, meet
 
 ---
 
-## Slice 3 — Evening shutdown + overload protection
+## Slice 3 — Evening shutdown + overload protection — ✅ BUILT 2026-07-06
+
+*Implemented: day-brief now returns `unfinished[]` + `daysPlanned` (applied plans only); `POST /ai/shutdown-defer` with three modes (tomorrow / slot via findFreeSlot — deterministic, no AI / release); `DayShutdown` card shows when a plan is applied, blocks remain, and it's ≥17:00 user-local OR >60% done — it takes the banner slot over from DayBrief (shared `shutdownDue` predicate so they never stack), and when the last block is resolved the brief returns in its "plan is done — close the laptop" state. E2E-verified: slot action moved the block to tomorrow 09:00, GCal-synced. Overload honesty had already landed in slice 1 (PlanReviewPanel deferred section). Whole feature now = brief → plan → review → apply → progress → shutdown.*
 
 The calm signature, closes the loop.
 

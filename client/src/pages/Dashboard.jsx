@@ -20,6 +20,7 @@ import { useAiMode } from '../hooks/useAiMode';
 import { aiToast } from '../lib/aiError';
 import PlanReviewPanel from '../components/PlanReviewPanel';
 import DayBrief from '../components/DayBrief';
+import DayShutdown from '../components/DayShutdown';
 import GlassCard from '../components/ui/GlassCard';
 import Chip from '../components/ui/Chip';
 import FreshCheck from '../components/ui/FreshCheck';
@@ -52,6 +53,15 @@ function firstName(user) {
 const NUMBER_WORDS = ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine'];
 const wordifyCount = (n) => (n >= 0 && n < NUMBER_WORDS.length ? NUMBER_WORDS[n] : String(n));
 
+// Mirrors DayShutdown's visibility so the brief and the shutdown card never
+// stack: winding-down time (or most of the plan done) hands the slot over.
+function shutdownDue(brief) {
+  if (!brief?.plan?.applied || !(brief.unfinished?.length > 0)) return false;
+  if (localStorage.getItem('ct_shutdown_dismissed') === brief.date) return false;
+  const { done, total } = brief.plan;
+  return new Date().getHours() >= 17 || (total > 0 && done / total > 0.6);
+}
+
 export default function Dashboard() {
   const [stats, setStats] = useState(null);
   const [dailyFocus, setDailyFocus] = useState([]);
@@ -71,6 +81,18 @@ export default function Dashboard() {
   const [planResult, setPlanResult] = useState(null);
   const [planLoading, setPlanLoading] = useState(false);
   const [briefBump, setBriefBump] = useState(0);
+  const [brief, setBrief] = useState(null);
+
+  // One brief fetch feeds both the morning banner and the evening shutdown.
+  // Refetches when completions change or a plan is applied. Fails silent —
+  // the banners are decoration, the page works without them.
+  const briefKey = `${stats?.completed_today ?? 0}-${briefBump}`;
+  useEffect(() => {
+    if (aiOff) return;
+    let alive = true;
+    api.ai.dayBrief().then(b => { if (alive) setBrief(b); }).catch(() => {});
+    return () => { alive = false; };
+  }, [briefKey, aiOff]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const runPlanDay = async () => {
     setPlanLoading(true);
@@ -245,12 +267,20 @@ export default function Dashboard() {
       </div>
 
       {!aiOff && (
-        <DayBrief
-          onPlan={runPlanDay}
-          planning={planLoading}
-          hidden={!!planResult}
-          refreshKey={`${stats?.completed_today ?? 0}-${briefBump}`}
-        />
+        <>
+          <DayShutdown
+            brief={brief}
+            onChanged={() => { setBriefBump(b => b + 1); fetchData(); }}
+            onDismissed={() => setBriefBump(b => b + 1)}
+            hidden={!!planResult}
+          />
+          <DayBrief
+            brief={brief}
+            onPlan={runPlanDay}
+            planning={planLoading}
+            hidden={!!planResult || shutdownDue(brief)}
+          />
+        </>
       )}
 
       {planResult && (

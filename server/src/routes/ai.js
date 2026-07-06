@@ -363,19 +363,32 @@ router.get('/day-brief', async (req, res) => {
     const meetings = buildMeetings(dayShape, req.today).length;
 
     let plan = null;
+    let unfinished = [];
     const row = planRow.rows[0];
     if (row) {
-      const { rows: [blocks] } = await pool.query(
-        `SELECT COUNT(*) FILTER (WHERE list != 'completed' AND is_daily_focus = true)::int AS remaining,
-                COUNT(*) FILTER (WHERE list = 'completed')::int AS done
+      const { rows: blocks } = await pool.query(
+        `SELECT id, title, scheduled_time, duration, list
          FROM tasks
-         WHERE user_id = $1 AND due_date = $2 AND scheduled_time IS NOT NULL`,
+         WHERE user_id = $1 AND due_date = $2 AND scheduled_time IS NOT NULL
+           AND (list = 'completed' OR is_daily_focus = true)
+         ORDER BY scheduled_time`,
         [req.user.id, req.today]
       );
-      plan = { applied: !!row.applied_at, done: blocks.done, total: blocks.done + blocks.remaining };
+      const done = blocks.filter(b => b.list === 'completed').length;
+      unfinished = blocks
+        .filter(b => b.list !== 'completed')
+        .map(b => ({ id: b.id, title: b.title, scheduled_time: b.scheduled_time, duration: b.duration }));
+      plan = { applied: !!row.applied_at, done, total: blocks.length };
     }
 
-    res.json({ date: req.today, freeMins, meetings, candidates: candidates.length, plan });
+    // Retention metric + calm meta for the shutdown card. Applied plans only —
+    // proposals the user walked away from don't count as planned days.
+    const { rows: [planned] } = await pool.query(
+      'SELECT COUNT(*)::int AS cnt FROM daily_plans WHERE user_id = $1 AND applied_at IS NOT NULL',
+      [req.user.id]
+    );
+
+    res.json({ date: req.today, freeMins, meetings, candidates: candidates.length, plan, unfinished, daysPlanned: planned.cnt });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Internal server error' });
@@ -496,6 +509,44 @@ router.post('/apply-plan', async (req, res) => {
     );
 
     res.json({ applied: updated.length, deferred: deferred.length, tasks: updated });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Evening shutdown: one-tap outcomes for a planned block that didn't happen.
+//   tomorrow — move to tomorrow, unscheduled (decide the time then)
+//   slot     — move to tomorrow into the first free slot (deterministic, no AI)
+//   release  — back to plain next actions, no date; today just didn't have room
+// Each mode clears today's focus/schedule so the day can actually end.
+router.post('/shutdown-defer', async (req, res) => {
+  try {
+    const { taskId, mode } = req.body;
+    if (!taskId || !['tomorrow', 'slot', 'release'].includes(mode)) {
+      return res.status(400).json({ error: 'taskId and a valid mode are required' });
+    }
+    const d = new Date(req.today + 'T12:00:00');
+    d.setDate(d.getDate() + 1);
+    const tomorrow = d.toISOString().slice(0, 10);
+
+    let updates;
+    if (mode === 'release') {
+      updates = { due_date: null, scheduled_time: null, is_daily_focus: false };
+    } else if (mode === 'slot') {
+      const existing = await TaskModel.getById(taskId, req.user.id);
+      if (!existing) return res.status(404).json({ error: 'Task not found' });
+      const time = await findFreeSlot(req.user.id, tomorrow, existing.duration || 30);
+      // A full tomorrow degrades to plain "tomorrow" rather than failing.
+      updates = { due_date: tomorrow, scheduled_time: time, is_daily_focus: false };
+    } else {
+      updates = { due_date: tomorrow, scheduled_time: null, is_daily_focus: false };
+    }
+
+    const task = await TaskModel.update(taskId, updates, req.user.id);
+    if (!task) return res.status(404).json({ error: 'Task not found' });
+    syncTaskToCalendar(req.user.id, task, req.clientTimezone).catch(err => console.error('syncTaskToCalendar (shutdown):', err));
+    res.json({ task, mode, moved_to: updates.due_date, scheduled_time: updates.scheduled_time ?? null });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Internal server error' });
