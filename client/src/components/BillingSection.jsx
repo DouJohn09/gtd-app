@@ -14,6 +14,7 @@ const PLANS = [
 ];
 
 const PRO_PERKS = [
+  'AI plans your day — every day, not 3 a month',
   'Unlimited projects, custom lists & habits',
   'Productivity analytics dashboard',
   'Much higher daily AI limit',
@@ -116,8 +117,8 @@ export default function BillingSection() {
         <>
           <p className="text-text-3 text-sm mb-4 leading-relaxed">
             You're on the <span className="text-text-1 font-medium">Free</span> plan — the full workflow,
-            calendar, and AI capture with a daily limit, up to 8 projects · 1 list · 3 habits.
-            Upgrade for:
+            calendar, AI capture with a daily limit, 3 AI-planned days a month,
+            up to 8 projects · 1 list · 3 habits. Upgrade for:
           </p>
           <ul className="text-[13px] text-text-2 space-y-1.5 mb-5">
             {PRO_PERKS.map((p) => (

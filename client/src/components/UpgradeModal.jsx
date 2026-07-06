@@ -10,6 +10,8 @@ const RESOURCE = {
   projects:     { noun: 'projects',     line: 'Organize every outcome without a ceiling.' },
   custom_lists: { noun: 'custom lists',  line: 'Keep as many reference lists as you like.' },
   habits:       { noun: 'habits',        line: 'Track every habit, not just three.' },
+  // Server resource key for the daily-planning gate (billing.js assertPlanWithinLimit).
+  'planned days this month': { noun: 'planned days this month', line: 'Let AI plan every day, not three a month.' },
 };
 
 export function UpgradeProvider({ children }) {

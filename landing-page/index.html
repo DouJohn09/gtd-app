@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Cleartable — Calm, AI Task Manager for Work & Life</title>
-  <meta name="description" content="A calm, AI-powered app that brings your tasks, habits, and calendar together — and does the organizing for you. Clarity for work and life." />
+  <meta name="description" content="A calm, AI-powered app that brings your tasks, habits, and calendar together — sorts everything for you and plans your day, calmly. Clarity for work and life." />
   <link rel="canonical" href="https://cleartable.app/" />
 
   <!-- Open Graph -->
@@ -13,7 +13,7 @@
   <meta property="og:locale" content="en_US" />
   <meta property="og:url" content="https://cleartable.app" />
   <meta property="og:title" content="Cleartable — Clear your table. Clear your mind." />
-  <meta property="og:description" content="A calm, AI-powered app that brings your tasks, habits, and calendar together — and does the organizing for you. Clarity for work and life." />
+  <meta property="og:description" content="A calm, AI-powered app that brings your tasks, habits, and calendar together — sorts everything for you and plans your day, calmly. Clarity for work and life." />
   <meta property="og:image" content="https://cleartable.app/og-image.png" />
   <meta property="og:image:width" content="1200" />
   <meta property="og:image:height" content="630" />
@@ -57,11 +57,12 @@
         "@id": "https://cleartable.app/#app",
         "name": "Cleartable",
         "url": "https://cleartable.app/",
-        "description": "A calm, AI-powered app that brings your tasks, habits, and calendar together and does the organizing for you. Clarity for work and life, structured on proven productivity principles.",
+        "description": "A calm, AI-powered app that brings your tasks, habits, and calendar together — sorts everything for you and plans your day into realistic time blocks. Clarity for work and life, structured on proven productivity principles.",
         "applicationCategory": "ProductivityApplication",
         "operatingSystem": "Web (PWA)",
         "browserRequirements": "Requires a modern web browser. Installable as a PWA.",
         "screenshot": [
+          "https://cleartable.app/screenshots/app-plan.jpg",
           "https://cleartable.app/screenshots/app-today.jpg",
           "https://cleartable.app/screenshots/app-inbox.jpg",
           "https://cleartable.app/screenshots/app-calendar.jpg",
@@ -124,7 +125,7 @@
             "name": "Why not just use Todoist or Things?",
             "acceptedAnswer": {
               "@type": "Answer",
-              "text": "Most task apps just store what you type — you still do all the sorting. Cleartable uses AI to organize your inbox, schedule your time, and prepare your weekly review, and it brings tasks, habits, and calendar into one calm place instead of three apps. It's cross-platform (Things and OmniFocus are Apple-only), and Pro comes in under Todoist Pro."
+              "text": "Most task apps just store what you type — you still do all the sorting and all the deciding. Cleartable uses AI to organize your inbox, plan your day into realistic time blocks around your calendar, and prepare your weekly review — in one calm place instead of three apps. It's cross-platform (Things and OmniFocus are Apple-only), and Pro comes in under Todoist Pro."
             }
           }
         ]
@@ -164,7 +165,8 @@
       <h1>Clear your table.<br />Clear your mind.</h1>
       <p class="subline">
         The calm, AI-powered way to organize your <strong>tasks, habits, and calendar</strong> —
-        at work and in life. Capture anything; Cleartable <strong>sorts it for you</strong>.
+        at work and in life. Capture anything; Cleartable <strong>sorts it for you</strong> and
+        <strong>plans your day</strong> around your real calendar.
       </p>
       <div id="waitlist">
         <form class="capture-form" id="waitlist-form">
@@ -255,6 +257,37 @@
     </div>
   </section>
 
+  <!-- ========== The daily ritual (AI Daily Planning) ========== -->
+  <section class="problem">
+    <div class="container">
+      <div class="mono-label violet" style="margin-bottom: 12px;">the daily ritual</div>
+      <h2 style="font-size: clamp(28px, 4.5vw, 44px); margin-bottom: 8px;">
+        Your day, planned calmly.
+      </h2>
+      <p class="section-sub" style="text-align: left; margin-left: 0;">
+        AI schedulers cram your calendar and reshuffle it all day. Cleartable does the opposite:
+        it plans what actually fits — and <em>protects</em> the rest of your day.
+      </p>
+      <div class="problem-grid reveal-stagger">
+        <div class="problem-card reveal">
+          <div class="icon">🌅</div>
+          <h3>Morning brief</h3>
+          <p>"2h free between 5 meetings · 9 candidates." One quiet line tells you the honest shape of your day before you commit to anything.</p>
+        </div>
+        <div class="problem-card reveal">
+          <div class="icon">✨</div>
+          <h3>One tap plans the day</h3>
+          <p>AI builds a realistic, time-blocked plan from your tasks, energy, and real calendar — and openly moves what doesn't fit to another day. You approve every block before anything changes.</p>
+        </div>
+        <div class="problem-card reveal">
+          <div class="icon">🌙</div>
+          <h3>Evening shutdown</h3>
+          <p>Whatever's left gets one tap: tomorrow, a free slot, or let it go. Close the laptop with a clear head — deferring is the plan working, not failing.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <!-- ========== Breadth: work + life in one place ========== -->
   <section class="gtd-section">
     <div class="container">
@@ -301,8 +334,10 @@
           <!-- Swap the slides for the demo video when it's recorded (keep the screenshot as the poster):
                <video src="demo.mp4" poster="screenshots/app-today.jpg" controls playsinline></video> -->
           <div class="carousel-viewport">
-            <img class="carousel-slide active" src="screenshots/app-today.jpg" width="1600" height="1000"
-                 alt="Cleartable Today view — your focus list, today's habits, and an AI suggestion to process your inbox" />
+            <img class="carousel-slide active" src="screenshots/app-plan.jpg" width="1600" height="1000"
+                 alt="AI daily plan review — time-blocked tasks with reasons, and tasks honestly moved to tomorrow to protect the day" />
+            <img class="carousel-slide" src="screenshots/app-today.jpg" width="1600" height="1000" loading="lazy"
+                 alt="Cleartable Today view — the morning brief with free time and meetings, your focus list, and today's habits" />
             <img class="carousel-slide" src="screenshots/app-inbox.jpg" width="1600" height="1000" loading="lazy"
                  alt="Inbox with unprocessed captures and an AI-processing panel" />
             <img class="carousel-slide" src="screenshots/app-calendar.jpg" width="1600" height="1000" loading="lazy"
@@ -318,12 +353,13 @@
           </button>
         </div>
         <div class="carousel-dots">
-          <button class="carousel-dot active" type="button" aria-label="Today view" aria-current="true"></button>
+          <button class="carousel-dot active" type="button" aria-label="Daily plan" aria-current="true"></button>
+          <button class="carousel-dot" type="button" aria-label="Today view"></button>
           <button class="carousel-dot" type="button" aria-label="Inbox"></button>
           <button class="carousel-dot" type="button" aria-label="Calendar"></button>
           <button class="carousel-dot" type="button" aria-label="Habits"></button>
         </div>
-        <p class="carousel-caption" aria-live="polite">Start the day with a short, honest focus list — tasks, habits, and an AI nudge.</p>
+        <p class="carousel-caption" aria-live="polite">One tap plans your day — time blocks with reasons, and what doesn't fit moves honestly to tomorrow.</p>
       </div>
     </div>
   </section>
@@ -344,6 +380,7 @@
             <li>Calendar + Google Calendar sync &amp; time blocking</li>
             <li>Weekly Review, recurring tasks, defer dates, custom contexts</li>
             <li>AI Smart Capture &amp; inbox processing (daily limit)</li>
+            <li>AI daily planning — 3 planned days per month</li>
             <li>Up to 8 projects · 1 custom list · 3 habits</li>
           </ul>
         </div>
@@ -354,6 +391,7 @@
           <div class="price-note">or $4/mo billed monthly · under Todoist Pro</div>
           <ul>
             <li>Everything in Free</li>
+            <li>AI plans your day, every day — time-blocked around your calendar</li>
             <li>Unlimited projects, custom lists &amp; habits</li>
             <li>Productivity analytics dashboard</li>
             <li>Much higher daily AI limit</li>
@@ -458,7 +496,7 @@
             <span class="faq-icon" aria-hidden="true">+</span>
           </summary>
           <div class="faq-answer">
-            Most task apps just store what you type — you still do all the sorting. Cleartable uses AI to organize your inbox, schedule your time, and prepare your weekly review, and it brings tasks, habits, and calendar into one calm place instead of three apps. It's cross-platform (Things and OmniFocus are Apple-only), and Pro comes in under Todoist Pro.
+            Most task apps just store what you type — you still do all the sorting and all the deciding. Cleartable uses AI to organize your inbox, plan your day into realistic time blocks around your calendar, and prepare your weekly review — in one calm place instead of three apps. It's cross-platform (Things and OmniFocus are Apple-only), and Pro comes in under Todoist Pro.
           </div>
         </details>
       </div>
@@ -605,7 +643,8 @@
       const dots = carousel.querySelectorAll('.carousel-dot');
       const caption = carousel.querySelector('.carousel-caption');
       const captions = [
-        'Start the day with a short, honest focus list — tasks, habits, and an AI nudge.',
+        'One tap plans your day — time blocks with reasons, and what doesn\'t fit moves honestly to tomorrow.',
+        'Start the day with the morning brief — your free time, your meetings, and a short, honest focus list.',
         'Capture anything. AI sorts your inbox into next actions, waiting-for, and someday.',
         'Time-block your day. Drag tasks onto the calendar; push to Google Calendar.',
         'Build habits that stick — forgiving streaks, no guilt.'
