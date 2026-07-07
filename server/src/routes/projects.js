@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { ProjectModel, TaskModel } from '../db/models.js';
 import { pool } from '../db/pool.js';
 import { suggestProjectBreakdown } from '../services/ai.js';
-import { enforceAiLimit } from '../middleware/aiLimit.js';
+import { enforceAiLimit, requireAiEnabled } from '../middleware/aiLimit.js';
 import { assertWithinLimit, LimitError } from '../services/billing.js';
 
 const router = Router();
@@ -67,7 +67,7 @@ router.delete('/:id', async (req, res) => {
   }
 });
 
-router.post('/:id/breakdown', enforceAiLimit, async (req, res) => {
+router.post('/:id/breakdown', requireAiEnabled, enforceAiLimit, async (req, res) => {
   try {
     const project = await ProjectModel.getById(req.params.id, req.user.id);
     if (!project) {

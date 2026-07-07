@@ -5,7 +5,7 @@ import { processInbox, getDailyPriorities, importNotes, findDuplicates, weeklyRe
 import { syncTaskToCalendar } from '../services/googleCalendar.js';
 import { findFreeSlot, freeRangesFor, timeToMinutes, eventMinutesOnDay, clampRangesToNow } from '../services/scheduling.js';
 import { consume, getStatus } from '../services/aiUsage.js';
-import { enforceAiLimit } from '../middleware/aiLimit.js';
+import { enforceAiLimit, requireAiEnabled } from '../middleware/aiLimit.js';
 import { getAiMode } from '../services/userPrefs.js';
 import { assertPlanWithinLimit, LimitError } from '../services/billing.js';
 
@@ -200,7 +200,7 @@ router.get('/usage', async (req, res) => {
   }
 });
 
-router.post('/process-inbox', enforceAiLimit, async (req, res) => {
+router.post('/process-inbox', requireAiEnabled, enforceAiLimit, async (req, res) => {
   try {
     const inboxTasks = await TaskModel.getAll('inbox', req.user.id);
     if (inboxTasks.length === 0) {
@@ -268,7 +268,7 @@ router.post('/apply-inbox-processing', async (req, res) => {
   }
 });
 
-router.post('/daily-priorities', enforceAiLimit, async (req, res) => {
+router.post('/daily-priorities', requireAiEnabled, enforceAiLimit, async (req, res) => {
   try {
     const [nextActions, stats] = await Promise.all([
       TaskModel.getAll('next_actions', req.user.id, req.today),
@@ -400,7 +400,7 @@ router.get('/day-brief', async (req, res) => {
 // time-blocked day. Tasks already time-blocked today are busy ranges, not
 // candidates. The AI proposes; packPlan (inside planDay) guarantees the
 // result is conflict-free; the user reviews before anything is applied.
-router.post('/plan-day', enforceAiLimit, async (req, res) => {
+router.post('/plan-day', requireAiEnabled, enforceAiLimit, async (req, res) => {
   try {
     await assertPlanWithinLimit(req.user.id, req.today);
 
@@ -558,7 +558,7 @@ router.post('/shutdown-defer', async (req, res) => {
   }
 });
 
-router.post('/import-notes', enforceAiLimit, async (req, res) => {
+router.post('/import-notes', requireAiEnabled, enforceAiLimit, async (req, res) => {
   try {
     const { text } = req.body;
     if (!text || !text.trim()) {
@@ -646,7 +646,7 @@ router.post('/apply-daily-focus', async (req, res) => {
   }
 });
 
-router.post('/find-duplicates', enforceAiLimit, async (req, res) => {
+router.post('/find-duplicates', requireAiEnabled, enforceAiLimit, async (req, res) => {
   try {
     const lists = await Promise.all(
       ['inbox', 'next_actions', 'waiting_for', 'someday_maybe'].map(list =>
@@ -662,6 +662,26 @@ router.post('/find-duplicates', enforceAiLimit, async (req, res) => {
     const userContexts = await getUserContexts(req.user.id);
     const result = await findDuplicates(allTasks, userContexts);
     if (aiFailed(res, result)) return;
+
+    // The model can only reference tasks we sent it — reject any id it invented
+    // or transposed, and rebuild each group from authoritative DB rows (real id +
+    // real title) so the client never renders a hallucinated title over a real id.
+    // apply-duplicates deletes by id, so a bogus id here would delete the wrong
+    // task. Keep only groups that still have ≥2 tasks and exactly one keep.
+    const byId = new Map(allTasks.map(t => [t.id, t]));
+    result.duplicate_groups = (result.duplicate_groups || [])
+      .map(g => {
+        const seen = new Set();
+        const tasks = [];
+        for (const t of (g.tasks || [])) {
+          const real = byId.get(Number(t.id));
+          if (!real || seen.has(real.id)) continue;
+          seen.add(real.id);
+          tasks.push({ id: real.id, title: real.title, list: real.list, keep: t.keep === true });
+        }
+        return { ...g, tasks };
+      })
+      .filter(g => g.tasks.length >= 2 && g.tasks.filter(t => t.keep).length === 1);
 
     res.json(result);
   } catch (error) {

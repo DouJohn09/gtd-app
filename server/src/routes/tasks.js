@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { TaskModel, ProjectModel } from '../db/models.js';
 import { pool } from '../db/pool.js';
 import { analyzeTask } from '../services/ai.js';
-import { enforceAiLimit } from '../middleware/aiLimit.js';
+import { enforceAiLimit, requireAiEnabled } from '../middleware/aiLimit.js';
 import { getCalendarEvents, syncTaskToCalendar, deleteTaskFromCalendar } from '../services/googleCalendar.js';
 
 const router = Router();
@@ -145,7 +145,7 @@ router.post('/:id/complete', async (req, res) => {
   }
 });
 
-router.post('/:id/analyze', enforceAiLimit, async (req, res) => {
+router.post('/:id/analyze', requireAiEnabled, enforceAiLimit, async (req, res) => {
   try {
     const task = await TaskModel.getById(req.params.id, req.user.id);
     if (!task) {

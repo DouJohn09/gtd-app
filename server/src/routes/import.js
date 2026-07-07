@@ -1,6 +1,7 @@
 import express from 'express';
 import { pool } from '../db/pool.js';
 import { ProjectModel } from '../db/models.js';
+import { remainingAllowance } from '../services/billing.js';
 
 const router = express.Router();
 
@@ -221,9 +222,15 @@ router.post('/commit', async (req, res) => {
     const { format, payload } = req.body || {};
     if (!payload) return res.status(400).json({ error: 'No payload' });
 
-    const counts = { tasks: 0, projects_new: 0, projects_merged: 0, contexts: 0, habits: 0, habit_logs: 0 };
+    const counts = { tasks: 0, projects_new: 0, projects_merged: 0, projects_skipped: 0, contexts: 0, habits: 0, habits_skipped: 0, habit_logs: 0 };
 
-    // Project resolver — case-insensitive match by name; create if missing.
+    // Free-tier caps apply to import too, or a hand-edited export JSON is a gate
+    // bypass. Merges into existing projects/habits don't consume budget; only new
+    // rows do. Over budget → skip and count, never partially fail the whole import.
+    let projectBudget = await remainingAllowance(userId, 'projects');
+
+    // Project resolver — case-insensitive match by name; create if missing and
+    // there's budget. Returns null when it can't resolve or create (caller skips).
     const existingProjects = await ProjectModel.getAll(userId);
     const projectIdByName = new Map(existingProjects.map(p => [(p.name || '').toLowerCase(), p.id]));
     async function resolveProject(name, projectShape) {
@@ -232,12 +239,17 @@ router.post('/commit', async (req, res) => {
       if (projectIdByName.has(key)) {
         return { id: projectIdByName.get(key), merged: true };
       }
+      if (projectBudget <= 0) {
+        counts.projects_skipped++;
+        return null;
+      }
       const created = await ProjectModel.create({
         name,
         description: projectShape?.description,
         outcome: projectShape?.outcome,
         execution_mode: projectShape?.execution_mode || 'parallel',
       }, userId);
+      projectBudget--;
       projectIdByName.set(key, created.id);
       return { id: created.id, merged: false };
     }
@@ -265,21 +277,31 @@ router.post('/commit', async (req, res) => {
       const { rows: habitRows } = await pool.query('SELECT id, name FROM habits WHERE user_id = $1', [userId]);
       const habitIdByName = new Map(habitRows.map(r => [(r.name || '').toLowerCase(), r.id]));
       const oldToNewHabitId = new Map();
+      let habitBudget = await remainingAllowance(userId, 'habits');
       for (const h of (payload.habits || [])) {
         const key = (h.name || '').toLowerCase();
         if (habitIdByName.has(key)) {
           oldToNewHabitId.set(h.id, habitIdByName.get(key));
           continue;
         }
+        // The Free habits cap counts only active habits, so only an active import
+        // consumes budget. Over budget → skip (its logs skip too, since the id map
+        // won't have an entry).
+        const willBeActive = !!(h.active ?? true);
+        if (willBeActive && habitBudget <= 0) {
+          counts.habits_skipped++;
+          continue;
+        }
         const { rows: insertRows } = await pool.query(
           `INSERT INTO habits (name, description, frequency, target_days, category, color, active, user_id)
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
           [h.name, h.description || null, h.frequency || 'daily', h.target_days || null,
-           h.category || null, h.color || '#3b82f6', !!(h.active ?? true), userId]
+           h.category || null, h.color || '#3b82f6', willBeActive, userId]
         );
         const newId = insertRows[0].id;
         habitIdByName.set(key, newId);
         oldToNewHabitId.set(h.id, newId);
+        if (willBeActive) habitBudget--;
         counts.habits++;
       }
 
@@ -305,18 +327,21 @@ router.post('/commit', async (req, res) => {
         counts.tasks++;
       }
     } else if (format === 'csv') {
-      const preExisting = new Set(projectIdByName.keys());
       const seenProjects = new Set();
       for (const t of (payload.tasks || [])) {
         let project_id = null;
         if (t.project_name) {
-          const key = t.project_name.toLowerCase();
-          if (!seenProjects.has(key)) {
-            seenProjects.add(key);
-            if (preExisting.has(key)) counts.projects_merged++;
-            else counts.projects_new++;
+          // resolveProject enforces the project cap and returns null when over
+          // budget (or unresolvable) — the task then imports without a project.
+          const r = await resolveProject(t.project_name, null);
+          if (r) {
+            project_id = r.id;
+            const key = t.project_name.toLowerCase();
+            if (!seenProjects.has(key)) {
+              seenProjects.add(key);
+              if (r.merged) counts.projects_merged++; else counts.projects_new++;
+            }
           }
-          project_id = (await resolveProject(t.project_name, null)).id;
         }
         await insertTaskRaw({
           title: t.title,

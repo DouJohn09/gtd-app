@@ -1,13 +1,13 @@
 import { Router } from 'express';
 import { CustomListModel, ListItemModel } from '../db/models.js';
 import { extractUrlMetadata } from '../services/ai.js';
-import { enforceAiLimit } from '../middleware/aiLimit.js';
+import { enforceAiLimit, requireAiEnabled } from '../middleware/aiLimit.js';
 import { aiRateLimiter } from '../middleware/rateLimit.js';
 import { assertWithinLimit, LimitError } from '../services/billing.js';
 
 const router = Router();
 
-router.post('/extract-url', aiRateLimiter, enforceAiLimit, async (req, res) => {
+router.post('/extract-url', aiRateLimiter, requireAiEnabled, enforceAiLimit, async (req, res) => {
   try {
     const { url } = req.body;
     if (!url) return res.status(400).json({ error: 'URL is required' });

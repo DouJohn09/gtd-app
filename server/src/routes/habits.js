@@ -258,6 +258,19 @@ router.put('/:id', async (req, res) => {
 
     if (fields.length === 0) return res.status(400).json({ error: 'No fields to update' });
 
+    // Reactivating a habit (inactive → active) creates capacity, so it must pass
+    // the Free cap the same as creating one — otherwise archive-create-reactivate
+    // is an unlimited-habits loophole (the cap counts only active = true).
+    if (active !== undefined && !!active) {
+      const { rows: cur } = await pool.query(
+        'SELECT active FROM habits WHERE id = $1 AND user_id = $2',
+        [req.params.id, req.user.id]
+      );
+      if (cur[0] && cur[0].active === false) {
+        await assertWithinLimit(req.user.id, 'habits');
+      }
+    }
+
     values.push(req.params.id, req.user.id);
     const idIdx = values.length - 1;
     const userIdx = values.length;
@@ -275,6 +288,9 @@ router.put('/:id', async (req, res) => {
     habit.target_days = habit.target_days ? JSON.parse(habit.target_days) : null;
     res.json(habit);
   } catch (error) {
+    if (error instanceof LimitError) {
+      return res.status(402).json({ error: error.message, code: error.code, resource: error.resource, limit: error.limit });
+    }
     console.error(error);
     res.status(500).json({ error: 'Internal server error' });
   }

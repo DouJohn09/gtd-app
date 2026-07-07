@@ -61,6 +61,17 @@ export async function assertWithinLimit(userId, resource) {
   if (rows[0].cnt >= limit) throw new LimitError(resource, limit);
 }
 
+// How many more of `resource` a user may create right now — Infinity for Pro and
+// for uncapped resources. For bulk paths (import) that should create up to the
+// cap and skip the rest rather than throwing a 402 mid-batch.
+export async function remainingAllowance(userId, resource) {
+  const limit = FREE_LIMITS[resource];
+  if (!limit) return Infinity;
+  if ((await getUserPlan(userId)) === 'pro') return Infinity;
+  const { rows } = await pool.query(COUNT_SQL[resource], [userId]);
+  return Math.max(0, limit - rows[0].cnt);
+}
+
 // Daily-planning gate: Free gets PLAN_DAYS_FREE_PER_MONTH distinct planned
 // days per calendar month (a taste of the ritual), Pro plans every day.
 // Only APPLIED days count — merely generating a proposal and cancelling it must
