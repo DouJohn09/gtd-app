@@ -149,7 +149,7 @@ router.post('/smart-capture', async (req, res) => {
     if (ai.find_free_slot && ai.due_date && !ai.scheduled_time) {
       const duration = ai.duration || 30;
       try {
-        const slot = await findFreeSlot(req.user.id, ai.due_date, duration);
+        const slot = await findFreeSlot(req.user.id, ai.due_date, duration, req.clientTimezone);
         if (slot) {
           ai.scheduled_time = slot;
           ai.duration = duration;
@@ -321,14 +321,14 @@ function minutesNowIn(tz) {
 
 // Named busy items for the prompt and the brief ("around your two meetings"):
 // today's Google events plus the user's own already-time-blocked tasks.
-function buildMeetings(dayShape, today) {
+function buildMeetings(dayShape, today, timeZone) {
   return [
     ...dayShape.gcalEvents
       .filter(e => e.due_date === today && !e.all_day && e.start_time && e.end_time)
       .map(e => ({
         title: e.title,
-        start: isoToMinutesOfDay(e.start_time, today),
-        end: isoToMinutesOfDay(e.end_time, today),
+        start: isoToMinutesOfDay(e.start_time, today, timeZone),
+        end: isoToMinutesOfDay(e.end_time, today, timeZone),
       })),
     ...dayShape.ownTasks
       .filter(t => t.due_date === today && t.scheduled_time)
@@ -354,13 +354,13 @@ async function planCandidates(userId, today) {
 router.get('/day-brief', async (req, res) => {
   try {
     const [dayShape, candidates, planRow] = await Promise.all([
-      freeRangesFor(req.user.id, req.today),
+      freeRangesFor(req.user.id, req.today, req.clientTimezone),
       planCandidates(req.user.id, req.today),
       pool.query('SELECT applied_at FROM daily_plans WHERE user_id = $1 AND plan_date = $2', [req.user.id, req.today]),
     ]);
     const free = clampRangesToNow(dayShape.free, minutesNowIn(req.clientTimezone));
     const freeMins = free.reduce((sum, r) => sum + (r.end - r.start), 0);
-    const meetings = buildMeetings(dayShape, req.today).length;
+    const meetings = buildMeetings(dayShape, req.today, req.clientTimezone).length;
 
     let plan = null;
     let unfinished = [];
@@ -406,7 +406,7 @@ router.post('/plan-day', enforceAiLimit, async (req, res) => {
 
     const [allCandidates, dayShape, userContexts] = await Promise.all([
       planCandidates(req.user.id, req.today),
-      freeRangesFor(req.user.id, req.today),
+      freeRangesFor(req.user.id, req.today, req.clientTimezone),
       getUserContexts(req.user.id),
     ]);
 
@@ -422,7 +422,7 @@ router.post('/plan-day', enforceAiLimit, async (req, res) => {
     // Only the part of the day that's still ahead is plannable.
     const freeRanges = clampRangesToNow(dayShape.free, minutesNowIn(req.clientTimezone));
     const totalFreeMins = freeRanges.reduce((sum, r) => sum + (r.end - r.start), 0);
-    const meetings = buildMeetings(dayShape, req.today);
+    const meetings = buildMeetings(dayShape, req.today, req.clientTimezone);
 
     const { rows: habits } = await pool.query(
       `SELECT h.name, (hl.id IS NOT NULL) AS completed_today
@@ -536,7 +536,7 @@ router.post('/shutdown-defer', async (req, res) => {
     } else if (mode === 'slot') {
       const existing = await TaskModel.getById(taskId, req.user.id);
       if (!existing) return res.status(404).json({ error: 'Task not found' });
-      const time = await findFreeSlot(req.user.id, tomorrow, existing.duration || 30);
+      const time = await findFreeSlot(req.user.id, tomorrow, existing.duration || 30, req.clientTimezone);
       // A full tomorrow degrades to plain "tomorrow" rather than failing.
       updates = { due_date: tomorrow, scheduled_time: time, is_daily_focus: false };
     } else {

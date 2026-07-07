@@ -38,21 +38,21 @@ const GROQ = 'llama-3.3-70b-versatile';
 const ROUTING = {
   // Migrated to Groq (eval-verified parity, see scripts/eval-smart-capture.mjs + eval-heavy-ops.mjs):
   'smart-capture':     { primary: { provider: 'groq',   model: GROQ },     fallback: { provider: 'openai', model: 'gpt-4o-mini' } },
-  'process-inbox':     { primary: { provider: 'groq',   model: GROQ },     fallback: { provider: 'openai', model: 'gpt-4o' } },
-  'import-notes':      { primary: { provider: 'groq',   model: GROQ },     fallback: { provider: 'openai', model: 'gpt-4o' } },
-  'find-duplicates':   { primary: { provider: 'groq',   model: GROQ },     fallback: { provider: 'openai', model: 'gpt-4o' } },
+  'process-inbox':     { primary: { provider: 'groq',   model: GROQ },     fallback: { provider: 'openai', model: 'gpt-4.1-mini' } },
+  'import-notes':      { primary: { provider: 'groq',   model: GROQ },     fallback: { provider: 'openai', model: 'gpt-4.1-mini' } },
+  'find-duplicates':   { primary: { provider: 'groq',   model: GROQ },     fallback: { provider: 'openai', model: 'gpt-4.1-mini' } },
   'url-extract':       { primary: { provider: 'groq',   model: GROQ },     fallback: { provider: 'openai', model: 'gpt-4o-mini' } },
-  // Advisory ops (low-frequency, high-judgment). Flipped to Groq primary with a
-  // gpt-4o fallback on 2026-06-30 after OpenAI hit a billing/quota 429 that left
-  // all four dead (fallback was null). Structural parity was proven in eval
-  // (scripts/eval-heavy-ops.mjs); advice-quality on Groq is still unverified, so
-  // gpt-4o stays as the fallback and auto-resumes as the path of choice once
-  // OpenAI credit is restored (swap primary/fallback back to revert).
-  'daily-priorities':  { primary: { provider: 'groq', model: GROQ }, fallback: { provider: 'openai', model: 'gpt-4o' } },
+  // Advisory ops (low-frequency, high-judgment). Flipped to Groq primary on
+  // 2026-06-30 after OpenAI hit a billing/quota 429 that left all four dead
+  // (fallback was null). Structural parity was proven in eval
+  // (scripts/eval-heavy-ops.mjs). Fallback downgraded gpt-4o → gpt-4.1-mini
+  // 2026-07-06: gpt-4o is legacy-priced (~6x the cost) and these ops only see
+  // the fallback when Groq is down or throttled — eval-verified parity below.
+  'daily-priorities':  { primary: { provider: 'groq', model: GROQ }, fallback: { provider: 'openai', model: 'gpt-4.1-mini' } },
   'plan-day':          { primary: { provider: 'groq', model: GROQ }, fallback: { provider: 'openai', model: 'gpt-4.1-mini' } },
-  'analyze-task':      { primary: { provider: 'groq', model: GROQ }, fallback: { provider: 'openai', model: 'gpt-4o' } },
-  'project-breakdown': { primary: { provider: 'groq', model: GROQ }, fallback: { provider: 'openai', model: 'gpt-4o' } },
-  'weekly-review':     { primary: { provider: 'groq', model: GROQ }, fallback: { provider: 'openai', model: 'gpt-4o' } },
+  'analyze-task':      { primary: { provider: 'groq', model: GROQ }, fallback: { provider: 'openai', model: 'gpt-4.1-mini' } },
+  'project-breakdown': { primary: { provider: 'groq', model: GROQ }, fallback: { provider: 'openai', model: 'gpt-4.1-mini' } },
+  'weekly-review':     { primary: { provider: 'groq', model: GROQ }, fallback: { provider: 'openai', model: 'gpt-4.1-mini' } },
 };
 
 // Per-task sampling + output caps. Classification/extraction tasks run at

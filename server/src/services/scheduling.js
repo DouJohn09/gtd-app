@@ -23,15 +23,34 @@ export function minutesToTime(mins) {
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 }
 
-export function isoToMinutesOfDay(iso, dateStr) {
+// Minutes-of-day for a calendar event, AS THE USER SEES IT. The instant must be
+// projected into the USER's timezone — not the server's. On a UTC server (Railway)
+// a Prague user's 12:00 meeting is 10:00 UTC; anchoring to server-local midnight
+// shifted every event by the UTC offset and made the planner book tasks on top of
+// real meetings. With a timezone we read the wall-clock in that zone via Intl;
+// without one we fall back to the wall-clock embedded in the ISO string itself
+// (which already carries the event's local offset) — never server-local midnight.
+export function isoToMinutesOfDay(iso, dateStr, timeZone) {
   if (!iso) return null;
   const d = new Date(iso);
+  if (isNaN(d.getTime())) return null;
+  if (timeZone) {
+    try {
+      const parts = new Intl.DateTimeFormat('en-GB', {
+        timeZone, hour12: false, hour: '2-digit', minute: '2-digit',
+      }).formatToParts(d);
+      const hh = Number(parts.find(p => p.type === 'hour').value) % 24;
+      const mm = Number(parts.find(p => p.type === 'minute').value);
+      return hh * 60 + mm;
+    } catch { /* bad timezone → fall through to wall-clock parse */ }
+  }
+  const m = /T(\d{2}):(\d{2})/.exec(iso);
+  if (m) return Number(m[1]) * 60 + Number(m[2]);
   const dayStart = new Date(dateStr + 'T00:00:00');
-  const diffMins = Math.round((d.getTime() - dayStart.getTime()) / 60000);
-  return diffMins;
+  return Math.round((d.getTime() - dayStart.getTime()) / 60000);
 }
 
-export function collectBusyRanges(dateStr, gcalEvents, ownTasks) {
+export function collectBusyRanges(dateStr, gcalEvents, ownTasks, timeZone) {
   const ranges = [];
 
   // Own time blocks
@@ -47,8 +66,8 @@ export function collectBusyRanges(dateStr, gcalEvents, ownTasks) {
   for (const e of gcalEvents) {
     if (e.due_date !== dateStr) continue;
     if (e.all_day) continue;
-    const start = isoToMinutesOfDay(e.start_time, dateStr);
-    const end = isoToMinutesOfDay(e.end_time, dateStr);
+    const start = isoToMinutesOfDay(e.start_time, dateStr, timeZone);
+    const end = isoToMinutesOfDay(e.end_time, dateStr, timeZone);
     if (start === null || end === null) continue;
     ranges.push([Math.max(0, start), Math.min(24 * 60, end)]);
   }
@@ -68,16 +87,16 @@ export function collectBusyRanges(dateStr, gcalEvents, ownTasks) {
 
 // Fetches the user's day (own scheduled tasks + Google events, soft-failing
 // on GCal errors) and returns the merged busy ranges plus working hours.
-async function busyRangesFor(userId, dateStr) {
+async function busyRangesFor(userId, dateStr, timeZone) {
   const ownTasks = await TaskModel.getByDateRange(dateStr, dateStr, userId);
   let gcalEvents = [];
   try {
-    gcalEvents = await getCalendarEvents(userId, dateStr, dateStr);
+    gcalEvents = await getCalendarEvents(userId, dateStr, dateStr, timeZone);
   } catch (err) {
     console.error('busyRangesFor: GCal fetch failed:', err.message);
   }
   const { start: workStart, end: workEnd } = workingHoursFor(dateStr);
-  const busy = collectBusyRanges(dateStr, gcalEvents, ownTasks);
+  const busy = collectBusyRanges(dateStr, gcalEvents, ownTasks, timeZone);
   return { busy, workStart, workEnd, gcalEvents, ownTasks };
 }
 
@@ -99,8 +118,8 @@ export function freeRangesFrom(busy, workStart, workEnd) {
 // Full free/busy picture for one user-day. `free`/`busy` in minutes-of-day;
 // `events` is the fetched context (own scheduled tasks + Google events) so
 // callers that also need the raw day (the planner) don't fetch twice.
-export async function freeRangesFor(userId, dateStr) {
-  const { busy, workStart, workEnd, gcalEvents, ownTasks } = await busyRangesFor(userId, dateStr);
+export async function freeRangesFor(userId, dateStr, timeZone) {
+  const { busy, workStart, workEnd, gcalEvents, ownTasks } = await busyRangesFor(userId, dateStr, timeZone);
   const free = freeRangesFrom(busy, workStart, workEnd);
   const totalFreeMins = free.reduce((sum, r) => sum + (r.end - r.start), 0);
   return { free, busy, workStart, workEnd, totalFreeMins, gcalEvents, ownTasks };
@@ -171,8 +190,8 @@ export function packPlan(blocks, freeRanges) {
   return { placed, overflow };
 }
 
-export async function findFreeSlot(userId, dateStr, durationMins) {
-  const { busy, workStart, workEnd } = await busyRangesFor(userId, dateStr);
+export async function findFreeSlot(userId, dateStr, durationMins, timeZone) {
+  const { busy, workStart, workEnd } = await busyRangesFor(userId, dateStr, timeZone);
 
   for (let candidate = workStart; candidate + durationMins <= workEnd; candidate += SLOT_STEP_MINS) {
     const candidateEnd = candidate + durationMins;

@@ -92,21 +92,31 @@ async function getValidAccessToken(userId) {
   }
 }
 
-function formatDateKey(date) {
+// Which calendar day a timed event falls on must be resolved in the USER's
+// timezone, not the server's: a 01:00 Prague event is 23:00 UTC the previous
+// day, and bucketing it server-local (UTC on Railway) would file it under the
+// wrong date. All-day events pass a date-only string and skip this.
+function formatDateKey(date, timeZone) {
   const d = typeof date === 'string' ? new Date(date) : date;
+  if (timeZone) {
+    try {
+      // en-CA renders as YYYY-MM-DD.
+      return new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(d);
+    } catch { /* bad timezone → fall through to server-local */ }
+  }
   const year = d.getFullYear();
   const month = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
 }
 
-function normalizeEvent(event) {
+function normalizeEvent(event, timeZone) {
   const startDateTime = event.start?.dateTime;
   const startDate = event.start?.date;
   const endDateTime = event.end?.dateTime;
   const allDay = !!startDate;
 
-  const dueDateStr = allDay ? startDate : formatDateKey(new Date(startDateTime));
+  const dueDateStr = allDay ? startDate : formatDateKey(new Date(startDateTime), timeZone);
 
   return {
     id: `gcal-${event.id}`,
@@ -121,11 +131,11 @@ function normalizeEvent(event) {
   };
 }
 
-function expandMultiDayEvent(event, rangeStart, rangeEnd) {
+function expandMultiDayEvent(event, rangeStart, rangeEnd, timeZone) {
   const startDate = event.start?.date;
   const endDate = event.end?.date;
 
-  if (!startDate || !endDate) return [normalizeEvent(event)];
+  if (!startDate || !endDate) return [normalizeEvent(event, timeZone)];
 
   const entries = [];
   const start = new Date(startDate + 'T00:00:00');
@@ -150,7 +160,7 @@ function expandMultiDayEvent(event, rangeStart, rangeEnd) {
   return entries;
 }
 
-export async function getCalendarEvents(userId, startDate, endDate) {
+export async function getCalendarEvents(userId, startDate, endDate, timeZone) {
   const accessToken = await getValidAccessToken(userId);
   if (!accessToken) return [];
 
@@ -184,7 +194,7 @@ export async function getCalendarEvents(userId, startDate, endDate) {
   const normalized = [];
   for (const event of events) {
     if (event.status === 'cancelled') continue;
-    const expanded = expandMultiDayEvent(event, startDate, endDate);
+    const expanded = expandMultiDayEvent(event, startDate, endDate, timeZone);
     normalized.push(...expanded);
   }
 

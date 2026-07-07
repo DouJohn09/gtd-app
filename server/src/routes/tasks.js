@@ -61,7 +61,7 @@ router.get('/calendar', async (req, res) => {
 
     let googleEvents = [];
     try {
-      googleEvents = await getCalendarEvents(req.user.id, start, end);
+      googleEvents = await getCalendarEvents(req.user.id, start, end, req.clientTimezone);
     } catch (err) {
       console.error('Google Calendar fetch error:', err.message);
     }

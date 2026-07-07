@@ -1,0 +1,14 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd /Users/jb/Desktop/gtd-app && b=$(awk '/^## Build Backlog/{f=1} f' PROJECT_KNOWLEDGE.md) && c=$(git log -5 --pretty=format:'- %h %s' 2>/dev/null) && jq -n --arg b \"$b\" --arg c \"$c\" '{hookSpecificOutput:{hookEventName:\"SessionStart\",additionalContext:(\"Project context (auto-loaded from PROJECT_KNOWLEDGE.md):\\n\\n\"+$b+\"\\n\\n## Recent commits\\n\"+$c+\"\\n\\n---\\nAt the start of this session, give a brief 3-5 line summary of the backlog (top P0/P1 items + most recent shipped work).\")}}'"
+          }
+        ]
+      }
+    ]
+  }
+}
