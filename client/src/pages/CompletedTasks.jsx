@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { CheckCircle2, RotateCcw, Trash2, Check } from 'lucide-react';
 import { api } from '../lib/api';
 import { contextLabel } from '../lib/context';
+import { todayStr, addDays, formatDateKey } from '../lib/dateUtils';
 import { useToast } from '../components/Toast';
 import SortDropdown, { sortTasks } from '../components/SortDropdown';
 import { useTaskFilters, applyFilters } from '../components/FilterDropdown';
@@ -90,13 +91,12 @@ export default function CompletedTasks() {
   };
 
   const formatDate = (dateStr) => {
-    if (!dateStr) return '';
-    const d = new Date(dateStr);
-    const now = new Date();
-    const diff = now - d;
-    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-    if (days === 0) return 'Today';
-    if (days === 1) return 'Yesterday';
+    if (!dateStr || dateStr === 'Unknown') return dateStr === 'Unknown' ? 'Unknown' : '';
+    const today = todayStr();
+    if (dateStr === today) return 'Today';
+    if (dateStr === addDays(today, -1)) return 'Yesterday';
+    const d = new Date(dateStr + 'T00:00:00');
+    const days = Math.round((new Date(today + 'T00:00:00') - d) / 86400000);
     if (days < 7) return `${days} days ago`;
     return d.toLocaleDateString();
   };
@@ -113,7 +113,7 @@ export default function CompletedTasks() {
   ];
 
   const grouped = sortedTasks.reduce((acc, task) => {
-    const date = task.completed_at ? task.completed_at.split('T')[0] : 'Unknown';
+    const date = task.completed_at ? formatDateKey(new Date(task.completed_at)) : 'Unknown';
     if (!acc[date]) acc[date] = [];
     acc[date].push(task);
     return acc;

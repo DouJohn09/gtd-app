@@ -7,6 +7,7 @@ import HabitModal, { SUGGESTED_HABITS } from '../components/HabitModal';
 import RestDaysModal from '../components/RestDaysModal';
 import MonoLabel from '../components/ui/MonoLabel';
 import ConfirmModal from '../components/ui/ConfirmModal';
+import { todayStr, formatDateKey } from '../lib/dateUtils';
 
 const HEAT_TONES = [
   'rgba(255,255,255,0.04)',
@@ -44,10 +45,10 @@ export default function Habits() {
   const handleToggle = async (habitId, date, opts = {}) => {
     try {
       const result = await api.habits.toggle(habitId, date, opts.status);
-      const todayStr = new Date().toISOString().split('T')[0];
       // Keep the card's today control in sync whether toggled from the circle
-      // (no date) or via the calendar popover (date === today).
-      if (!date || date === todayStr) {
+      // (no date) or via the calendar popover (date === today). Local day, so it
+      // agrees with the server's timezone-derived today.
+      if (!date || date === todayStr()) {
         setHabits(prev => prev.map(h =>
           h.id === habitId ? { ...h, today_status: result.status, completed_today: result.status === 'done' } : h
         ));
@@ -362,7 +363,7 @@ function Heatmap({ data, totalHabits }) {
     for (let i = 89; i >= 0; i--) {
       const d = new Date(today);
       d.setDate(d.getDate() - i);
-      const dateStr = d.toISOString().split('T')[0];
+      const dateStr = formatDateKey(d);
       const count = data[dateStr] || 0;
       const intensity = totalHabits > 0 ? count / totalHabits : 0;
       result.push({ date: dateStr, count, intensity, day: d.getDay() });

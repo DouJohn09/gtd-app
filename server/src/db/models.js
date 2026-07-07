@@ -1,5 +1,5 @@
 import { pool } from './pool.js';
-import { todayInTz } from '../lib/dateTime.js';
+import { todayInTz, isValidTimezone } from '../lib/dateTime.js';
 
 // Default "today" when a caller doesn't supply a tz-resolved date — UTC, i.e.
 // the previous behavior. Route handlers pass req.today (user's local day).
@@ -379,7 +379,7 @@ export const TaskModel = {
     return this.getByProject(projectId, userId);
   },
 
-  async getStats(userId, today = utcToday()) {
+  async getStats(userId, today = utcToday(), timeZone = null) {
     const nextActionsSql = `
       SELECT COUNT(*)::int AS cnt FROM tasks t
       LEFT JOIN projects p ON t.project_id = p.id AND p.user_id = t.user_id
@@ -406,10 +406,15 @@ export const TaskModel = {
         AND list != 'completed' AND list != 'someday_maybe' AND user_id = $1
         AND (start_date IS NULL OR start_date <= $2::date)
     `;
-    const completedTodaySql = `
-      SELECT COUNT(*)::int AS cnt FROM tasks
-      WHERE list = 'completed' AND completed_at::date = $2::date AND user_id = $1
-    `;
+    // completed_at is TIMESTAMPTZ; casting ::date resolves in the DB session zone
+    // (UTC on Railway), which buckets a user's late-evening / after-midnight
+    // completions into the wrong day. When we know the user's zone, convert first.
+    const useTz = isValidTimezone(timeZone);
+    const completedTodaySql = useTz
+      ? `SELECT COUNT(*)::int AS cnt FROM tasks
+         WHERE list = 'completed' AND (completed_at AT TIME ZONE $3)::date = $2::date AND user_id = $1`
+      : `SELECT COUNT(*)::int AS cnt FROM tasks
+         WHERE list = 'completed' AND completed_at::date = $2::date AND user_id = $1`;
 
     const [inbox, nextActions, waiting, someday, dailyFocus, completedToday] = await Promise.all([
       pool.query(simpleCountSql, ['inbox', userId, today]),
@@ -417,7 +422,7 @@ export const TaskModel = {
       pool.query(simpleCountSql, ['waiting_for', userId, today]),
       pool.query(simpleCountSql, ['someday_maybe', userId, today]),
       pool.query(dailyFocusCountSql, [userId, today]),
-      pool.query(completedTodaySql, [userId, today]),
+      pool.query(completedTodaySql, useTz ? [userId, today, timeZone] : [userId, today]),
     ]);
 
     return {

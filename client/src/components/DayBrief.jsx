@@ -51,8 +51,10 @@ export default function DayBrief({ brief, onPlan, planning, hidden }) {
     );
   }
 
-  // CTA state: nothing planned yet and there's a day worth planning.
-  if (!brief.plan && brief.candidates > 0 && brief.freeMins >= 30) {
+  // CTA state: no plan is applied yet and there's a day worth planning. A plan
+  // row that exists but was never applied (a proposal the user generated and then
+  // cancelled) still shows the CTA — it must not silently swallow the banner.
+  if (!brief.plan?.applied && brief.candidates > 0 && brief.freeMins >= 30) {
     return (
       <div className="rounded-2xl glass px-4 py-3 mb-5 flex items-center gap-3 flex-wrap" style={{ boxShadow: 'inset 0 0 0 1px rgb(var(--violet) / 0.18)' }}>
         <span

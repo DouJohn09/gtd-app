@@ -3,7 +3,7 @@ import { TaskModel, ProjectModel, WeeklyReviewModel } from '../db/models.js';
 import { pool } from '../db/pool.js';
 import { processInbox, getDailyPriorities, importNotes, findDuplicates, weeklyReviewAnalysis, smartCapture, planDay } from '../services/ai.js';
 import { syncTaskToCalendar } from '../services/googleCalendar.js';
-import { findFreeSlot, freeRangesFor, timeToMinutes, isoToMinutesOfDay, clampRangesToNow } from '../services/scheduling.js';
+import { findFreeSlot, freeRangesFor, timeToMinutes, eventMinutesOnDay, clampRangesToNow } from '../services/scheduling.js';
 import { consume, getStatus } from '../services/aiUsage.js';
 import { enforceAiLimit } from '../middleware/aiLimit.js';
 import { getAiMode } from '../services/userPrefs.js';
@@ -272,7 +272,7 @@ router.post('/daily-priorities', enforceAiLimit, async (req, res) => {
   try {
     const [nextActions, stats] = await Promise.all([
       TaskModel.getAll('next_actions', req.user.id, req.today),
-      TaskModel.getStats(req.user.id, req.today),
+      TaskModel.getStats(req.user.id, req.today, req.clientTimezone),
     ]);
 
     if (nextActions.length === 0) {
@@ -324,12 +324,12 @@ function minutesNowIn(tz) {
 function buildMeetings(dayShape, today, timeZone) {
   return [
     ...dayShape.gcalEvents
-      .filter(e => e.due_date === today && !e.all_day && e.start_time && e.end_time)
-      .map(e => ({
-        title: e.title,
-        start: isoToMinutesOfDay(e.start_time, today, timeZone),
-        end: isoToMinutesOfDay(e.end_time, today, timeZone),
-      })),
+      .filter(e => !e.all_day && e.start_time && e.end_time)
+      .map(e => {
+        const interval = eventMinutesOnDay(e.start_time, e.end_time, today, timeZone);
+        return interval ? { title: e.title, start: interval[0], end: interval[1] } : null;
+      })
+      .filter(Boolean),
     ...dayShape.ownTasks
       .filter(t => t.due_date === today && t.scheduled_time)
       .map(t => ({
@@ -446,10 +446,15 @@ router.post('/plan-day', enforceAiLimit, async (req, res) => {
     }, userContexts);
     if (aiFailed(res, result)) return;
 
+    // Store the proposal WITHOUT touching applied_at. Re-proposing a day whose
+    // plan is already applied (e.g. tapping "Plan my day" again in the afternoon
+    // and then cancelling) must not wipe the applied state — that would erase the
+    // progress line, the evening shutdown card, and the day's retention credit for
+    // a plan still in effect. applied_at is set only when a plan is actually applied.
     await pool.query(
       `INSERT INTO daily_plans (user_id, plan_date, payload)
        VALUES ($1, $2, $3)
-       ON CONFLICT (user_id, plan_date) DO UPDATE SET payload = $3, created_at = NOW(), applied_at = NULL`,
+       ON CONFLICT (user_id, plan_date) DO UPDATE SET payload = $3, created_at = NOW()`,
       [req.user.id, req.today, JSON.stringify(result)]
     );
 
@@ -740,7 +745,7 @@ router.post('/weekly-review', async (req, res) => {
       }
     }
     const [stats, inboxItems, nextActions, waitingFor, somedayMaybe, projects, staleItems, lastReview, streak, habitStats, userContexts] = await Promise.all([
-      TaskModel.getStats(userId, req.today),
+      TaskModel.getStats(userId, req.today, req.clientTimezone),
       TaskModel.getAll('inbox', userId, req.today),
       TaskModel.getAll('next_actions', userId, req.today),
       TaskModel.getAll('waiting_for', userId, req.today),

@@ -164,12 +164,19 @@ export async function getCalendarEvents(userId, startDate, endDate, timeZone) {
   const accessToken = await getValidAccessToken(userId);
   if (!accessToken) return [];
 
-  const timeMin = new Date(startDate + 'T00:00:00').toISOString();
-  const timeMax = new Date(endDate + 'T23:59:59').toISOString();
+  // Anchor to UTC explicitly (…'Z') so the window is server-timezone-independent,
+  // and pad a day on each side so it always covers the user's local day whatever
+  // their offset. Consumers filter to the exact day (by due_date / minutes-of-day
+  // overlap), so the extra edge events are harmless. Without the pad, a UTC server
+  // built a window that missed a west-of-UTC user's late-afternoon meetings.
+  const timeMin = new Date(startDate + 'T00:00:00Z');
+  timeMin.setUTCDate(timeMin.getUTCDate() - 1);
+  const timeMax = new Date(endDate + 'T00:00:00Z');
+  timeMax.setUTCDate(timeMax.getUTCDate() + 2);
 
   const params = new URLSearchParams({
-    timeMin,
-    timeMax,
+    timeMin: timeMin.toISOString(),
+    timeMax: timeMax.toISOString(),
     singleEvents: 'true',
     orderBy: 'startTime',
     maxResults: '250',

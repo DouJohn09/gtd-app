@@ -50,6 +50,38 @@ export function isoToMinutesOfDay(iso, dateStr, timeZone) {
   return Math.round((d.getTime() - dayStart.getTime()) / 60000);
 }
 
+// Date key (YYYY-MM-DD) of an instant, in the user's timezone. Tells us whether
+// a timed event's start/end falls before, on, or after `dateStr`.
+function dateKeyInTz(iso, timeZone) {
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return null;
+  if (timeZone) {
+    try {
+      return new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(d);
+    } catch { /* fall through to wall-clock date */ }
+  }
+  const m = /^(\d{4}-\d{2}-\d{2})/.exec(iso);
+  return m ? m[1] : null;
+}
+
+// The minutes-of-day interval [start,end] a timed event occupies ON dateStr,
+// clamped to [0,1440] in the user's timezone. Returns null when the event
+// doesn't touch that day. Correctly handles events that cross midnight: a
+// 15:00 → next-day-12:00 shift occupies 15:00–24:00 today and 00:00–12:00
+// tomorrow, instead of the inverted [900,720] that used to break freeRangesFrom
+// and let the planner book tasks straight on top of the meeting.
+export function eventMinutesOnDay(startIso, endIso, dateStr, timeZone) {
+  if (!startIso || !endIso) return null;
+  const startDay = dateKeyInTz(startIso, timeZone);
+  const endDay = dateKeyInTz(endIso, timeZone);
+  if (!startDay || !endDay) return null;
+  if (endDay < dateStr || startDay > dateStr) return null; // no overlap with this day
+  const start = startDay < dateStr ? 0 : isoToMinutesOfDay(startIso, dateStr, timeZone);
+  const end = endDay > dateStr ? 24 * 60 : isoToMinutesOfDay(endIso, dateStr, timeZone);
+  if (start === null || end === null || end <= start) return null;
+  return [Math.max(0, start), Math.min(24 * 60, end)];
+}
+
 export function collectBusyRanges(dateStr, gcalEvents, ownTasks, timeZone) {
   const ranges = [];
 
@@ -62,14 +94,12 @@ export function collectBusyRanges(dateStr, gcalEvents, ownTasks, timeZone) {
     ranges.push([start, end]);
   }
 
-  // Google events (skip all-day)
+  // Google events (skip all-day). Overlap is decided per-day so events fetched
+  // for adjacent days — and events that cross midnight — are handled correctly.
   for (const e of gcalEvents) {
-    if (e.due_date !== dateStr) continue;
     if (e.all_day) continue;
-    const start = isoToMinutesOfDay(e.start_time, dateStr, timeZone);
-    const end = isoToMinutesOfDay(e.end_time, dateStr, timeZone);
-    if (start === null || end === null) continue;
-    ranges.push([Math.max(0, start), Math.min(24 * 60, end)]);
+    const interval = eventMinutesOnDay(e.start_time, e.end_time, dateStr, timeZone);
+    if (interval) ranges.push(interval);
   }
 
   // Merge overlapping

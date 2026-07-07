@@ -1,13 +1,7 @@
 import { useState, useEffect } from 'react';
 import { X, Palmtree } from 'lucide-react';
 import { api } from '../lib/api';
-
-const todayStr = () => new Date().toISOString().split('T')[0];
-const addDays = (s, n) => {
-  const d = new Date(s + 'T00:00:00Z');
-  d.setUTCDate(d.getUTCDate() + n);
-  return d.toISOString().slice(0, 10);
-};
+import { todayStr, addDays } from '../lib/dateUtils';
 
 // Mark a span of days as rest for all build habits — protects streaks while you're
 // away or unwell. Rendered at page level (not inside a card), so no portal needed.

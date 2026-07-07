@@ -6,6 +6,14 @@ export function formatDateKey(date) {
   return `${year}-${month}-${day}`;
 }
 
+// Today's calendar date (YYYY-MM-DD) in the user's LOCAL timezone — the same day
+// the server derives from the X-Client-Timezone header. Never use
+// `new Date().toISOString().slice(0,10)` for this: that is the UTC day, which is
+// wrong east of UTC just after midnight and west of UTC in the evening.
+export function todayStr() {
+  return formatDateKey(new Date());
+}
+
 export function addDays(dateStr, n) {
   const d = new Date(dateStr + 'T00:00:00');
   d.setDate(d.getDate() + n);

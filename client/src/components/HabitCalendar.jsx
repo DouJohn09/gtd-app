@@ -2,31 +2,33 @@ import { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { X, ChevronLeft, ChevronRight, Check, Minus } from 'lucide-react';
 import { api } from '../lib/api';
+import { todayStr } from '../lib/dateUtils';
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December'];
 const DOW = ['M', 'T', 'W', 'T', 'F', 'S', 'S']; // Monday-start, matching habit streak logic
 
-// All date math is UTC on 'YYYY-MM-DD' strings, matching the server (DATE columns
-// come back as ISO strings and `today` is computed in UTC).
+// Grid cells are plain 'YYYY-MM-DD' strings (log dates come back keyed that way).
+// "Today" must be the user's LOCAL day — the server derives the same day from the
+// timezone header — so a user just after local midnight (east of UTC) or in the
+// evening (west of UTC) sees the right cell enabled, not a UTC-shifted one.
 const pad = (n) => String(n).padStart(2, '0');
 const ymdUTC = (y, m, d) => `${y}-${pad(m + 1)}-${pad(d)}`;
-const todayStrUTC = () => new Date().toISOString().slice(0, 10);
 
 // Click any day to cycle its state. Build habits: done → rest → clear. Quit
 // habits: slip → clear (a logged day is a slip). Replaces the old native date
 // picker, which could only set a day "done" and never cycle.
 export default function HabitCalendar({ habit, onToggle, onClose }) {
   const isQuit = habit.type === 'quit';
-  const todayStr = todayStrUTC();
+  const today = todayStr();
   const anchorStr = habit.created_at ? String(habit.created_at).slice(0, 10) : null;
 
-  const [year, setYear] = useState(Number(todayStr.slice(0, 4)));
-  const [month, setMonth] = useState(Number(todayStr.slice(5, 7)) - 1); // 0-11
+  const [year, setYear] = useState(Number(today.slice(0, 4)));
+  const [month, setMonth] = useState(Number(today.slice(5, 7)) - 1); // 0-11
   const [logs, setLogs] = useState({}); // 'YYYY-MM-DD' -> { status, note }
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
-  const [selectedDate, setSelectedDate] = useState(todayStr); // day the note editor targets
+  const [selectedDate, setSelectedDate] = useState(today); // day the note editor targets
   const [noteDraft, setNoteDraft] = useState('');
 
   const statusOf = (d) => logs[d]?.status;
@@ -72,21 +74,21 @@ export default function HabitCalendar({ habit, onToggle, onClose }) {
     if (month === 0) { setYear(y => y - 1); setMonth(11); } else setMonth(m => m - 1);
   };
   const goNext = () => {
-    if (year === Number(todayStr.slice(0, 4)) && month >= Number(todayStr.slice(5, 7)) - 1) return;
+    if (year === Number(today.slice(0, 4)) && month >= Number(today.slice(5, 7)) - 1) return;
     if (month === 11) { setYear(y => y + 1); setMonth(0); } else setMonth(m => m + 1);
   };
-  const atCurrentMonth = year === Number(todayStr.slice(0, 4)) && month === Number(todayStr.slice(5, 7)) - 1;
+  const atCurrentMonth = year === Number(today.slice(0, 4)) && month === Number(today.slice(5, 7)) - 1;
 
   // Clicking a day only SELECTS it (shows its state + note) — never mutates, so
   // opening a note can't accidentally change a logged day. State changes go through
   // the explicit buttons below.
   const handleDayClick = (dateStr) => {
-    if (!dateStr || dateStr > todayStr) return;
+    if (!dateStr || dateStr > today) return;
     setSelectedDate(dateStr);
   };
 
   const setStatus = async (target) => {
-    if (busy || !selectedDate || selectedDate > todayStr) return;
+    if (busy || !selectedDate || selectedDate > today) return;
     setBusy(true);
     try {
       const r = await onToggle(habit.id, selectedDate, { silent: true, status: target });
@@ -115,7 +117,7 @@ export default function HabitCalendar({ habit, onToggle, onClose }) {
 
   const cellStyle = (dateStr) => {
     const status = statusOf(dateStr);
-    const future = dateStr > todayStr;
+    const future = dateStr > today;
     if (future) return { opacity: 0.4, boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.05)', color: 'rgb(var(--text-3))' };
     if (status === 'done') {
       return { background: 'linear-gradient(180deg, rgb(var(--mint) / 0.85), rgb(var(--mint) / 0.6))', color: 'rgb(var(--bg))' };
@@ -205,7 +207,7 @@ export default function HabitCalendar({ habit, onToggle, onClose }) {
             <div className="grid grid-cols-7 gap-1">
               {cells.map((dateStr, i) => {
                 if (!dateStr) return <div key={i} />;
-                const future = dateStr > todayStr;
+                const future = dateStr > today;
                 const day = Number(dateStr.slice(8, 10));
                 const status = statusOf(dateStr);
                 const hasNote = !!logs[dateStr]?.note;
@@ -237,7 +239,7 @@ export default function HabitCalendar({ habit, onToggle, onClose }) {
           {!loading && (() => {
             const sel = logs[selectedDate];
             const selStatus = sel?.status || 'none';
-            const selFuture = selectedDate > todayStr;
+            const selFuture = selectedDate > today;
             const options = isQuit
               ? [{ v: 'slip', label: 'Slip' }, { v: 'none', label: 'Clean' }]
               : [{ v: 'done', label: 'Done' }, { v: 'skipped', label: 'Rest' }, { v: 'none', label: 'Clear' }];

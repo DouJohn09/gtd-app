@@ -32,7 +32,7 @@ router.get('/deferred', async (req, res) => {
 
 router.get('/stats', async (req, res) => {
   try {
-    const stats = await TaskModel.getStats(req.user.id, req.today);
+    const stats = await TaskModel.getStats(req.user.id, req.today, req.clientTimezone);
     res.json(stats);
   } catch (error) {
     console.error(error);
