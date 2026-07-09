@@ -479,9 +479,15 @@ router.post('/plan-day', requireAiEnabled, enforceAiLimit, async (req, res) => {
   }
 });
 
-// Applies a reviewed plan: chosen blocks become today's time-blocked focus,
-// deferred items move to their new date. Mirrors apply-daily-focus's "clear
-// then set" so the plan IS the day's focus list. No AI call → no aiLimit.
+// Applies a reviewed plan: kept blocks become today's time-blocked focus,
+// deferred items move to their new date. ADDITIVE — it only touches the tasks in
+// the plan, and never clears focus on tasks the user didn't act on. The old
+// "clear is_daily_focus on every next action first" pass caused two bugs: applying
+// a plan with all blocks skipped wiped a hand-curated Today list (M1), and a
+// same-day replan orphaned the previous plan's unfinished blocks — they lost focus,
+// kept a stale past time, and dropped out of every ritual surface (H6). plan-day's
+// candidates already exclude tasks scheduled today, so re-planning is inherently
+// "plan the rest," not "replace the day." No AI call → no aiLimit.
 router.post('/apply-plan', async (req, res) => {
   try {
     const items = Array.isArray(req.body.items) ? req.body.items : [];
@@ -489,11 +495,6 @@ router.post('/apply-plan', async (req, res) => {
     if (items.length === 0 && deferred.length === 0) {
       return res.status(400).json({ error: 'Nothing to apply' });
     }
-
-    const nextActions = await TaskModel.getAll('next_actions', req.user.id, req.today);
-    await Promise.all(nextActions.map(task =>
-      TaskModel.update(task.id, { is_daily_focus: false }, req.user.id)
-    ));
 
     const updated = [];
     for (const item of items) {
