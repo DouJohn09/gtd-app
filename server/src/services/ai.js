@@ -982,9 +982,31 @@ export async function extractUrlMetadata(url) {
       if (![301, 302, 303, 307, 308].includes(res.status) || !location) break;
       currentUrl = new URL(location, currentUrl).toString();
     }
-    clearTimeout(timeout);
-    // Cap how much HTML we hold/parse — a hostile page shouldn't OOM the server.
-    const html = (await res.text()).slice(0, 500_000);
+    // Read the body with the 8s abort timer STILL armed (so a slow-drip response
+    // can't hang the request past the timeout) and stop after MAX_HTML bytes so a
+    // huge/hostile page can't OOM the server. clearTimeout only in the finally,
+    // AFTER the read — not before it.
+    const MAX_HTML = 500_000;
+    let html = '';
+    try {
+      if (res.body) {
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let total = 0;
+        while (total < MAX_HTML) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          total += value.length;
+          html += decoder.decode(value, { stream: true });
+        }
+        try { await reader.cancel(); } catch { /* already done */ }
+        html = html.slice(0, MAX_HTML);
+      } else {
+        html = (await res.text()).slice(0, MAX_HTML);
+      }
+    } finally {
+      clearTimeout(timeout);
+    }
 
     pageTitle = html.match(/<title[^>]*>([^<]+)<\/title>/i)?.[1]?.trim() || '';
     ogTitle = extractMeta(html, 'og:title');

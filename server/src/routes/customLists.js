@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { CustomListModel, ListItemModel } from '../db/models.js';
 import { extractUrlMetadata } from '../services/ai.js';
-import { enforceAiLimit, requireAiEnabled } from '../middleware/aiLimit.js';
+import { enforceAiLimit, requireAiEnabled, chargeAiUsage } from '../middleware/aiLimit.js';
 import { aiRateLimiter } from '../middleware/rateLimit.js';
 import { assertWithinLimit, LimitError } from '../services/billing.js';
 
@@ -13,6 +13,7 @@ router.post('/extract-url', aiRateLimiter, requireAiEnabled, enforceAiLimit, asy
     if (!url) return res.status(400).json({ error: 'URL is required' });
     const result = await extractUrlMetadata(url);
     if (!result) return res.status(422).json({ error: 'Could not extract metadata' });
+    await chargeAiUsage(req);
     res.json(result);
   } catch (err) { console.error(err); res.status(500).json({ error: 'Internal server error' }); }
 });

@@ -76,6 +76,31 @@ export async function consume(userId, weight = 1) {
   };
 }
 
+// Pre-flight cap check for the gate: is the user under budget right now? Read
+// only — it does NOT increment. The actual charge is recorded AFTER a successful
+// AI call (see charge()), so no-op requests (empty inbox) and provider failures
+// never burn budget. A boundary race between two concurrent requests can let both
+// through and overshoot the cap by a hair; acceptable for a soft, non-punitive
+// daily valve (and the counter is observational until AI_DAILY_LIMIT_* is set).
+export async function check(userId) {
+  const limit = await limitFor(userId);
+  const unlimited = limit <= 0;
+  const used = await getUsageToday(userId);
+  return {
+    allowed: unlimited || used < limit,
+    used,
+    limit: unlimited ? null : limit,
+    unlimited,
+    remaining: unlimited ? null : Math.max(0, limit - used),
+  };
+}
+
+// Record `weight` successful AI calls against today's budget. Call only after the
+// AI work actually succeeded, so failures and no-ops aren't counted.
+export async function charge(userId, weight = 1) {
+  await increment(userId, weight);
+}
+
 // Read-only snapshot for the client (usage meter / upgrade nudge). Does not consume.
 export async function getStatus(userId) {
   const limit = await limitFor(userId);

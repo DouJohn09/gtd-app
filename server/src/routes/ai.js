@@ -4,8 +4,8 @@ import { pool } from '../db/pool.js';
 import { processInbox, getDailyPriorities, importNotes, findDuplicates, weeklyReviewAnalysis, smartCapture, planDay } from '../services/ai.js';
 import { syncTaskToCalendar } from '../services/googleCalendar.js';
 import { findFreeSlot, freeRangesFor, timeToMinutes, eventMinutesOnDay, clampRangesToNow } from '../services/scheduling.js';
-import { consume, getStatus } from '../services/aiUsage.js';
-import { enforceAiLimit, requireAiEnabled } from '../middleware/aiLimit.js';
+import { check, charge, getStatus } from '../services/aiUsage.js';
+import { enforceAiLimit, requireAiEnabled, chargeAiUsage } from '../middleware/aiLimit.js';
 import { getAiMode } from '../services/userPrefs.js';
 import { assertPlanWithinLimit, LimitError } from '../services/billing.js';
 
@@ -93,13 +93,16 @@ router.post('/smart-capture', async (req, res) => {
     let ai = null;
     let throttled = false;
     if (aiMode !== 'off') {
-      const budget = await consume(req.user.id);
+      const budget = await check(req.user.id);
       throttled = !budget.allowed;
       if (budget.allowed) {
         ai = await smartCapture(rawText, contexts, projects, today, dayName, history, openTitles);
         // No provider configured → same graceful raw-capture fallback as the
         // budget path, not an error. The capture must never fail.
         if (ai?.error) ai = null;
+        // Charge only for enrichment we actually delivered — a throttle or a
+        // provider failure (raw-capture fallback) doesn't consume budget.
+        if (ai) await charge(req.user.id);
       }
     }
 
@@ -124,12 +127,16 @@ router.post('/smart-capture', async (req, res) => {
       routedToInbox = true;
     }
 
-    // Resolve project_id from AI's project_name suggestion (exact → includes → fuzzy)
+    // Resolve project_id from AI's project_name suggestion: exact, then whole-word
+    // containment either direction. The pad-with-spaces trick keeps a short project
+    // name ("AI", "Tax") from matching any phrase that merely contains those letters
+    // ("mAIntain the garden") — the old bare substring match silently misfiled tasks.
     let projectId = null;
     if (ai.project_name) {
-      const aiName = ai.project_name.toLowerCase();
-      const match = projects.find(p => p.name.toLowerCase() === aiName)
-        || projects.find(p => p.name.toLowerCase().includes(aiName) || aiName.includes(p.name.toLowerCase()));
+      const norm = s => ` ${s.toLowerCase().trim().replace(/\s+/g, ' ')} `;
+      const aiName = norm(ai.project_name);
+      const match = projects.find(p => norm(p.name) === aiName)
+        || projects.find(p => { const n = norm(p.name); return aiName.includes(n) || n.includes(aiName); });
       if (match) projectId = match.id;
       else console.warn(`Smart capture: AI suggested project "${ai.project_name}" but no match found. Available: ${projects.map(p => p.name).join(', ')}`);
     }
@@ -218,6 +225,7 @@ router.post('/process-inbox', requireAiEnabled, enforceAiLimit, async (req, res)
       projects, today: req.today, dayName, history,
     });
     if (aiFailed(res, result)) return;
+    await chargeAiUsage(req);
 
     // Resolve AI project_name suggestions to ids so the client can apply them
     // directly, and normalize the time field to the apply-route's name (same
@@ -298,6 +306,7 @@ router.post('/daily-priorities', requireAiEnabled, enforceAiLimit, async (req, r
       scheduledToday: load?.count ? load : null,
     });
     if (aiFailed(res, result)) return;
+    await chargeAiUsage(req);
 
     result.tasks = nextActions;
     res.json(result);
@@ -445,6 +454,7 @@ router.post('/plan-day', requireAiEnabled, enforceAiLimit, async (req, res) => {
       habits,
     }, userContexts);
     if (aiFailed(res, result)) return;
+    await chargeAiUsage(req);
 
     // Store the proposal WITHOUT touching applied_at. Re-proposing a day whose
     // plan is already applied (e.g. tapping "Plan my day" again in the afternoon
@@ -574,6 +584,7 @@ router.post('/import-notes', requireAiEnabled, enforceAiLimit, async (req, res) 
     const dayName = new Date().toLocaleDateString('en-US', { weekday: 'long', timeZone: req.clientTimezone || 'UTC' });
     const result = await importNotes(text, userContexts, projects, today, dayName);
     if (aiFailed(res, result)) return;
+    await chargeAiUsage(req);
 
     if (Array.isArray(result.items)) {
       result.items = result.items.map(item => {
@@ -662,6 +673,7 @@ router.post('/find-duplicates', requireAiEnabled, enforceAiLimit, async (req, re
     const userContexts = await getUserContexts(req.user.id);
     const result = await findDuplicates(allTasks, userContexts);
     if (aiFailed(res, result)) return;
+    await chargeAiUsage(req);
 
     // The model can only reference tasks we sent it — reject any id it invented
     // or transposed, and rebuild each group from authoritative DB rows (real id +
@@ -758,8 +770,7 @@ router.post('/weekly-review', async (req, res) => {
     let aiAllowed = aiMode !== 'off';
     if (aiAllowed) {
       try {
-        const status = await consume(userId);
-        aiAllowed = status.allowed;
+        aiAllowed = (await check(userId)).allowed;
       } catch (err) {
         console.error('weekly-review metering error (failing open):', err);
       }
@@ -788,6 +799,9 @@ router.post('/weekly-review', async (req, res) => {
           lastReviewDate: lastReview?.completed_at || null,
         }, userContexts)
       : null;
+    // Charge only when the analysis actually came back — opening the review page
+    // when AI fails (or is off) must not burn a credit.
+    if (aiAnalysis && !aiAnalysis.error) await charge(userId);
 
     res.json({
       stats, inboxItems, nextActions, waitingFor, somedayMaybe,

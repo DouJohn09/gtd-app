@@ -1,7 +1,19 @@
 import { TaskModel } from '../db/models.js';
 import { getCalendarEvents } from './googleCalendar.js';
+import { todayInTz } from '../lib/dateTime.js';
 
 const SLOT_STEP_MINS = 15;
+
+// Minutes-of-day right now in the user's timezone (null on a bad tz).
+function minutesNowInTz(tz) {
+  try {
+    const [h, m] = new Intl.DateTimeFormat('en-GB', { timeZone: tz || 'UTC', hour: '2-digit', minute: '2-digit', hour12: false })
+      .format(new Date()).split(':').map(Number);
+    return (h % 24) * 60 + m;
+  } catch {
+    return null;
+  }
+}
 
 export function workingHoursFor(dateStr) {
   const day = new Date(dateStr + 'T12:00:00').getDay();
@@ -223,7 +235,15 @@ export function packPlan(blocks, freeRanges) {
 export async function findFreeSlot(userId, dateStr, durationMins, timeZone) {
   const { busy, workStart, workEnd } = await busyRangesFor(userId, dateStr, timeZone);
 
-  for (let candidate = workStart; candidate + durationMins <= workEnd; candidate += SLOT_STEP_MINS) {
+  // Never return a slot in the past: when scheduling for today, start no earlier
+  // than the next 15-min mark from now (a 16:00 "today" capture must not book 09:00).
+  let earliest = workStart;
+  if (dateStr === todayInTz(timeZone)) {
+    const now = minutesNowInTz(timeZone);
+    if (now != null) earliest = Math.max(earliest, Math.ceil(now / SLOT_STEP_MINS) * SLOT_STEP_MINS);
+  }
+
+  for (let candidate = earliest; candidate + durationMins <= workEnd; candidate += SLOT_STEP_MINS) {
     const candidateEnd = candidate + durationMins;
     const conflicts = busy.some(([bStart, bEnd]) => candidate < bEnd && candidateEnd > bStart);
     if (!conflicts) {

@@ -1,4 +1,4 @@
-import { consume } from '../services/aiUsage.js';
+import { check, charge } from '../services/aiUsage.js';
 import { getAiMode } from '../services/userPrefs.js';
 
 // Blocks EXPLICIT AI actions when the user has AI turned off. ai_mode is the
@@ -20,18 +20,19 @@ export async function requireAiEnabled(req, res, next) {
   next();
 }
 
-// Enforces the daily AI cap for EXPLICIT, user-triggered AI actions (process
-// inbox, daily priorities, import notes, find duplicates, weekly review). Over
-// the cap → 429 with an upgrade-friendly payload the client can surface as a
-// toast. Smart Capture does NOT use this — it degrades to raw manual capture
-// instead (see routes/ai.js), because a high-frequency auto-action shouldn't
-// hard-stop mid-flow.
+// Pre-flight gate for EXPLICIT, user-triggered AI actions (process inbox, daily
+// priorities, plan day, import notes, find duplicates, task analyze, project
+// breakdown, url extract). Over the cap → 429 with an upgrade-friendly payload.
+// This only CHECKS — it does not increment. The route calls chargeAiUsage(req)
+// after the AI actually succeeds, so a no-op (empty inbox) or a provider failure
+// never burns budget. Smart Capture doesn't use this gate (it degrades to raw
+// capture and charges inline on successful enrichment).
 //
 // Fails OPEN: if the metering query throws, the user keeps their AI action.
 // Metering must never break a feature someone may be paying for.
 export async function enforceAiLimit(req, res, next) {
   try {
-    const status = await consume(req.user.id);
+    const status = await check(req.user.id);
     if (!status.allowed) {
       return res.status(429).json({
         error: 'daily_ai_limit',
@@ -40,10 +41,21 @@ export async function enforceAiLimit(req, res, next) {
         used: status.used,
       });
     }
-    req.aiUsage = status;
+    req.aiWeight = 1;
     next();
   } catch (err) {
     console.error('enforceAiLimit error (failing open):', err);
     next();
+  }
+}
+
+// Record a successful AI call against today's budget. Called from the route once
+// the AI result is known-good. Non-fatal: a metering write must never fail the
+// response the user already earned.
+export async function chargeAiUsage(req, weight = req.aiWeight ?? 1) {
+  try {
+    await charge(req.user.id, weight);
+  } catch (err) {
+    console.error('chargeAiUsage error (non-fatal):', err);
   }
 }

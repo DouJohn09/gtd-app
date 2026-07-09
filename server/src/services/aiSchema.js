@@ -21,6 +21,16 @@ function coerce(obj, field, { numeric = false } = {}) {
   obj[field] = v;
 }
 
+// Coerce LLM boolean slop ("false"/"0"/1) to a real boolean in place, so a
+// downstream `if (obj.field)` can't be fooled by the truthy string "false".
+function coerceBool(obj, field) {
+  if (!(field in obj)) return;
+  const v = obj[field];
+  if (typeof v === 'boolean') return;
+  if (v === true || v === 'true' || v === 1 || v === '1') obj[field] = true;
+  else obj[field] = false; // "false", "0", 0, "", "null", null, undefined, anything else
+}
+
 function checkEnum(obj, field, allowed, problems, { nullable = true, label = '' } = {}) {
   coerce(obj, field);
   const v = obj[field];
@@ -72,6 +82,8 @@ export function validateSmartCapture(r) {
   coerce(r, 'project_name');
   coerce(r, 'context');
   coerce(r, 'possible_duplicate_of');
+  coerceBool(r, 'find_free_slot');
+  coerceBool(r, 'is_daily_focus');
   return problems;
 }
 
@@ -193,11 +205,16 @@ export function validatePlanDay(taskCount) {
       coerce(b, 'start');
       if (b.start == null || !TIME_RE.test(b.start)) problems.push(`${label}start is "${b.start}" but must be HH:MM 24-hour`);
       coerce(b, 'duration_mins', { numeric: true });
-      // Min 5, not 15: tasks legitimately carry 10-minute estimates and the
-      // prompt tells the model to use them — a validator floor above real
-      // estimates makes the repair loop unwinnable (seen live 2026-07-06).
-      if (!Number.isInteger(b.duration_mins) || b.duration_mins < 5 || b.duration_mins > 480) {
-        problems.push(`${label}duration_mins must be an integer 5-480`);
+      // Clamp, don't reject. The prompt tells the model to use the task's own
+      // estimate, so a large estimate (a 10-hour task → 600) would deadlock the
+      // repair loop against a ceiling it was instructed to exceed — same class as
+      // the min-floor deadlock seen live 2026-07-06. packPlan places or overflows
+      // any size deterministically, so we just bound it to a sane [5, 480] window.
+      // Only a genuinely non-numeric duration is a repairable problem.
+      if (b.duration_mins == null || !Number.isFinite(Number(b.duration_mins))) {
+        problems.push(`${label}duration_mins must be a number`);
+      } else {
+        b.duration_mins = Math.min(480, Math.max(5, Math.round(Number(b.duration_mins))));
       }
     });
     (Array.isArray(r.deferred) ? r.deferred : []).forEach((d, i) => {

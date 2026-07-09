@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { TaskModel, ProjectModel } from '../db/models.js';
 import { pool } from '../db/pool.js';
 import { analyzeTask } from '../services/ai.js';
-import { enforceAiLimit, requireAiEnabled } from '../middleware/aiLimit.js';
+import { enforceAiLimit, requireAiEnabled, chargeAiUsage } from '../middleware/aiLimit.js';
 import { getCalendarEvents, syncTaskToCalendar, deleteTaskFromCalendar } from '../services/googleCalendar.js';
 
 const router = Router();
@@ -160,6 +160,7 @@ router.post('/:id/analyze', requireAiEnabled, enforceAiLimit, async (req, res) =
     const analysis = await analyzeTask(task, userContexts, projects, req.today, dayName);
     if (analysis?.error) return res.status(503).json({ error: 'AI is not configured on this server' });
     if (!analysis) return res.status(502).json({ error: 'AI processing failed' });
+    await chargeAiUsage(req);
     res.json(analysis);
   } catch (error) {
     console.error(error);
