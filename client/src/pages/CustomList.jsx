@@ -90,11 +90,20 @@ export default function CustomList() {
     } catch (err) { addToast(err.message, 'error'); }
   };
 
-  const handleReorder = async (index, direction) => {
+  const handleReorder = async (itemId, direction) => {
+    // Swap relative to the VISIBLE neighbour, then apply that swap to the full
+    // list by id. The buttons pass the item's id (not its filtered index): under
+    // an active status filter the filtered index doesn't match the full-array
+    // index, so the old index-based swap reordered the wrong (or unrelated) items.
+    const visible = filter === 'all' ? items : items.filter(i => i.status === filter);
+    const vIdx = visible.findIndex(i => i.id === itemId);
+    const vSwap = vIdx + direction;
+    if (vIdx < 0 || vSwap < 0 || vSwap >= visible.length) return;
+    const ia = items.findIndex(i => i.id === visible[vIdx].id);
+    const ib = items.findIndex(i => i.id === visible[vSwap].id);
+    if (ia < 0 || ib < 0) return;
     const newItems = [...items];
-    const swapIdx = index + direction;
-    if (swapIdx < 0 || swapIdx >= newItems.length) return;
-    [newItems[index], newItems[swapIdx]] = [newItems[swapIdx], newItems[index]];
+    [newItems[ia], newItems[ib]] = [newItems[ib], newItems[ia]];
     setItems(newItems);
     try {
       await api.customLists.reorderItems(listId, newItems.map(i => i.id));
@@ -290,14 +299,14 @@ export default function CustomList() {
                   {/* Reorder */}
                   <div className="flex flex-col opacity-0 group-hover:opacity-100 transition-opacity">
                     <button
-                      onClick={(e) => { e.stopPropagation(); handleReorder(idx, -1); }}
+                      onClick={(e) => { e.stopPropagation(); handleReorder(item.id, -1); }}
                       className="text-text-3 hover:text-text-1 p-0.5"
                       disabled={idx === 0}
                     >
                       <ChevronUp className="w-3 h-3" />
                     </button>
                     <button
-                      onClick={(e) => { e.stopPropagation(); handleReorder(idx, 1); }}
+                      onClick={(e) => { e.stopPropagation(); handleReorder(item.id, 1); }}
                       className="text-text-3 hover:text-text-1 p-0.5"
                       disabled={idx === filteredItems.length - 1}
                     >

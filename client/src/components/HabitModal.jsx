@@ -17,6 +17,22 @@ const DEFAULT_CATEGORIES = [
   'Productivity', 'Self-Care', 'Social', 'Finance',
 ];
 
+// The default count shown in the weekly / interval inputs when nothing is picked.
+const FREQ_DEFAULT = { weekly: 3, interval: 2 };
+
+// weekly/interval store a single count in target_days[0]; specific_days stores an
+// array of weekday values. Clamp counts to a real integer so an untouched or
+// cleared input saves what the UI displayed (not undefined → server default 1).
+function normalizeTargetDays(frequency, targetDays) {
+  if (frequency === 'weekly' || frequency === 'interval') {
+    const n = parseInt(targetDays?.[0], 10);
+    const fallback = FREQ_DEFAULT[frequency];
+    return [Number.isFinite(n) && n >= 1 ? n : fallback];
+  }
+  if (frequency === 'specific_days') return targetDays || [];
+  return null; // daily
+}
+
 export const SUGGESTED_HABITS = [
   { name: 'Exercise',          description: '30 min workout',         category: 'Fitness',      color: '#fb7185', frequency: 'daily' },
   { name: 'Read',              description: 'Read for 20 minutes',    category: 'Learning',     color: '#60a5fa', frequency: 'daily' },
@@ -101,9 +117,10 @@ export default function HabitModal({ habit, onClose, onSave, existingCategories 
       category: category || null,
       // Quit habits are daily abstinence — frequency/target_days don't apply.
       frequency: isQuit ? 'daily' : form.frequency,
-      target_days: !isQuit && ['specific_days', 'weekly', 'interval'].includes(form.frequency)
-        ? form.target_days
-        : null,
+      // weekly/interval carry a single count; the input can display a default (3/2)
+      // while state is still [] or [NaN] (empty input), which the server would read
+      // as 1×/week. Clamp to a real number so the saved target matches what's shown.
+      target_days: isQuit ? null : normalizeTargetDays(form.frequency, form.target_days),
     };
     onSave(data);
   };
@@ -223,7 +240,14 @@ export default function HabitModal({ habit, onClose, onSave, existingCategories 
                 <label className="gtd-label">Frequency</label>
                 <select
                   value={form.frequency}
-                  onChange={e => setForm({ ...form, frequency: e.target.value, target_days: [] })}
+                  onChange={e => {
+                    const freq = e.target.value;
+                    // Seed the count default so the input's displayed value (3/2)
+                    // is actually in state — not just shown — for weekly/interval.
+                    const seeded = freq === 'weekly' ? [FREQ_DEFAULT.weekly]
+                      : freq === 'interval' ? [FREQ_DEFAULT.interval] : [];
+                    setForm({ ...form, frequency: freq, target_days: seeded });
+                  }}
                   className="gtd-input"
                 >
                   <option value="daily">Daily</option>

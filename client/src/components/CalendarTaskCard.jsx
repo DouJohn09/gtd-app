@@ -17,21 +17,27 @@ export default function CalendarTaskCard({ task, onEdit, onComplete, onDragStart
   const overdue = isOverdue(task.due_date);
   const tone = LIST_TONE[task.list] || LIST_TONE.next_actions;
   const isFocus = !!task.is_daily_focus;
+  // This card is a clone shown on the task's start_date (see Calendar.itemsByDate).
+  // It must NOT be draggable: the drop handler only knows the task id and always
+  // writes due_date, so dragging the start marker silently moved the DUE date.
+  const isStartMarker = task._calendarDate === 'start';
 
   return (
     <div
-      draggable="true"
-      onDragStart={(e) => {
+      draggable={!isStartMarker}
+      onDragStart={isStartMarker ? undefined : (e) => {
         e.dataTransfer.setData('text/plain', task.id.toString());
         e.dataTransfer.effectAllowed = 'move';
         onDragStart?.(task.id);
       }}
       onClick={() => onEdit?.(task)}
+      title={isStartMarker ? 'Starts this day — edit the task to change its start date' : undefined}
       className="group relative flex items-center gap-1.5 px-2 py-1 rounded-md text-[11.5px] cursor-pointer transition-all"
       style={{
         background: overdue ? 'rgba(251,113,133,0.10)' : tone.bg,
-        border: `1px solid ${overdue ? 'rgba(251,113,133,0.25)' : tone.border}`,
+        border: `1px ${isStartMarker ? 'dashed' : 'solid'} ${overdue ? 'rgba(251,113,133,0.25)' : tone.border}`,
         color: overdue ? 'rgb(var(--rose-glow))' : tone.text,
+        opacity: isStartMarker ? 0.7 : 1,
       }}
     >
       {isFocus && (

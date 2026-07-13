@@ -122,14 +122,16 @@ export default function Calendar() {
 
   const handlePrev = () => {
     const d = new Date(currentDate);
-    if (viewType === 'month') d.setMonth(d.getMonth() - 1);
+    // Snap to the 1st before shifting the month, or setMonth overflows on day 31
+    // (June 31 → July 1, so "prev" from July 31 appears stuck; Jan 31 skips Feb).
+    if (viewType === 'month') { d.setDate(1); d.setMonth(d.getMonth() - 1); }
     else if (viewType === 'week') d.setDate(d.getDate() - 7);
     else d.setDate(d.getDate() - 1);
     setCurrentDate(d);
   };
   const handleNext = () => {
     const d = new Date(currentDate);
-    if (viewType === 'month') d.setMonth(d.getMonth() + 1);
+    if (viewType === 'month') { d.setDate(1); d.setMonth(d.getMonth() + 1); }
     else if (viewType === 'week') d.setDate(d.getDate() + 7);
     else d.setDate(d.getDate() + 1);
     setCurrentDate(d);

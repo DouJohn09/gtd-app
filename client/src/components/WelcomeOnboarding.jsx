@@ -118,15 +118,28 @@ export default function WelcomeOnboarding() {
   };
 
   const finish = async () => {
+    if (finishing) return; // guard: a double-tap must not seed the samples twice
     setFinishing(true);
+    // Persist completion BEFORE seeding. onboarded_at is the idempotency key: if
+    // this fails and the wizard re-shows (or a refreshUser restores the server's
+    // null), we must not have already created the sample tasks — otherwise the
+    // retry doubles them. On failure we stay on the step so the user can retry.
+    try {
+      await api.preferences.completeOnboarding();
+    } catch {
+      setFinishing(false);
+      addToast('Could not finish setup — please try again.', 'error');
+      return;
+    }
+    patchUser({ onboarded_at: new Date().toISOString() });
     if (seedSamples) {
       const results = await Promise.allSettled(SAMPLE_TASKS.map(t => api.tasks.create(t)));
       if (results.some(r => r.status === 'fulfilled')) {
         window.dispatchEvent(new Event('task-captured'));
       }
+    } else {
+      window.dispatchEvent(new Event('open-capture'));
     }
-    markDone();
-    if (!seedSamples) window.dispatchEvent(new Event('open-capture'));
   };
 
   const next = async () => {

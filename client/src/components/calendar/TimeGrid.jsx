@@ -119,13 +119,23 @@ export default function TimeGrid({
   const containerRef = useRef(null);
   const [dragOverY, setDragOverY] = useState(null);
   const [resizingId, setResizingId] = useState(null);
+  const [resizeDuration, setResizeDuration] = useState(null); // live height during a drag
+  const resizeDurationRef = useRef(null);                     // latest value for the mouseup commit
   const [movingId, setMovingId] = useState(null);
 
   const hourHeight = compact ? 40 : HOUR_HEIGHT;
   const totalHours = HOUR_END - HOUR_START;
   const scrollHeight = compact ? 420 : 560;
 
-  const layoutBlocks = useMemo(() => computeLayout(timeBlocks), [timeBlocks]);
+  // While resizing, override just the dragged block's duration locally so the
+  // block grows/shrinks live without a server write on every mousemove.
+  const displayBlocks = useMemo(
+    () => (resizingId != null && resizeDuration != null)
+      ? timeBlocks.map(b => (b.id === resizingId ? { ...b, duration: resizeDuration } : b))
+      : timeBlocks,
+    [timeBlocks, resizingId, resizeDuration]
+  );
+  const layoutBlocks = useMemo(() => computeLayout(displayBlocks), [displayBlocks]);
 
   // Scroll to 7am on mount (or earliest scheduled block, whichever is sooner)
   useEffect(() => {
@@ -175,9 +185,19 @@ export default function TimeGrid({
       const startMins = timeToMinutes(block.scheduled_time);
       const endMins = Math.max(startMins + 15, yToMinutes(y));
       const newDuration = Math.min(endMins - startMins, HOUR_END * 60 - startMins);
-      onUpdateTask?.(resizingId, { duration: newDuration });
+      // Local only — resize live, persist once on mouseup. The old code fired a
+      // PUT + full refetch + Google-Calendar sync on every mousemove (dozens per
+      // gesture), which thrashed the server and let out-of-order responses win.
+      resizeDurationRef.current = newDuration;
+      setResizeDuration(newDuration);
     };
-    const handleUp = () => setResizingId(null);
+    const handleUp = () => {
+      const finalDuration = resizeDurationRef.current;
+      resizeDurationRef.current = null;
+      setResizingId(null);
+      setResizeDuration(null);
+      if (finalDuration != null) onUpdateTask?.(resizingId, { duration: finalDuration });
+    };
     window.addEventListener('mousemove', handleMove);
     window.addEventListener('mouseup', handleUp);
     return () => {
