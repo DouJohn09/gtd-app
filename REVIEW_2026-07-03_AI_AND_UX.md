@@ -54,5 +54,7 @@ AI failures now surface as error toasts in AIAssistant + Projects breakdown (wer
 
 ---
 
-## ⚠️ Operational risk (must fix before launch)
+## ✅ Operational risk — RESOLVED 2026-07-27
+**Resolved:** OpenAI billing was restored on 2026-07-27 and verified live in dev and on Railway (same key), so the fallback floor is alive again. The held `gpt-4.1-mini` parity eval also ran and passed (heavy-ops 7/7 schema + 9/9 ground-truth, plan-day 6/6). The Groq daily-budget advice below still applies. Original finding, as written on 2026-07-03:
+
 **OpenAI API quota is exhausted** (billing 429 since ~2026-06-30), so the gpt-4o(-mini) **fallback is dead** — if Groq fails, AI features 502. Groq free tier is **12k tokens/min + 100k tokens/day**; a single eval run consumes most of a day's budget. Before real traffic: restore OpenAI billing or upgrade Groq Dev Tier. Don't run evals and demos on the same day.
