@@ -53,8 +53,14 @@ export default function QuickCapture({ onCapture, placeholder = "Quick capture �
     (async () => {
       try {
         if (useAi) {
-          const { ai, fallback, bookedSlot, slotSearchFailed, routedToInbox } = await api.ai.smartCapture(text);
-          if (fallback || !ai) addToast('Captured to inbox (AI unavailable)', 'info');
+          const { ai, fallback, throttled, bookedSlot, slotSearchFailed, routedToInbox } = await api.ai.smartCapture(text);
+          // Over the daily budget is not the same as AI being down, and saying
+          // "unavailable" for it sends people looking for an outage that isn't
+          // there. No upgrade modal here on purpose — capture is fire-and-forget,
+          // and interrupting someone mid-thought to sell them is the opposite of
+          // what this app is for.
+          if (throttled) addToast("Captured to inbox — that's today's AI actions used up", 'info');
+          else if (fallback || !ai) addToast('Captured to inbox (AI unavailable)', 'info');
           else if (bookedSlot) addToast(formatBookedToast(bookedSlot), 'success');
           else if (slotSearchFailed) addToast('No free slot found — captured without booking', 'info');
           else if (routedToInbox && mode === 'assisted') addToast(formatAiToast(ai), 'success');

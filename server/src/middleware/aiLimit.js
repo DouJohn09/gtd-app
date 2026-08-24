@@ -1,4 +1,4 @@
-import { check, charge } from '../services/aiUsage.js';
+import { check, charge, getTier } from '../services/aiUsage.js';
 import { getAiMode } from '../services/userPrefs.js';
 
 // Blocks EXPLICIT AI actions when the user has AI turned off. ai_mode is the
@@ -34,9 +34,20 @@ export async function enforceAiLimit(req, res, next) {
   try {
     const status = await check(req.user.id);
     if (!status.allowed) {
+      // Hitting the cap is the moment of peak intent — the user wants an AI
+      // action right now. For Free users we tag the response with the same
+      // `limit_reached` code the 402 capacity gates use, so the existing client
+      // plumbing (api.js → UpgradeProvider) opens the upgrade modal instead of
+      // leaving them at a dead-end toast. Pro users get the plain message:
+      // they're already paying, so there is nothing to upsell.
+      const tier = await getTier(req.user.id);
+      const isFree = tier === 'free';
       return res.status(429).json({
         error: 'daily_ai_limit',
-        message: `You've used all ${status.limit} of today's AI actions. They reset tomorrow.`,
+        ...(isFree ? { code: 'limit_reached', resource: 'AI actions today' } : {}),
+        message: isFree
+          ? `You've used all ${status.limit} of today's AI actions. They reset tomorrow — Pro gets a much higher daily limit.`
+          : `You've used all ${status.limit} of today's AI actions. They reset tomorrow.`,
         limit: status.limit,
         used: status.used,
       });

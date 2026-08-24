@@ -7,6 +7,10 @@ export function ToastProvider({ children }) {
   const [toasts, setToasts] = useState([]);
 
   const addToast = (message, type = 'success') => {
+    // An empty message means "say nothing" — used when another surface (e.g. the
+    // upgrade modal) has already handled the event. Without this an empty toast
+    // box would render for 4s.
+    if (!message) return;
     const id = Date.now() + Math.random();
     setToasts(prev => [...prev, { id, message, type }]);
     setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 4000);
