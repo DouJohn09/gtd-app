@@ -332,6 +332,30 @@ nav .container {
   box-shadow: 0 4px 20px rgba(124, 58, 237, 0.35);
 }
 
+/* Standalone primary CTA. Same treatment as the capture-form button (so the
+   page keeps one button language) but sized for a solo call to action, now
+   that sign-in replaced the email capture as the way in. */
+.cta-button {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 14px;
+  letter-spacing: 0.03em;
+  padding: 16px 32px;
+  border-radius: 12px;
+  background: var(--violet-deep);
+  color: #fff;
+  border: none;
+  cursor: pointer;
+  white-space: nowrap;
+  text-decoration: none;
+  transition: transform 200ms, box-shadow 200ms;
+}
+
+.cta-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 20px rgba(124, 58, 237, 0.35);
+}
+
 .capture-note {
   font-family: var(--font-mono);
   font-size: 11px;

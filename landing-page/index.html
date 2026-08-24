@@ -163,7 +163,7 @@
       <div class="nav-right">
         <a href="/blog/" class="nav-link">Blog</a>
         <a href="/app" class="nav-link">Sign in</a>
-        <a href="#waitlist" class="nav-cta">Join waitlist</a>
+        <a href="/app" class="nav-cta">Start free</a>
       </div>
     </div>
   </nav>
@@ -172,26 +172,16 @@
   <!-- ========== Hero ========== -->
   <section class="hero">
     <div class="container">
-      <div class="mono-label violet" style="margin-bottom: 16px;">coming soon</div>
+      <div class="mono-label violet" style="margin-bottom: 16px;">now open · free to start</div>
       <h1>Clear your table.<br />Clear your mind.</h1>
       <p class="subline">
         The calm, AI-powered way to organize your <strong>tasks, habits, and calendar</strong> —
         at work and in life. Capture anything; Cleartable <strong>sorts it for you</strong> and
         <strong>plans your day</strong> around your real calendar.
       </p>
-      <div id="waitlist">
-        <form class="capture-form" id="waitlist-form">
-          <input type="email" name="email" placeholder="you@email.com" required autocomplete="email" />
-          <button type="submit">Join waitlist</button>
-        </form>
-        <div class="form-success" id="form-success">
-          <div class="checkmark">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
-          </div>
-          <p>You're on the list.</p>
-          <div class="note">We'll email your invite when it's ready — waitlist members get first dibs on the founder price.</div>
-        </div>
-        <p class="capture-note" id="capture-note">No spam. Just a launch-day invite.</p>
+      <div>
+        <a href="/app" class="cta-button">Start free with Google</a>
+        <p class="capture-note">Free forever. No credit card.</p>
       </div>
     </div>
   </section>
@@ -393,7 +383,7 @@
             <li>Everything in Pro</li>
             <li>Founder price locked in while you stay subscribed</li>
             <li>Refundable for 30 days — back the build risk-free</li>
-            <li>Only 30 spots — for waitlist &amp; early adopters</li>
+            <li>Only 30 spots — for early adopters</li>
           </ul>
         </div>
       </div>
@@ -425,11 +415,11 @@
       <div class="faq-list">
         <details class="faq-item">
           <summary>
-            <span>When is Cleartable launching?</span>
+            <span>Can I use Cleartable right now?</span>
             <span class="faq-icon" aria-hidden="true">+</span>
           </summary>
           <div class="faq-answer">
-            Soft launch to the waitlist within weeks, broader release shortly after. Join the waitlist to be notified first — the first 30 buyers can lock in the refundable $30/yr founder price before Pro settles at $36/yr.
+            It's open now — sign in with Google and start free, no invite needed. Pro is coming shortly, and the first 30 buyers can lock in the refundable $30/yr founder price before Pro settles at $36/yr.
           </div>
         </details>
         <details class="faq-item">
@@ -494,18 +484,8 @@
   <section class="bottom-cta">
     <div class="container">
       <h2>Ready to clear the table?</h2>
-      <form class="capture-form" id="waitlist-form-bottom">
-        <input type="email" name="email" placeholder="you@email.com" required autocomplete="email" />
-        <button type="submit">Join waitlist</button>
-      </form>
-      <div class="form-success" id="form-success-bottom">
-        <div class="checkmark">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
-        </div>
-        <p>You're on the list.</p>
-        <div class="note">We'll email your invite when it's ready — waitlist members get first dibs on the founder price.</div>
-      </div>
-      <p class="capture-note" id="capture-note-bottom">Launch invite. No spam. Unsubscribe anytime.</p>
+      <a href="/app" class="cta-button">Start free with Google</a>
+      <p class="capture-note">Free forever. No credit card. Export your data anytime.</p>
     </div>
   </section>
   </main>
@@ -552,75 +532,6 @@
     }, { threshold: 0.15 });
 
     document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
-
-    // ========== Waitlist form ==========
-    //
-    // Posts to our own Express API. Emails land in the `waitlist` table in
-    // Postgres so we own the data and can email the list ourselves at launch.
-    // Absolute URL so the form works even if the landing page is ever served
-    // from a different origin than the API.
-    const WAITLIST_ENDPOINT = 'https://cleartable.app/api/waitlist';
-
-    async function submitWaitlist(form) {
-      const button = form.querySelector('button');
-      const input = form.querySelector('input[type="email"]');
-      const originalLabel = button.textContent;
-      const email = input.value.trim();
-
-      if (!email) return;
-
-      button.disabled = true;
-      input.disabled = true;
-      button.textContent = 'Joining…';
-      form.classList.remove('has-error');
-
-      // Track which form converted ('hero' = top of page, 'bottom-cta' = end).
-      // Tagged on the row so we can compare placement performance later.
-      const source = form.id === 'waitlist-form' ? 'hero' : 'bottom-cta';
-
-      try {
-        if (WAITLIST_ENDPOINT) {
-          const res = await fetch(WAITLIST_ENDPOINT, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-            body: JSON.stringify({ email, source })
-          });
-          if (!res.ok) throw new Error('submission_failed');
-        } else {
-          console.log('[Cleartable] Waitlist signup (no endpoint configured):', email);
-          await new Promise(r => setTimeout(r, 500));
-        }
-
-        const isHero = form.id === 'waitlist-form';
-        const noteId = isHero ? 'capture-note' : 'capture-note-bottom';
-        const successId = isHero ? 'form-success' : 'form-success-bottom';
-        form.style.display = 'none';
-        const note = document.getElementById(noteId);
-        if (note) note.style.display = 'none';
-        const success = document.getElementById(successId);
-        if (success) success.style.display = 'block';
-      } catch (err) {
-        button.disabled = false;
-        input.disabled = false;
-        button.textContent = originalLabel;
-        form.classList.add('has-error');
-        const errorEl = form.querySelector('.form-error') || (() => {
-          const el = document.createElement('div');
-          el.className = 'form-error';
-          el.textContent = "Something went wrong. Please try again.";
-          form.insertAdjacentElement('afterend', el);
-          return el;
-        })();
-        errorEl.style.display = 'block';
-      }
-    }
-
-    document.querySelectorAll('#waitlist-form, #waitlist-form-bottom').forEach(form => {
-      form.addEventListener('submit', (e) => {
-        e.preventDefault();
-        submitWaitlist(form);
-      });
-    });
 
   </script>
 

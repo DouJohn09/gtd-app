@@ -17,7 +17,7 @@ export default function Login() {
     try {
       await login(credentialResponse.credential);
     } catch {
-      setError("We couldn't sign you in. Cleartable is in private beta right now — if you haven't been invited, your account isn't enabled yet. Otherwise, please try again.");
+      setError("We couldn't sign you in. Please try again — if it keeps happening, email support@cleartable.app and we'll sort it out.");
     } finally {
       setSigningIn(false);
     }
@@ -102,6 +102,16 @@ export default function Login() {
           {/* Quote */}
           <p className="text-center font-display italic text-[14px] text-text-3 mt-6 max-w-xs mx-auto leading-relaxed">
             Your mind is for having ideas, not holding them.
+          </p>
+
+          {/* Signing in creates an account, so the terms that govern it have to be
+              reachable from here — not only from the landing footer. Root-relative:
+              the landing pages are served at the domain root, the app under /app/. */}
+          <p className="text-center font-mono text-[10px] text-text-3 mt-6 leading-relaxed">
+            By signing in you agree to our{' '}
+            <a href="/terms.html" target="_blank" rel="noopener" className="underline hover:text-text-2">Terms</a>
+            {' · '}
+            <a href="/privacy.html" target="_blank" rel="noopener" className="underline hover:text-text-2">Privacy</a>
           </p>
         </div>
       </div>
