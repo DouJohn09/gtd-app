@@ -16,7 +16,6 @@ const PLANS = [
 const PRO_PERKS = [
   'AI plans your day — every day, not 3 a month',
   'Unlimited projects, custom lists & habits',
-  'Productivity analytics dashboard',
   'Much higher daily AI limit',
 ];
 
@@ -34,6 +33,10 @@ export default function BillingSection() {
   const { addToast } = useToast();
   const [status, setStatus] = useState(null);
   const [busy, setBusy] = useState(null);
+  // Checkout is only offered once Paddle runs in production. In sandbox the
+  // overlay rejects real cards and accepts test ones — neither is something a
+  // stranger should be able to reach from a public Settings page.
+  const [billingLive, setBillingLive] = useState(null); // null = unknown yet
 
   const isPro = (status?.plan ?? user?.plan) === 'pro';
   const canceling = status?.subscriptionStatus === 'canceled';
@@ -41,6 +44,9 @@ export default function BillingSection() {
 
   useEffect(() => {
     api.billing.status().then(setStatus).catch(() => {});
+    api.config()
+      .then(cfg => setBillingLive(cfg?.paddle?.environment === 'production' && !!cfg?.paddle?.clientToken))
+      .catch(() => setBillingLive(false));
   }, []);
 
   async function refreshStatus() {
@@ -129,7 +135,17 @@ export default function BillingSection() {
             ))}
           </ul>
 
-          <div className="grid sm:grid-cols-3 gap-3">
+          {billingLive === false && (
+            <div
+              className="rounded-xl p-4 mb-3 text-[13px] text-text-2 leading-relaxed"
+              style={{ boxShadow: 'inset 0 0 0 1px rgb(var(--violet) / 0.30)', background: 'rgb(var(--violet) / 0.06)' }}
+            >
+              <span className="text-text-1 font-medium">Pro is opening soon.</span> The first 30 subscribers
+              lock in the <span className="text-text-1">$30/yr founder price</span> (refundable for 30 days)
+              before Pro settles at $36/yr — we'll announce it here and by email.
+            </div>
+          )}
+          <div className={`grid sm:grid-cols-3 gap-3 ${billingLive ? '' : 'hidden'}`}>
             {PLANS.map((plan) => (
               <button
                 key={plan.key}
@@ -164,12 +180,12 @@ export default function BillingSection() {
               </button>
             ))}
           </div>
-          <p className="text-text-3 text-[11px] mt-3">
+          {billingLive && <p className="text-text-3 text-[11px] mt-3">
             Secure checkout by Paddle, our payment provider. Cancel anytime · refundable per our{' '}
             <a href="/refund.html" target="_blank" rel="noopener" style={{ color: 'rgb(var(--violet))' }}>
               refund policy
             </a>.
-          </p>
+          </p>}
         </>
       )}
     </section>

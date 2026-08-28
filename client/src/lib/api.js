@@ -155,6 +155,7 @@ export const api = {
     findDuplicates: () => fetchApi('/ai/find-duplicates', { method: 'POST' }),
     applyDuplicates: (taskIds) => fetchApi('/ai/apply-duplicates', { method: 'POST', body: JSON.stringify({ taskIds }) }),
     weeklyReview: () => fetchApi('/ai/weekly-review', { method: 'POST' }),
+    analyzeWeek: () => fetchApi('/ai/weekly-review/analyze', { method: 'POST' }),
     completeReview: (data) => fetchApi('/ai/complete-review', { method: 'POST', body: JSON.stringify(data) }),
     smartCapture: (text) => fetchApi('/ai/smart-capture', { method: 'POST', body: JSON.stringify({ text }) }),
     planDay: () => fetchApi('/ai/plan-day', { method: 'POST' }),

@@ -761,56 +761,59 @@ async function getHabitStats(userId) {
   };
 }
 
-// Not behind enforceAiLimit: this route auto-fires on page mount and must
-// serve the review data (lists, stats, habits) even when AI is off or over
-// budget — only the analysis itself is gated.
+// Everything the review needs, minus the AI. Shared by the page load and the
+// on-demand analysis so both see the same snapshot.
+async function loadReviewData(userId, req) {
+  const [stats, inboxItems, nextActions, waitingFor, somedayMaybe, projects, staleItems, lastReview, streak, habitStats, userContexts] = await Promise.all([
+    TaskModel.getStats(userId, req.today, req.clientTimezone),
+    TaskModel.getAll('inbox', userId, req.today),
+    TaskModel.getAll('next_actions', userId, req.today),
+    TaskModel.getAll('waiting_for', userId, req.today),
+    TaskModel.getAll('someday_maybe', userId, req.today),
+    ProjectModel.getAll(userId),
+    WeeklyReviewModel.getStaleItems(userId),
+    WeeklyReviewModel.getLastReview(userId),
+    WeeklyReviewModel.getStreak(userId),
+    getHabitStats(userId),
+    getUserContexts(userId),
+  ]);
+  const since = lastReview?.completed_at || new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  const completedThisWeek = await WeeklyReviewModel.getCompletedTasksSince(userId, since);
+  return { stats, inboxItems, nextActions, waitingFor, somedayMaybe, projects, staleItems, lastReview, streak, habitStats, userContexts, completedThisWeek };
+}
+
+// Page load: data only, no AI call. This route auto-fires on mount, and running
+// the (3000-token) analysis here meant every visit to the page burned a daily AI
+// action the user never asked for — and, at ~20 visits, Groq's whole app-wide
+// daily budget. The analysis is now a separate, explicit action below.
+// `aiAnalysis` is null = "not requested yet"; {error:'ai_off'} tells the client
+// to render the manual Reflect step instead.
 router.post('/weekly-review', async (req, res) => {
   try {
     const userId = req.user.id;
     const aiMode = await getAiMode(userId);
-    let aiAllowed = aiMode !== 'off';
-    if (aiAllowed) {
-      try {
-        aiAllowed = (await check(userId)).allowed;
-      } catch (err) {
-        console.error('weekly-review metering error (failing open):', err);
-      }
-    }
-    const [stats, inboxItems, nextActions, waitingFor, somedayMaybe, projects, staleItems, lastReview, streak, habitStats, userContexts] = await Promise.all([
-      TaskModel.getStats(userId, req.today, req.clientTimezone),
-      TaskModel.getAll('inbox', userId, req.today),
-      TaskModel.getAll('next_actions', userId, req.today),
-      TaskModel.getAll('waiting_for', userId, req.today),
-      TaskModel.getAll('someday_maybe', userId, req.today),
-      ProjectModel.getAll(userId),
-      WeeklyReviewModel.getStaleItems(userId),
-      WeeklyReviewModel.getLastReview(userId),
-      WeeklyReviewModel.getStreak(userId),
-      getHabitStats(userId),
-      getUserContexts(userId),
-    ]);
+    const { userContexts, staleItems, ...data } = await loadReviewData(userId, req);
+    res.json({ ...data, aiAnalysis: aiMode === 'off' ? { error: 'ai_off' } : null });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
 
-    const since = lastReview?.completed_at || new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-    const completedThisWeek = await WeeklyReviewModel.getCompletedTasksSince(userId, since);
-
-    const aiAnalysis = aiAllowed
-      ? await weeklyReviewAnalysis({
-          stats, nextActions, waitingFor, somedayMaybe, projects,
-          staleItems, habitStats, completedThisWeek,
-          lastReviewDate: lastReview?.completed_at || null,
-        }, userContexts)
-      : null;
-    // Charge only when the analysis actually came back — opening the review page
-    // when AI fails (or is off) must not burn a credit.
-    if (aiAnalysis && !aiAnalysis.error) await charge(userId);
-
-    res.json({
-      stats, inboxItems, nextActions, waitingFor, somedayMaybe,
-      projects, habitStats, lastReview, streak, completedThisWeek,
-      aiAnalysis: aiAnalysis && !aiAnalysis.error
-        ? aiAnalysis
-        : { error: aiMode === 'off' ? 'ai_off' : 'AI analysis unavailable' },
-    });
+// Explicit "Analyze my week" — the one AI call in the ritual, gated and charged
+// like every other user-triggered AI action.
+router.post('/weekly-review/analyze', requireAiEnabled, enforceAiLimit, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const d = await loadReviewData(userId, req);
+    const aiAnalysis = await weeklyReviewAnalysis({
+      stats: d.stats, nextActions: d.nextActions, waitingFor: d.waitingFor, somedayMaybe: d.somedayMaybe,
+      projects: d.projects, staleItems: d.staleItems, habitStats: d.habitStats, completedThisWeek: d.completedThisWeek,
+      lastReviewDate: d.lastReview?.completed_at || null,
+    }, d.userContexts);
+    if (aiFailed(res, aiAnalysis)) return;
+    await chargeAiUsage(req);
+    res.json({ aiAnalysis });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Internal server error' });

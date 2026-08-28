@@ -8,6 +8,7 @@ import TaskCard from '../components/TaskCard';
 import TaskModal from '../components/TaskModal';
 import MonoLabel from '../components/ui/MonoLabel';
 import { linkify } from '../lib/linkify.jsx';
+import { aiToast } from '../lib/aiError';
 
 const STEPS = [
   { num: 1, label: 'Get Clear',   tone: 'amber' },
@@ -103,10 +104,25 @@ export default function WeeklyReview() {
   const [done, setDone] = useState(false);
   const [resultStreak, setResultStreak] = useState(0);
   const [editingTask, setEditingTask] = useState(null);
+  const [analyzing, setAnalyzing] = useState(false);
+
+  // The one AI call in the ritual, run only when the user asks for it on step 3.
+  // (It used to fire on page load, which charged a daily AI action per visit.)
+  const runAnalysis = async () => {
+    setAnalyzing(true);
+    try {
+      const { aiAnalysis } = await api.ai.analyzeWeek();
+      setReviewData(prev => (prev ? { ...prev, aiAnalysis } : prev));
+    } catch (err) {
+      addToast(...aiToast(err, 'Could not analyze your week — you can still complete the review.'));
+    } finally {
+      setAnalyzing(false);
+    }
+  };
 
   // Patch a single task in place after an edit, so opening details mid-review
-  // doesn't trigger a full refetch (which would re-run the AI analysis and wipe
-  // the user's in-progress triage marks).
+  // doesn't trigger a full refetch (which would wipe the user's in-progress
+  // triage marks and any analysis they've already run).
   const handleTaskSaved = (updated) => {
     if (!updated?.id) return;
     setReviewData(prev => {
@@ -467,6 +483,24 @@ export default function WeeklyReview() {
                   </div>
                 </div>
               )}
+            </div>
+          ) : !reviewData.aiAnalysis ? (
+            <div className="rounded-2xl glass p-8 text-center">
+              <p className="font-display italic text-[20px] mb-2">Want a second pair of eyes?</p>
+              <p className="text-[13px] text-text-2 leading-relaxed max-w-prose mx-auto mb-5">
+                AI reads your lists, stale items and projects and writes a short, honest
+                read on the week — what moved, what's stuck, what to follow up. Runs
+                only when you ask; uses one of today's AI actions.
+              </p>
+              <button
+                onClick={runAnalysis}
+                disabled={analyzing}
+                className="gtd-btn gtd-btn-primary inline-flex items-center gap-2 text-[12.5px] disabled:opacity-60"
+              >
+                {analyzing
+                  ? <><span className="w-3 h-3 rounded-full border-2 border-white/40 border-t-white animate-spin" /> Analyzing…</>
+                  : <><Sparkles className="w-3.5 h-3.5" /> Analyze my week</>}
+              </button>
             </div>
           ) : ai.error ? (
             <div className="rounded-2xl glass p-8 text-center text-text-2 text-[13px]">

@@ -80,7 +80,6 @@ export function UpgradeProvider({ children }) {
 
             <ul className="text-[12.5px] text-text-2 space-y-1.5 mb-5">
               <li>· Unlimited projects, lists &amp; habits</li>
-              <li>· Productivity analytics dashboard</li>
               <li>· A much higher daily AI cap</li>
             </ul>
 
