@@ -31,7 +31,11 @@ export function AuthProvider({ children }) {
         headers: { Authorization: `Bearer ${token}` }
       })
         .then(res => res.ok ? res.json() : Promise.reject())
-        .then(data => setUser(data.user))
+        .then(data => {
+          // /me returns a fresh token once the current one is a day old (sliding session).
+          if (data.token) localStorage.setItem('token', data.token);
+          setUser(data.user);
+        })
         .catch(() => {
           localStorage.removeItem('token');
         })
@@ -71,6 +75,7 @@ export function AuthProvider({ children }) {
       const res = await fetch('/api/auth/me', { headers: { Authorization: `Bearer ${token}` } });
       if (res.ok) {
         const data = await res.json();
+        if (data.token) localStorage.setItem('token', data.token);
         setUser(data.user);
       }
     } catch {

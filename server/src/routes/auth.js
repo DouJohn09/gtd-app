@@ -33,6 +33,12 @@ router.post('/google', loginLimiter, async (req, res) => {
     });
     const payload = ticket.getPayload();
     const { sub: googleId, email, name, picture } = payload;
+    // Google sets email_verified=false for accounts whose address it hasn't
+    // confirmed. The email is our account identity and where we'd send
+    // account mail, so an unverified one isn't good enough to sign in with.
+    if (payload.email_verified === false) {
+      return res.status(401).json({ error: 'Google account email is not verified' });
+    }
     // Capture the browser timezone (forwarded via X-Client-Timezone) so
     // server-side "today" is the user's local day. null = leave as-is.
     const tz = isValidTimezone(req.clientTimezone) ? req.clientTimezone : null;
@@ -98,6 +104,14 @@ router.post('/google', loginLimiter, async (req, res) => {
   }
 });
 
+// Sessions are 7-day JWTs. /me runs on every app load, so it doubles as the
+// renewal point: once a token is more than a day old we hand back a fresh one
+// and the client swaps it in. Net effect is a sliding session — anyone who opens
+// the app at least weekly stays signed in, while an abandoned device still
+// expires. (Before this, every user was hard-logged-out weekly, which on an
+// installed PWA reads as "the app forgot me".)
+const TOKEN_RENEW_AFTER_S = 24 * 60 * 60;
+
 router.get('/me', async (req, res) => {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -124,7 +138,11 @@ router.get('/me', async (req, res) => {
     // Derived entitlement the client gates on. Keep current_period_end so the UI
     // can show "Pro until <date>" for canceled/past-due subscriptions.
     user.plan = isProActive(user) ? 'pro' : 'free';
-    return res.json({ user });
+    const ageS = Math.floor(Date.now() / 1000) - (payload.iat || 0);
+    const token = ageS > TOKEN_RENEW_AFTER_S
+      ? jwt.sign({ userId: user.id, email: user.email }, process.env.JWT_SECRET, { expiresIn: '7d' })
+      : undefined;
+    return res.json({ user, ...(token ? { token } : {}) });
   } catch {
     return res.status(401).json({ error: 'Invalid token' });
   }
