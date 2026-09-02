@@ -2,6 +2,8 @@ import { Router } from 'express';
 import { pool } from '../db/pool.js';
 import {
   isPaddleConfigured,
+  isCheckoutEnabled,
+  founderSpotsLeft,
   createCheckoutTransaction,
   unmarshalWebhook,
   handleWebhookEvent,
@@ -29,15 +31,24 @@ router.post('/checkout', async (req, res) => {
     if (!isPaddleConfigured()) {
       return res.status(503).json({ error: 'Billing is not configured', code: 'billing_unconfigured' });
     }
+    // Same rule the client uses to hide the buy buttons, enforced server-side
+    // so a hand-made request can't reach the sandbox checkout either.
+    if (!isCheckoutEnabled()) {
+      return res.status(503).json({ error: 'Pro is not open for purchase yet', code: 'billing_not_live' });
+    }
     const { plan } = req.body || {};
     const priceId = priceIdFor(plan);
     if (!priceId) {
       return res.status(400).json({ error: 'Unknown or unconfigured plan', code: 'bad_plan' });
     }
 
-    // TODO(founder-cap): the founder plan is limited to the first 30 buyers.
-    // Enforce here once we record which price a subscription used (count
-    // active founder subscriptions and 503 'founder_sold_out' when >= 30).
+    // Founder offer is capped at the first FOUNDER_CAP buyers. Checked at
+    // checkout creation; two buyers racing for the last slot can both pass,
+    // which is acceptable for a 30-seat offer — archive the price in Paddle
+    // once it sells out to make the cap hard.
+    if (plan === 'founder' && (await founderSpotsLeft()) <= 0) {
+      return res.status(409).json({ error: 'The founder offer has sold out', code: 'founder_sold_out' });
+    }
 
     const { rows } = await pool.query(
       'SELECT paddle_customer_id FROM users WHERE id = $1',

@@ -27,6 +27,40 @@ export function isPaddleConfigured() {
   return Boolean(apiKey && webhookSecret);
 }
 
+// Checkout is only offered to users when Paddle runs in production. The sandbox
+// overlay rejects real cards and accepts test ones, so a public Settings page
+// must never reach it. PADDLE_ALLOW_SANDBOX_CHECKOUT=1 re-opens it for a
+// deliberate end-to-end sandbox test; never set that in production.
+export function isCheckoutEnabled() {
+  if (!isPaddleConfigured()) return false;
+  if (environment === Environment.production) return true;
+  return process.env.PADDLE_ALLOW_SANDBOX_CHECKOUT === '1';
+}
+
+// Founder offer: the discounted annual price is capped at the first N buyers.
+// A "buyer" is anyone whose subscription on the founder price is still live
+// (paying, or canceled/paused but inside the period they paid for). A refund
+// inside the 30-day window cancels the subscription immediately, which frees
+// the slot again.
+export const FOUNDER_CAP = Math.max(0, Number(process.env.FOUNDER_CAP) || 30);
+
+export async function founderSpotsLeft() {
+  const founderPriceId = process.env.PADDLE_PRICE_FOUNDER;
+  if (!founderPriceId) return 0;
+  const { rows } = await pool.query(
+    `SELECT COUNT(*)::int AS cnt
+       FROM users
+      WHERE paddle_price_id = $1
+        AND plan = 'pro'
+        AND (
+          subscription_status IN ('active', 'trialing', 'past_due')
+          OR (subscription_status IN ('canceled', 'paused') AND current_period_end > NOW())
+        )`,
+    [founderPriceId]
+  );
+  return Math.max(0, FOUNDER_CAP - rows[0].cnt);
+}
+
 // Verify the signature and parse the event. Throws if the signature is invalid.
 export async function unmarshalWebhook(rawBody, signature) {
   if (!webhookSecret) throw new Error('PADDLE_WEBHOOK_SECRET is not set');
@@ -65,6 +99,10 @@ async function syncSubscription(sub) {
   let status = sub.status; // active | trialing | past_due | paused | canceled
   if (sub.scheduledChange?.action === 'cancel') status = 'canceled';
   const periodEnd = sub.currentBillingPeriod?.endsAt ?? null;
+  // Which price this subscription is on — drives the founder cap. Single-item
+  // subscriptions only (that's all we sell); keep the existing value if the
+  // event carries no items.
+  const priceId = sub.items?.[0]?.price?.id ?? null;
 
   if (userId) {
     await pool.query(
@@ -73,9 +111,10 @@ async function syncSubscription(sub) {
               subscription_status = $1,
               current_period_end = $2,
               paddle_subscription_id = $3,
-              paddle_customer_id = COALESCE(paddle_customer_id, $4)
+              paddle_customer_id = COALESCE(paddle_customer_id, $4),
+              paddle_price_id = COALESCE($6, paddle_price_id)
         WHERE id = $5`,
-      [status, periodEnd, sub.id, sub.customerId, userId]
+      [status, periodEnd, sub.id, sub.customerId, userId, priceId]
     );
   } else if (sub.customerId) {
     await pool.query(
@@ -83,14 +122,15 @@ async function syncSubscription(sub) {
           SET plan = 'pro',
               subscription_status = $1,
               current_period_end = $2,
-              paddle_subscription_id = $3
+              paddle_subscription_id = $3,
+              paddle_price_id = COALESCE($5, paddle_price_id)
         WHERE paddle_customer_id = $4`,
-      [status, periodEnd, sub.id, sub.customerId]
+      [status, periodEnd, sub.id, sub.customerId, priceId]
     );
   } else {
     console.warn('[paddle] subscription event with no user_id or customer_id', sub.id);
   }
-  return { userId, status, periodEnd };
+  return { userId, status, periodEnd, priceId };
 }
 
 // Dispatch a verified event. Subscription lifecycle events drive plan state;

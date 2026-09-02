@@ -37,6 +37,8 @@ export default function BillingSection() {
   // overlay rejects real cards and accepts test ones — neither is something a
   // stranger should be able to reach from a public Settings page.
   const [billingLive, setBillingLive] = useState(null); // null = unknown yet
+  // Founder seats left (null = unknown). 0 hides the founder plan.
+  const [founder, setFounder] = useState({ left: null, cap: 30 });
 
   const isPro = (status?.plan ?? user?.plan) === 'pro';
   const canceling = status?.subscriptionStatus === 'canceled';
@@ -45,7 +47,15 @@ export default function BillingSection() {
   useEffect(() => {
     api.billing.status().then(setStatus).catch(() => {});
     api.config()
-      .then(cfg => setBillingLive(cfg?.paddle?.environment === 'production' && !!cfg?.paddle?.clientToken))
+      .then(cfg => {
+        // The server decides whether checkout is open (production Paddle, or an
+        // explicit sandbox-test override) — the same rule it enforces on POST.
+        setBillingLive(!!cfg?.paddle?.checkoutEnabled && !!cfg?.paddle?.clientToken);
+        setFounder({
+          left: typeof cfg?.paddle?.founderSpotsLeft === 'number' ? cfg.paddle.founderSpotsLeft : null,
+          cap: cfg?.paddle?.founderCap ?? 30,
+        });
+      })
       .catch(() => setBillingLive(false));
   }, []);
 
@@ -67,12 +77,13 @@ export default function BillingSection() {
         },
       });
     } catch (err) {
-      addToast(
-        err.code === 'billing_unconfigured'
-          ? "Billing isn't set up yet — check back soon."
-          : err.message || 'Could not start checkout',
-        'error'
-      );
+      const msg = {
+        billing_unconfigured: "Billing isn't set up yet — check back soon.",
+        billing_not_live: "Pro isn't open for purchase yet — check back soon.",
+        founder_sold_out: 'The founder offer just sold out — the annual plan is still 25% off monthly.',
+      }[err.code] || err.message || 'Could not start checkout';
+      addToast(msg, 'error');
+      if (err.code === 'founder_sold_out') setFounder(f => ({ ...f, left: 0 }));
     } finally {
       setBusy(null);
     }
@@ -146,7 +157,7 @@ export default function BillingSection() {
             </div>
           )}
           <div className={`grid sm:grid-cols-3 gap-3 ${billingLive ? '' : 'hidden'}`}>
-            {PLANS.map((plan) => (
+            {PLANS.filter(plan => plan.key !== 'founder' || founder.left !== 0).map((plan) => (
               <button
                 key={plan.key}
                 onClick={() => upgrade(plan.key)}
@@ -175,7 +186,11 @@ export default function BillingSection() {
                   <span className="text-sm text-text-3">{plan.cadence}</span>
                 </div>
                 <div className="text-[11px] text-text-3 mt-1 leading-snug">
-                  {busy === plan.key ? 'Opening checkout…' : plan.sub}
+                  {busy === plan.key
+                    ? 'Opening checkout…'
+                    : plan.key === 'founder' && founder.left !== null
+                      ? `${founder.left} of ${founder.cap} seats left · refundable 30 days`
+                      : plan.sub}
                 </div>
               </button>
             ))}

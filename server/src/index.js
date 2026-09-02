@@ -18,6 +18,7 @@ import exportRouter from './routes/export.js';
 import importRouter from './routes/import.js';
 import customListsRouter from './routes/customLists.js';
 import billingRouter, { paddleWebhookHandler } from './routes/billing.js';
+import { isCheckoutEnabled, founderSpotsLeft, FOUNDER_CAP } from './services/paddle.js';
 import preferencesRouter from './routes/preferences.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -82,14 +83,23 @@ app.get('/api/health', (req, res) => {
 });
 
 // Expose public client config to the frontend (all safe-to-publish values):
-// Google client id, plus the Paddle client-side token, environment, and the
-// price ids the upgrade UI offers.
-app.get('/api/config', (req, res) => {
+// Google client id, plus the Paddle client-side token, environment, the price
+// ids the upgrade UI offers, whether checkout is open, and founder seats left.
+app.get('/api/config', async (req, res) => {
+  let founderLeft = null;
+  try {
+    founderLeft = await founderSpotsLeft();
+  } catch (error) {
+    console.error('[config] founderSpotsLeft failed:', error.message);
+  }
   res.json({
     googleClientId: process.env.GOOGLE_CLIENT_ID,
     paddle: {
       clientToken: process.env.PADDLE_CLIENT_TOKEN || null,
       environment: process.env.PADDLE_ENV || 'sandbox',
+      checkoutEnabled: isCheckoutEnabled(),
+      founderCap: FOUNDER_CAP,
+      founderSpotsLeft: founderLeft,
       prices: {
         monthly: process.env.PADDLE_PRICE_PRO_MONTHLY || null,
         yearly: process.env.PADDLE_PRICE_PRO_YEARLY || null,
