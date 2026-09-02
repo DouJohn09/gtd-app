@@ -17,7 +17,6 @@ import habitsRouter from './routes/habits.js';
 import exportRouter from './routes/export.js';
 import importRouter from './routes/import.js';
 import customListsRouter from './routes/customLists.js';
-import waitlistRouter from './routes/waitlist.js';
 import billingRouter, { paddleWebhookHandler } from './routes/billing.js';
 import preferencesRouter from './routes/preferences.js';
 
@@ -65,7 +64,6 @@ app.use((req, _res, next) => {
 
 // Public routes (no auth)
 app.use('/api/auth', authRouter);
-app.use('/api/waitlist', waitlistRouter);
 
 // Protected routes
 app.use('/api/tasks', requireAuth, tasksRouter);
