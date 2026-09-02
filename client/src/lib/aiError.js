@@ -10,8 +10,10 @@ export function aiToast(err, fallback) {
   // getting a modal and a toast for the same event. Centralised on purpose: every
   // AI call site funnels through aiToast, so none of them need their own guard.
   if (err?.code === 'limit_reached') return [null, 'info'];
+  // Input too long for the AI step — the server's message says what to do instead.
+  if (err?.status === 413) return [err.message, 'info'];
   if (err?.status === 429 || err?.message?.includes('limit')) {
-    return [err?.message || 'Daily AI limit reached — it resets tomorrow.', 'info'];
+    return [err?.message || 'Daily AI limit reached — it resets at midnight.', 'info'];
   }
   return [fallback, 'error'];
 }

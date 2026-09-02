@@ -7,7 +7,7 @@ import { dirname, join } from 'path';
 import { pingDb } from './db/pool.js';
 import { requireAuth } from './middleware/auth.js';
 import { aiRateLimiter } from './middleware/rateLimit.js';
-import { todayInTz } from './lib/dateTime.js';
+import { todayInTz, isValidTimezone } from './lib/dateTime.js';
 import authRouter from './routes/auth.js';
 import tasksRouter from './routes/tasks.js';
 import projectsRouter from './routes/projects.js';
@@ -53,8 +53,10 @@ app.post('/api/billing/webhook', express.raw({ type: 'application/json' }), padd
 app.use(express.json({ limit: '1mb' }));
 
 app.use((req, _res, next) => {
+  // Only a valid IANA zone is trusted; anything else falls back to UTC instead
+  // of throwing inside toLocaleDateString later (a garbage header 500'd AI routes).
   const tz = req.get('X-Client-Timezone');
-  if (tz && typeof tz === 'string' && tz.length <= 64) {
+  if (isValidTimezone(tz)) {
     req.clientTimezone = tz;
   }
   // "Today" in the user's local timezone (falls back to UTC). Used by any route

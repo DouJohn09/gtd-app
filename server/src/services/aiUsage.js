@@ -11,11 +11,12 @@ const DAILY_LIMITS = {
   pro: Number(process.env.AI_DAILY_LIMIT_PRO) || 0,
 };
 
-// UTC calendar day. Reset happens at UTC midnight — acceptable for a soft,
-// non-punitive valve. Revisit (per-user timezone) only if users complain about
-// the reset landing mid-evening.
-function today() {
-  return new Date().toISOString().split('T')[0];
+// The daily bucket is the USER's calendar day: callers pass `req.today`, which
+// index.js derives from the X-Client-Timezone header, so the cap resets at the
+// user's local midnight (and "resets at midnight" in the UI is true). Falls back
+// to the UTC date when no day is given (scripts, tests).
+function dayOr(day) {
+  return day || new Date().toISOString().split('T')[0];
 }
 
 // Tier resolution reads the user's live plan (billing #5): a Pro subscription
@@ -30,50 +31,22 @@ async function limitFor(userId) {
   return DAILY_LIMITS[tier] ?? 0;
 }
 
-export async function getUsageToday(userId) {
+export async function getUsageToday(userId, day) {
   const { rows } = await pool.query(
     'SELECT count FROM ai_usage WHERE user_id = $1 AND usage_date = $2',
-    [userId, today()]
+    [userId, dayOr(day)]
   );
   return rows[0]?.count ?? 0;
 }
 
-async function increment(userId, weight) {
+async function increment(userId, weight, day) {
   await pool.query(
     `INSERT INTO ai_usage (user_id, usage_date, count)
      VALUES ($1, $2, $3)
      ON CONFLICT (user_id, usage_date)
      DO UPDATE SET count = ai_usage.count + EXCLUDED.count`,
-    [userId, today(), weight]
+    [userId, dayOr(day), weight]
   );
-}
-
-// Charge `weight` AI calls against today's budget. Increments only when allowed,
-// so a throttled request never inflates the counter. Check-and-increment happens
-// in a single statement: the upsert's WHERE clause only lets the increment
-// through while under the cap, so concurrent requests at the boundary can't
-// both slip past. No row returned = over budget.
-export async function consume(userId, weight = 1) {
-  const limit = await limitFor(userId);
-  const unlimited = limit <= 0;
-  const { rows } = await pool.query(
-    `INSERT INTO ai_usage (user_id, usage_date, count)
-     VALUES ($1, $2, $3)
-     ON CONFLICT (user_id, usage_date)
-     DO UPDATE SET count = ai_usage.count + EXCLUDED.count
-     WHERE $4::boolean OR ai_usage.count < $5::int
-     RETURNING count`,
-    [userId, today(), weight, unlimited, limit]
-  );
-  const allowed = rows.length > 0;
-  const used = allowed ? rows[0].count : await getUsageToday(userId);
-  return {
-    allowed,
-    used,
-    limit: unlimited ? null : limit,
-    unlimited,
-    remaining: unlimited ? null : Math.max(0, limit - used),
-  };
 }
 
 // Pre-flight cap check for the gate: is the user under budget right now? Read
@@ -82,10 +55,10 @@ export async function consume(userId, weight = 1) {
 // never burn budget. A boundary race between two concurrent requests can let both
 // through and overshoot the cap by a hair; acceptable for a soft, non-punitive
 // daily valve (and the counter is observational until AI_DAILY_LIMIT_* is set).
-export async function check(userId) {
+export async function check(userId, day) {
   const limit = await limitFor(userId);
   const unlimited = limit <= 0;
-  const used = await getUsageToday(userId);
+  const used = await getUsageToday(userId, day);
   return {
     allowed: unlimited || used < limit,
     used,
@@ -97,14 +70,14 @@ export async function check(userId) {
 
 // Record `weight` successful AI calls against today's budget. Call only after the
 // AI work actually succeeded, so failures and no-ops aren't counted.
-export async function charge(userId, weight = 1) {
-  await increment(userId, weight);
+export async function charge(userId, weight = 1, day) {
+  await increment(userId, weight, day);
 }
 
 // Read-only snapshot for the client (usage meter / upgrade nudge). Does not consume.
-export async function getStatus(userId) {
+export async function getStatus(userId, day) {
   const limit = await limitFor(userId);
-  const used = await getUsageToday(userId);
+  const used = await getUsageToday(userId, day);
   const unlimited = limit <= 0;
   return {
     tier: await getTier(userId),

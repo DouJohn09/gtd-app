@@ -59,7 +59,7 @@ export default function QuickCapture({ onCapture, placeholder = "Quick capture �
           // there. No upgrade modal here on purpose — capture is fire-and-forget,
           // and interrupting someone mid-thought to sell them is the opposite of
           // what this app is for.
-          if (throttled) addToast("Captured to inbox — that's today's AI actions used up", 'info');
+          if (throttled) addToast("Captured to inbox — today's AI actions are used up (resets at midnight)", 'info');
           else if (fallback || !ai) addToast('Captured to inbox (AI unavailable)', 'info');
           else if (bookedSlot) addToast(formatBookedToast(bookedSlot), 'success');
           else if (slotSearchFailed) addToast('No free slot found — captured without booking', 'info');
@@ -75,7 +75,9 @@ export default function QuickCapture({ onCapture, placeholder = "Quick capture �
       } catch (error) {
         console.error('Failed to capture:', error);
         const snippet = text.length > 40 ? text.slice(0, 40) + '…' : text;
-        addToast(`Failed to capture "${snippet}"`, 'error');
+        // 413 = too long for a capture; the server says where the text belongs.
+        if (error?.status === 413) addToast(error.message, 'info');
+        else addToast(`Failed to capture "${snippet}"`, 'error');
       }
     })();
   };

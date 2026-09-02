@@ -32,7 +32,7 @@ export async function requireAiEnabled(req, res, next) {
 // Metering must never break a feature someone may be paying for.
 export async function enforceAiLimit(req, res, next) {
   try {
-    const status = await check(req.user.id);
+    const status = await check(req.user.id, req.today);
     if (!status.allowed) {
       // Hitting the cap is the moment of peak intent — the user wants an AI
       // action right now. For Free users we tag the response with the same
@@ -46,8 +46,8 @@ export async function enforceAiLimit(req, res, next) {
         error: 'daily_ai_limit',
         ...(isFree ? { code: 'limit_reached', resource: 'AI actions today' } : {}),
         message: isFree
-          ? `You've used all ${status.limit} of today's AI actions. They reset tomorrow — Pro gets a much higher daily limit.`
-          : `You've used all ${status.limit} of today's AI actions. They reset tomorrow.`,
+          ? `You've used all ${status.limit} of today's AI actions. They reset at midnight — Pro gets a much higher daily limit.`
+          : `You've used all ${status.limit} of today's AI actions. They reset at midnight.`,
         limit: status.limit,
         used: status.used,
       });
@@ -65,7 +65,7 @@ export async function enforceAiLimit(req, res, next) {
 // response the user already earned.
 export async function chargeAiUsage(req, weight = req.aiWeight ?? 1) {
   try {
-    await charge(req.user.id, weight);
+    await charge(req.user.id, weight, req.today);
   } catch (err) {
     console.error('chargeAiUsage error (non-fatal):', err);
   }

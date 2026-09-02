@@ -66,11 +66,24 @@ function aiFailed(res, result) {
 
 const router = Router();
 
+// Free-text inputs are bounded before any provider call. The body limit alone
+// (1 MB) would let one paste fall through Groq's context window onto the paid
+// OpenAI fallback at ~225k tokens, and a failed call is never charged, so an
+// unbounded input is a free, repeatable cost amplifier.
+const MAX_CAPTURE_CHARS = 2_000;   // a captured thought, not a document
+const MAX_NOTES_CHARS = 20_000;    // import-notes: a long meeting note / brain dump
+
 router.post('/smart-capture', async (req, res) => {
   try {
     const { text } = req.body;
-    if (!text?.trim()) {
+    if (typeof text !== 'string' || !text.trim()) {
       return res.status(400).json({ error: 'Text is required' });
+    }
+    if (text.length > MAX_CAPTURE_CHARS) {
+      return res.status(413).json({
+        error: 'text_too_long',
+        message: `Keep a capture under ${MAX_CAPTURE_CHARS.toLocaleString()} characters — for longer text use Import notes.`,
+      });
     }
     const rawText = text.trim();
     const urls = rawText.match(/https?:\/\/[^\s]+/gi) || [];
@@ -93,7 +106,7 @@ router.post('/smart-capture', async (req, res) => {
     let ai = null;
     let throttled = false;
     if (aiMode !== 'off') {
-      const budget = await check(req.user.id);
+      const budget = await check(req.user.id, req.today);
       throttled = !budget.allowed;
       if (budget.allowed) {
         ai = await smartCapture(rawText, contexts, projects, today, dayName, history, openTitles);
@@ -102,7 +115,7 @@ router.post('/smart-capture', async (req, res) => {
         if (ai?.error) ai = null;
         // Charge only for enrichment we actually delivered — a throttle or a
         // provider failure (raw-capture fallback) doesn't consume budget.
-        if (ai) await charge(req.user.id);
+        if (ai) await charge(req.user.id, 1, req.today);
       }
     }
 
@@ -200,7 +213,7 @@ router.post('/smart-capture', async (req, res) => {
 
 router.get('/usage', async (req, res) => {
   try {
-    res.json(await getStatus(req.user.id));
+    res.json(await getStatus(req.user.id, req.today));
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Internal server error' });
@@ -572,8 +585,14 @@ router.post('/shutdown-defer', async (req, res) => {
 router.post('/import-notes', requireAiEnabled, enforceAiLimit, async (req, res) => {
   try {
     const { text } = req.body;
-    if (!text || !text.trim()) {
+    if (typeof text !== 'string' || !text.trim()) {
       return res.status(400).json({ error: 'No text provided' });
+    }
+    if (text.length > MAX_NOTES_CHARS) {
+      return res.status(413).json({
+        error: 'text_too_long',
+        message: `That's over ${MAX_NOTES_CHARS.toLocaleString()} characters — split it into smaller chunks.`,
+      });
     }
 
     const [userContexts, allProjects] = await Promise.all([
