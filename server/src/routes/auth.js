@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { sendWelcome, notifyFounderSignup } from '../services/email.js';
 import rateLimit from 'express-rate-limit';
 import { OAuth2Client } from 'google-auth-library';
 import jwt from 'jsonwebtoken';
@@ -80,6 +81,10 @@ router.post('/google', loginLimiter, async (req, res) => {
       await Promise.all(defaultContexts.map(ctx =>
         pool.query('INSERT INTO contexts (name, user_id) VALUES ($1, $2)', [ctx, id])
       ));
+
+      // Fire-and-forget: mail must never delay or fail a sign-in.
+      sendWelcome(email, name).catch(err => console.error('[email] welcome failed:', err.message));
+      notifyFounderSignup({ email, name, id }).catch(err => console.error('[email] founder notice failed:', err.message));
     }
 
     const token = jwt.sign(

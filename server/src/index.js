@@ -4,7 +4,8 @@ import cors from 'cors';
 import helmet from 'helmet';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
-import { pingDb } from './db/pool.js';
+import { pingDb, pool } from './db/pool.js';
+import { captureError, flushErrors } from './lib/observability.js';
 import { requireAuth } from './middleware/auth.js';
 import { aiRateLimiter } from './middleware/rateLimit.js';
 import { todayInTz, isValidTimezone } from './lib/dateTime.js';
@@ -80,8 +81,16 @@ app.use('/api/custom-lists', requireAuth, customListsRouter);
 app.use('/api/billing', requireAuth, billingRouter);
 app.use('/api/preferences', requireAuth, preferencesRouter);
 
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+// Health touches the database so a wedged pool or a dead Postgres shows up
+// here (Railway restarts on non-2xx), not only in user-facing 500s.
+app.get('/api/health', async (req, res) => {
+  try {
+    await pool.query('SELECT 1');
+    res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  } catch (err) {
+    console.error('[health] db check failed:', err.message);
+    res.status(503).json({ status: 'degraded', error: 'database_unreachable' });
+  }
 });
 
 // Expose public client config to the frontend (all safe-to-publish values):
@@ -109,6 +118,11 @@ app.get('/api/config', async (req, res) => {
       },
     },
   });
+});
+
+// Unknown API routes answer JSON, not the SPA/landing HTML fallback below.
+app.use('/api', (req, res) => {
+  res.status(404).json({ error: 'not_found', message: `No route for ${req.method} ${req.originalUrl}` });
 });
 
 // Static + SPA routing in production:
@@ -149,11 +163,70 @@ if (process.env.NODE_ENV === 'production') {
   });
 }
 
+// Final error handler: every thrown/next(err) error becomes JSON with a stable
+// shape and never leaks a stack. Body-parser errors get their proper 4xx.
+// eslint-disable-next-line no-unused-vars
+app.use((err, req, res, _next) => {
+  if (err?.type === 'entity.parse.failed') {
+    return res.status(400).json({ error: 'invalid_json', message: 'Request body is not valid JSON' });
+  }
+  if (err?.type === 'entity.too.large') {
+    return res.status(413).json({ error: 'payload_too_large', message: 'Request body is too large' });
+  }
+  const status = Number.isInteger(err?.status) && err.status >= 400 && err.status < 600 ? err.status : 500;
+  if (status >= 500) {
+    console.error(`[error] ${req.method} ${req.originalUrl}`, err);
+    captureError(err, { userId: req.user?.id, route: `${req.method} ${req.route?.path || req.path}` });
+  }
+  if (res.headersSent) return;
+  res.status(status).json({
+    error: status >= 500 ? 'internal_error' : (err.code || 'request_failed'),
+    message: status >= 500 ? 'Something went wrong on our side' : err.message,
+  });
+});
+
+let server;
+
+async function shutdown(signal) {
+  console.log(`[shutdown] ${signal} received — closing`);
+  // Railway sends SIGTERM on redeploy. Stop accepting, let in-flight requests
+  // finish, return pooled connections, then exit. Hard-exit after 10s so a
+  // stuck connection can't keep the old instance alive.
+  const force = setTimeout(() => { console.error('[shutdown] forced exit'); process.exit(1); }, 10_000);
+  force.unref();
+  try {
+    await new Promise((resolve) => (server ? server.close(resolve) : resolve()));
+    await pool.end();
+    await flushErrors();
+  } catch (err) {
+    console.error('[shutdown] error while closing:', err);
+  }
+  process.exit(0);
+}
+
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));
+process.on('unhandledRejection', (reason) => {
+  console.error('[unhandledRejection]', reason);
+  captureError(reason instanceof Error ? reason : new Error(String(reason)), { route: 'unhandledRejection' });
+});
+process.on('uncaughtException', async (err) => {
+  console.error('[uncaughtException]', err);
+  captureError(err, { route: 'uncaughtException' });
+  await flushErrors();
+  process.exit(1);
+});
+
 async function start() {
   await pingDb();
-  app.listen(PORT, () => {
+  server = app.listen(PORT, () => {
     console.log(`Cleartable server running on http://localhost:${PORT}`);
   });
 }
 
-start();
+start().catch(async (err) => {
+  console.error('Failed to start:', err);
+  captureError(err, { route: 'start' });
+  await flushErrors();
+  process.exit(1);
+});
