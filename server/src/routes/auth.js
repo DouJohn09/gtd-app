@@ -56,6 +56,17 @@ router.post('/google', loginLimiter, async (req, res) => {
         'UPDATE users SET last_login = NOW(), name = $1, picture = $2, timezone = COALESCE($3, timezone) WHERE id = $4',
         [name, picture, tz, user.id]
       );
+      // Identity is google_id; the email column follows Google's current
+      // address so account mail reaches the user. Guarded against the (rare)
+      // case where another account already holds that address.
+      if (email && email !== user.email) {
+        const { rowCount } = await pool.query(
+          `UPDATE users SET email = $1 WHERE id = $2
+             AND NOT EXISTS (SELECT 1 FROM users WHERE email = $1 AND id <> $2)`,
+          [email, user.id]
+        );
+        if (rowCount === 1) user.email = email;
+      }
 
       // Seed default contexts for existing users who don't have any
       const { rows: ctxCountRows } = await pool.query(
@@ -208,12 +219,20 @@ router.delete('/account', requireAuth, async (req, res) => {
   const userId = req.user.id;
   try {
     // Best-effort external cleanup — log failures but proceed with erasure.
+    let email = null;
     try {
-      const { rows } = await pool.query('SELECT paddle_subscription_id FROM users WHERE id = $1', [userId]);
+      const { rows } = await pool.query('SELECT email, paddle_subscription_id FROM users WHERE id = $1', [userId]);
+      email = rows[0]?.email || null;
       const subId = rows[0]?.paddle_subscription_id;
       if (subId) await cancelSubscription(subId);
     } catch (err) {
       console.error('Account deletion: Paddle cancel failed (continuing):', err.message);
+    }
+    // The legacy waitlist row is the one piece of this person's data outside
+    // the users cascade; erasure means it goes too.
+    if (email) {
+      await pool.query('DELETE FROM waitlist WHERE email = $1', [email]).catch(err =>
+        console.error('Account deletion: waitlist cleanup failed (continuing):', err.message));
     }
     try {
       await revokeCalendarAccess(userId);

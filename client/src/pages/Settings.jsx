@@ -21,6 +21,11 @@ export default function Settings() {
   const [newContextName, setNewContextName] = useState('');
   const [addingContext, setAddingContext] = useState(false);
   const [contextToDelete, setContextToDelete] = useState(null);
+  // Today's AI usage — the cap was invisible until the 429 arrived.
+  const [aiUsage, setAiUsage] = useState(null);
+  useEffect(() => {
+    api.ai.usage().then(setAiUsage).catch(() => {});
+  }, []);
   const { mode, setMode } = useAiMode();
 
   useEffect(() => {
@@ -300,10 +305,18 @@ export default function Settings() {
           <Sparkles className="w-4 h-4" style={{ color: 'rgb(var(--violet-glow))' }} />
           AI assistance
         </h2>
-        <p className="text-text-3 text-sm mb-5 leading-relaxed">
+        <p className="text-text-3 text-sm mb-3 leading-relaxed">
           One dial for how much Cleartable acts on its own. You can change it
           any time — nothing you've already organized is touched.
         </p>
+        {aiUsage && mode !== 'off' && (
+          <p className="text-[12px] text-text-3 mb-5">
+            {aiUsage.unlimited
+              ? <>Today: <span className="text-text-2">{aiUsage.used}</span> AI actions used · no daily limit</>
+              : <>Today: <span className="text-text-2">{aiUsage.used} of {aiUsage.limit}</span> AI actions used · resets at midnight
+                  {aiUsage.tier === 'free' && <> · Pro raises the limit</>}</>}
+          </p>
+        )}
 
         <div className="space-y-2">
           {[

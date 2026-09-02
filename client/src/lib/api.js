@@ -158,6 +158,7 @@ export const api = {
     analyzeWeek: () => fetchApi('/ai/weekly-review/analyze', { method: 'POST' }),
     completeReview: (data) => fetchApi('/ai/complete-review', { method: 'POST', body: JSON.stringify(data) }),
     smartCapture: (text) => fetchApi('/ai/smart-capture', { method: 'POST', body: JSON.stringify({ text }) }),
+    usage: () => fetchApi('/ai/usage'),
     planDay: () => fetchApi('/ai/plan-day', { method: 'POST' }),
     dayBrief: () => fetchApi('/ai/day-brief'),
     shutdownDefer: (taskId, mode) => fetchApi('/ai/shutdown-defer', { method: 'POST', body: JSON.stringify({ taskId, mode }) }),
