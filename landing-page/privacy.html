@@ -1,8 +1,4 @@
 <!DOCTYPE html>
-<!--
-  DRAFT — requires human/legal review before publishing.
-  Verify sub-processor list matches production reality at publish time. (IČO 14136074 set.)
--->
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -29,7 +25,7 @@
       <a href="/" class="logo">clear<span>table</span></a>
       <div class="nav-right">
         <a href="/app" class="nav-link">Sign in</a>
-        <a href="/#waitlist" class="nav-cta">Join waitlist</a>
+        <a href="/app" class="nav-cta">Start free</a>
       </div>
     </div>
   </nav>
@@ -37,7 +33,7 @@
   <main class="legal">
     <div class="eyebrow">privacy</div>
     <h1>Privacy Policy</h1>
-    <div class="updated">Last updated: 13 June 2026</div>
+    <div class="updated">Last updated: 2 September 2026</div>
     <p class="intro">
       This policy explains what personal data Cleartable collects, why, who we share it with, and the rights you
       have over it. Cleartable is operated by an individual entrepreneur established in the Czech Republic, and this
@@ -55,14 +51,16 @@
     <h3>Account data</h3>
     <ul>
       <li>If you sign in with Google: your email address, name, and profile picture, provided by Google OAuth. We never receive or store your Google password.</li>
+      <li>Your time zone (sent by your browser so dates and daily limits line up with your day) and your in-app preferences (AI mode, onboarding progress).</li>
     </ul>
     <h3>Content you create</h3>
     <ul>
-      <li>Tasks, projects, notes, contexts, habits, custom lists, and the metadata you attach to them (due dates, energy levels, etc.). This is your data — we process it only to provide the service.</li>
+      <li>Tasks, projects, notes, contexts, habits, custom lists, daily plans, and the metadata you attach to them (due dates, energy levels, etc.). This is your data — we process it only to provide the service.</li>
+      <li>A per-day count of AI actions on your account, kept only to enforce plan limits.</li>
     </ul>
     <h3>Google Calendar (optional)</h3>
     <ul>
-      <li>Only if you explicitly connect it: OAuth access/refresh tokens, calendar events we read to display alongside your tasks, and events we create in a dedicated "Cleartable" calendar. You can disconnect at any time, which revokes and deletes these tokens.</li>
+      <li>Only if you explicitly connect it: OAuth access/refresh tokens, calendar events we read to display alongside your tasks, and events we create in a dedicated "Cleartable" calendar. Tokens are kept until you disconnect or delete your account; disconnecting revokes and deletes them.</li>
     </ul>
     <h3>Payment data</h3>
     <ul>
@@ -71,7 +69,7 @@
     <h3>Technical data</h3>
     <ul>
       <li>An authentication token (JWT) and preference settings stored in your browser's local storage. We do not use advertising or cross-site tracking cookies.</li>
-      <li><strong>Analytics (with your consent):</strong> on the marketing website we use Google Analytics to understand how visitors use the site. It runs <strong>only if you accept</strong> the cookie banner, and your choice is remembered for 12 months. You can <a href="#" onclick="if(window.ctConsentReset){ctConsentReset();}else{localStorage.removeItem('ct-consent');location.reload();}return false;">reset your cookie choice</a> at any time. Declining never limits what you can do on the site or in the app.</li>
+      <li><strong>Website analytics:</strong> the marketing site uses Cloudflare Web Analytics, which is cookieless and does not identify you. We do not currently run Google Analytics or any consent-based tracker. If that changes, a cookie banner will ask first and this policy will be updated.</li>
     </ul>
 
     <h2>3. How we use your data</h2>
@@ -79,13 +77,13 @@
       <li>To provide and operate the app (store and sync your tasks, run the GTD workflow).</li>
       <li>To process your text with AI features when you use them (see section 5).</li>
       <li>To manage your subscription and unlock paid features.</li>
-      <li>To send you essential account and launch communications. Marketing emails are sent only with your consent (e.g. waitlist signup) and you can unsubscribe at any time.</li>
+      <li>To send you essential account and launch communications. Marketing emails are sent only with your consent (e.g. product updates you opt into) and you can unsubscribe at any time.</li>
     </ul>
 
     <h2>4. Legal bases for processing (GDPR Art. 6)</h2>
     <ul>
       <li><strong>Performance of a contract</strong> — providing the app and your account.</li>
-      <li><strong>Consent</strong> — connecting Google Calendar, marketing emails, and website analytics cookies (Google Analytics). You may withdraw consent at any time.</li>
+      <li><strong>Consent</strong> — connecting Google Calendar and marketing emails. You may withdraw consent at any time.</li>
       <li><strong>Legitimate interests</strong> — keeping the service secure and functioning.</li>
       <li><strong>Legal obligation</strong> — tax and accounting records (handled via our Merchant of Record).</li>
     </ul>
@@ -107,10 +105,11 @@
       <tr><th>Provider</th><th>Purpose</th><th>Region</th></tr>
       <tr><td>Railway</td><td>Application hosting &amp; PostgreSQL database (where your tasks are stored)</td><td>EU / US</td></tr>
       <tr><td>Cloudflare</td><td>DNS, CDN/proxy for the website, and privacy-friendly (cookieless) web analytics</td><td>EU / US</td></tr>
-      <tr><td>Google</td><td>Sign-in (OAuth), optional Calendar sync, and website analytics (Google Analytics, consent-based)</td><td>EU / US</td></tr>
+      <tr><td>Google</td><td>Sign-in (OAuth) and optional Calendar sync</td><td>EU / US</td></tr>
       <tr><td>Groq</td><td>AI processing (capture &amp; objective ops)</td><td>US</td></tr>
       <tr><td>OpenAI</td><td>AI processing (fallback &amp; advisory ops)</td><td>US</td></tr>
       <tr><td>Paddle</td><td>Payments &amp; subscription management (Merchant of Record)</td><td>EU / US</td></tr>
+      <tr><td>Resend</td><td>Transactional email (account and service notices) — receives your email address and the message</td><td>EU (Ireland) / US</td></tr>
     </table>
 
     <h2>7. International transfers</h2>
