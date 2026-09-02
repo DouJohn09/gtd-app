@@ -18,8 +18,15 @@ const TASK_FIELDS = [
 ];
 const PROJECT_FIELDS = ['id', 'name', 'description', 'status', 'outcome', 'execution_mode', 'created_at', 'updated_at'];
 const CONTEXT_FIELDS = ['id', 'name', 'created_at'];
-const HABIT_FIELDS = ['id', 'name', 'description', 'frequency', 'target_days', 'category', 'color', 'active', 'created_at'];
-const HABIT_LOG_FIELDS = ['id', 'habit_id', 'completed_date', 'created_at'];
+// `type` (build/quit) and log `status`/`note` (done/skipped/slip + note) were
+// missing from v1 exports, so a round-trip turned quit habits into build habits
+// and rest days into completions. v2 carries them.
+const HABIT_FIELDS = ['id', 'name', 'description', 'type', 'frequency', 'target_days', 'category', 'color', 'active', 'created_at'];
+const HABIT_LOG_FIELDS = ['id', 'habit_id', 'completed_date', 'status', 'note', 'created_at'];
+const CUSTOM_LIST_FIELDS = ['id', 'name', 'icon', 'color', 'position', 'created_at'];
+const LIST_ITEM_FIELDS = ['id', 'list_id', 'title', 'notes', 'url', 'status', 'rating', 'position', 'linked_task_id', 'created_at', 'completed_at'];
+const DAILY_PLAN_FIELDS = ['plan_date', 'payload', 'applied_at', 'created_at'];
+const WEEKLY_REVIEW_FIELDS = ['completed_at', 'inbox_count_at_start', 'tasks_completed', 'tasks_moved', 'tasks_deleted', 'ai_summary'];
 
 function pick(obj, fields) {
   const out = {};
@@ -34,23 +41,27 @@ function todayStamp() {
 router.get('/json', async (req, res) => {
   try {
     const userId = req.user.id;
-    const [tasksRaw, projectsRaw, contextsRaw, habitsRaw, habitLogsRaw] = await Promise.all([
-      getRows('tasks', userId),
-      getRows('projects', userId),
-      getRows('contexts', userId),
-      getRows('habits', userId),
-      getRows('habit_logs', userId),
-    ]);
-
-    const tasks = tasksRaw.map(t => pick(t, TASK_FIELDS));
-    const projects = projectsRaw.map(p => pick(p, PROJECT_FIELDS));
-    const contexts = contextsRaw.map(c => pick(c, CONTEXT_FIELDS));
-    const habits = habitsRaw.map(h => pick(h, HABIT_FIELDS));
-    const habit_logs = habitLogsRaw.map(l => pick(l, HABIT_LOG_FIELDS));
+    // Everything the user created, so this doubles as the GDPR Art. 20 export.
+    // Sequential rather than Promise.all: nine parallel queries on a 5-slot
+    // pool would starve every other request while one user exports.
+    const tasks = (await getRows('tasks', userId)).map(t => pick(t, TASK_FIELDS));
+    const projects = (await getRows('projects', userId)).map(p => pick(p, PROJECT_FIELDS));
+    const contexts = (await getRows('contexts', userId)).map(c => pick(c, CONTEXT_FIELDS));
+    const habits = (await getRows('habits', userId)).map(h => pick(h, HABIT_FIELDS));
+    const habit_logs = (await getRows('habit_logs', userId)).map(l => pick(l, HABIT_LOG_FIELDS));
+    const custom_lists = (await getRows('custom_lists', userId)).map(l => pick(l, CUSTOM_LIST_FIELDS));
+    const list_items = (await getRows('list_items', userId)).map(i => pick(i, LIST_ITEM_FIELDS));
+    const daily_plans = (await getRows('daily_plans', userId)).map(d => pick(d, DAILY_PLAN_FIELDS));
+    const weekly_reviews = (await getRows('weekly_reviews', userId)).map(w => pick(w, WEEKLY_REVIEW_FIELDS));
+    const { rows: prefRows } = await pool.query(
+      'SELECT timezone, ai_mode, onboarded_at FROM users WHERE id = $1',
+      [userId]
+    );
+    const preferences = pick(prefRows[0] || {}, ['timezone', 'ai_mode', 'onboarded_at']);
 
     const payload = {
       app: 'Cleartable',
-      version: 1,
+      version: 2,
       exported_at: new Date().toISOString(),
       counts: {
         tasks: tasks.length,
@@ -58,8 +69,14 @@ router.get('/json', async (req, res) => {
         contexts: contexts.length,
         habits: habits.length,
         habit_logs: habit_logs.length,
+        custom_lists: custom_lists.length,
+        list_items: list_items.length,
+        daily_plans: daily_plans.length,
+        weekly_reviews: weekly_reviews.length,
       },
-      tasks, projects, contexts, habits, habit_logs,
+      preferences,
+      tasks, projects, contexts, habits, habit_logs, custom_lists, list_items,
+      daily_plans, weekly_reviews,
     };
 
     res.setHeader('Content-Type', 'application/json; charset=utf-8');

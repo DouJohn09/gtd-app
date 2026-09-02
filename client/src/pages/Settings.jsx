@@ -126,8 +126,16 @@ export default function Settings() {
         counts.projects_merged && `${counts.projects_merged} projects merged`,
         counts.contexts && `${counts.contexts} contexts`,
         counts.habits && `${counts.habits} habits`,
+        counts.habit_logs && `${counts.habit_logs} habit logs`,
+        counts.custom_lists && `${counts.custom_lists} lists`,
+        counts.list_items && `${counts.list_items} list items`,
       ].filter(Boolean).join(' · ');
-      addToast(`Imported: ${summary || 'nothing new'}`, 'success');
+      const skipped = (counts.projects_skipped || 0) + (counts.habits_skipped || 0) + (counts.custom_lists_skipped || 0);
+      addToast(
+        `Imported: ${summary || 'nothing new'}` +
+          (skipped ? ` · ${skipped} skipped (Free plan limit)` : ''),
+        skipped ? 'info' : 'success'
+      );
       setPreview(null);
     } catch (err) {
       addToast(err.message || 'Import failed', 'error');
@@ -247,7 +255,17 @@ export default function Settings() {
                   {preview.summary.habit_logs > 0 && <> · {preview.summary.habit_logs} log entries</>}
                 </li>
               )}
+              {preview.summary.custom_lists > 0 && (
+                <li>
+                  {preview.summary.custom_lists} list{preview.summary.custom_lists === 1 ? '' : 's'}
+                  {preview.summary.list_items > 0 && <> · {preview.summary.list_items} items</>}
+                </li>
+              )}
+              {preview.summary.weekly_reviews > 0 && <li>{preview.summary.weekly_reviews} weekly-review records</li>}
             </ul>
+            <p className="text-[11px] text-text-3 mb-4">
+              Items beyond your plan's limits are skipped, not imported partially. Daily plans aren't restored.
+            </p>
 
             {preview.sample?.length > 0 && (
               <div className="font-mono text-[11px] text-text-3 mb-4">
