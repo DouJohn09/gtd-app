@@ -158,8 +158,18 @@ if (process.env.NODE_ENV === 'production') {
   // etc. directly; the catch-all falls back to landing-page/index.html for
   // anything not matched above (including bare `/`).
   app.use(express.static(landingPath));
-  app.get('*', (req, res) => {
-    res.sendFile(join(landingPath, 'index.html'));
+
+  // /pricing.html never existed as a file; external listings (Paddle) point at
+  // it, so send them to the pricing section of the homepage.
+  app.get('/pricing.html', (req, res) => res.redirect(301, '/#pricing'));
+
+  // Everything else is a real 404. Serving index.html with a 200 for unknown
+  // paths made every vulnerability probe (/.env, /wp-admin/...) look like a
+  // page view and gave search engines thousands of soft-404 duplicates.
+  app.use((req, res) => {
+    res.status(404);
+    if (req.accepts('html')) return res.sendFile(join(landingPath, '404.html'));
+    res.type('txt').send('Not found');
   });
 }
 
