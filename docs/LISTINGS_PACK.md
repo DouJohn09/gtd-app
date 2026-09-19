@@ -101,7 +101,7 @@ It's been my daily driver for a while. It just opened to the public, so the hone
 
 ## 7. Per-site notes (order = easiest and most useful first)
 
-1. **AlternativeTo** — https://alternativeto.net/manage/submit-application/ · Submit as alternative to Motion, Todoist, TickTick, Sunsama. Use the long description, tick "Freemium", platforms Web + PWA. Backlink is dofollow once approved.
+1. **AlternativeTo** — https://alternativeto.net/ → sign in → "Add a new application" (top-right user menu); the old /manage/submit-application URL is dead · Submit as alternative to Motion, Todoist, TickTick, Sunsama. Use the long description, tick "Freemium", platforms Web + PWA. Backlink is dofollow once approved.
 2. **SaaSHub** — https://www.saashub.com/submit · Same fields; add the "Alternative to" list, it drives their comparison pages.
 3. **There's An AI For That** — https://theresanaiforthat.com/submit/ · Category "Task management". One-liner + 50-word. Free listing has a queue; the paid fast-track is not worth it yet.
 4. **Futurepedia** — https://www.futurepedia.io/submit-tool · Medium description, tags, lead screenshot `app-plan.jpg` (the AI angle).
