@@ -9,6 +9,7 @@ import AIAssistant from './pages/AIAssistant';
 import Habits from './pages/Habits';
 import CompletedTasks from './pages/CompletedTasks';
 import WeeklyReview from './pages/WeeklyReview';
+import Insights from './pages/Insights';
 import Calendar from './pages/Calendar';
 import Settings from './pages/Settings';
 import CustomList from './pages/CustomList';
@@ -36,6 +37,7 @@ export default function App() {
         <Route path="habits" element={<Habits />} />
         <Route path="completed" element={<CompletedTasks />} />
         <Route path="review" element={<WeeklyReview />} />
+        <Route path="insights" element={<Insights />} />
         <Route path="calendar" element={<Calendar />} />
         <Route path="ai" element={<AIAssistant />} />
         <Route path="custom-lists/:listId" element={<CustomList />} />

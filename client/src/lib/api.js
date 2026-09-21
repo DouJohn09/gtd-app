@@ -126,6 +126,9 @@ export const api = {
     delete: (id) => fetchApi(`/contexts/${id}`, { method: 'DELETE' }),
   },
 
+  insights: {
+    get: () => fetchApi('/insights'),
+  },
   habits: {
     getAll: () => fetchApi('/habits'),
     getStats: () => fetchApi('/habits/stats'),

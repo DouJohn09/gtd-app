@@ -8,6 +8,7 @@ import { check, charge, getStatus } from '../services/aiUsage.js';
 import { enforceAiLimit, requireAiEnabled, chargeAiUsage } from '../middleware/aiLimit.js';
 import { getAiMode } from '../services/userPrefs.js';
 import { assertPlanWithinLimit, LimitError } from '../services/billing.js';
+import { recordAppliedBlocks, closeBlock, planReality, planningProfileText, calibrationLine } from '../services/insights.js';
 
 async function getUserContexts(userId) {
   const { rows } = await pool.query(
@@ -426,10 +427,13 @@ router.post('/plan-day', requireAiEnabled, enforceAiLimit, async (req, res) => {
   try {
     await assertPlanWithinLimit(req.user.id, req.today);
 
-    const [allCandidates, dayShape, userContexts] = await Promise.all([
+    const [allCandidates, dayShape, userContexts, reality] = await Promise.all([
       planCandidates(req.user.id, req.today),
       freeRangesFor(req.user.id, req.today, req.clientTimezone),
       getUserContexts(req.user.id),
+      // What this person's planned days actually looked like — feeds the
+      // "what we know about you" paragraph and, past 10 days, a block cap.
+      planReality(req.user.id, req.clientTimezone, { today: req.today }).catch(err => { console.error('planReality:', err); return null; }),
     ]);
 
     const candidates = allCandidates.slice(0, 40); // bound the prompt; ordered by priority DESC
@@ -465,9 +469,12 @@ router.post('/plan-day', requireAiEnabled, enforceAiLimit, async (req, res) => {
       workEnd: dayShape.workEnd,
       meetings,
       habits,
+      profile: planningProfileText(reality),
+      maxBlocks: reality?.level === 'firm' ? reality.suggestedBlocks : null,
     }, userContexts);
     if (aiFailed(res, result)) return;
     await chargeAiUsage(req);
+    result.calibration = calibrationLine(reality, result.plan.length);
 
     // Store the proposal WITHOUT touching applied_at. Re-proposing a day whose
     // plan is already applied (e.g. tapping "Plan my day" again in the afternoon
@@ -536,6 +543,11 @@ router.post('/apply-plan', async (req, res) => {
       'UPDATE daily_plans SET applied_at = NOW() WHERE user_id = $1 AND plan_date = $2',
       [req.user.id, req.today]
     );
+    // Fact record for Insights + planner calibration: which task sat in which
+    // block. Only blocks whose task update succeeded.
+    const appliedIds = new Set(updated.map(t => t.id));
+    recordAppliedBlocks(req.user.id, req.today, items.filter(i => appliedIds.has(i.taskId)))
+      .catch(err => console.error('recordAppliedBlocks:', err));
 
     res.json({ applied: updated.length, deferred: deferred.length, tasks: updated });
   } catch (error) {
@@ -574,6 +586,7 @@ router.post('/shutdown-defer', async (req, res) => {
 
     const task = await TaskModel.update(taskId, updates, req.user.id);
     if (!task) return res.status(404).json({ error: 'Task not found' });
+    closeBlock(req.user.id, task.id, mode).catch(err => console.error('closeBlock (shutdown):', err));
     syncTaskToCalendar(req.user.id, task, req.clientTimezone).catch(err => console.error('syncTaskToCalendar (shutdown):', err));
     res.json({ task, mode, moved_to: updates.due_date, scheduled_time: updates.scheduled_time ?? null });
   } catch (error) {

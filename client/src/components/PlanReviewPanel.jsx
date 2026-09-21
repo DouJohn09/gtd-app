@@ -73,7 +73,10 @@ export default function PlanReviewPanel({ result, onApplied, onCancel }) {
       </div>
 
       {result.summary && (
-        <p className="text-[13px] text-text-2 leading-relaxed mb-3">{result.summary}</p>
+        <p className={`text-[13px] text-text-2 leading-relaxed ${result.calibration ? 'mb-1.5' : 'mb-3'}`}>{result.summary}</p>
+      )}
+      {result.calibration && (
+        <p className="text-[12px] text-text-3 leading-relaxed mb-3">{result.calibration}</p>
       )}
 
       <div className="space-y-2">

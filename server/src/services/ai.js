@@ -697,10 +697,10 @@ THE DAY:
 
 CANDIDATE TASKS:
 ${taskList}
-
+${day.profile ? `\n${day.profile}\n` : ''}
 PLANNING RULES:
 - Place blocks INSIDE the free windows only; blocks must not overlap each other or the busy times.
-- Be realistic, not ambitious: plan at most ~80% of the free minutes. 3-6 blocks is a good day; fewer is fine.
+- Be realistic, not ambitious: plan at most ~80% of the free minutes. ${day.maxBlocks ? `This person's history says ${day.maxBlocks} blocks is the real ceiling today — do not exceed it.` : '3-6 blocks is a good day; fewer is fine.'}
 - duration_mins comes from the task's time estimate; when unknown, guess honestly (30 is a sane default).
 - Tasks due TODAY or OVERDUE come first unless clearly superseded.
 - Match energy to the day: high-energy/deep work in the longest early windows, shallow tasks in short gaps.
@@ -739,7 +739,16 @@ Respond with JSON:
       duration: b.duration_mins,
       reason: b.reason || '',
     }));
-  const { placed, overflow } = packPlan(blocks, day.freeRanges);
+  const { placed: packed, overflow: packOverflow } = packPlan(blocks, day.freeRanges);
+  // History-based ceiling (Insights → plan vs reality). The model was told; this
+  // makes it true regardless. Extra blocks become deferred with an honest reason.
+  let placed = packed, overflow = packOverflow;
+  if (day.maxBlocks && packed.length > day.maxBlocks) {
+    const kept = [...packed].sort((a, b) => a.start - b.start).slice(0, day.maxBlocks);
+    const keptIdx = new Set(kept.map(k => k.task_index));
+    overflow = [...packOverflow, ...packed.filter(p => !keptIdx.has(p.task_index)).map(p => ({ ...p, capped: true }))];
+    placed = kept;
+  }
 
   const deferred = (Array.isArray(parsed.deferred) ? parsed.deferred : [])
     .filter(d => !placed.some(p => p.task_index === d.task_index))
@@ -750,7 +759,11 @@ Respond with JSON:
     }));
   for (const o of overflow) {
     if (!deferred.some(d => d.task_index === o.task_index)) {
-      deferred.push({ task_index: o.task_index, move_to: nextDay(day.today), reason: 'No room left in today’s free windows.' });
+      deferred.push({
+        task_index: o.task_index,
+        move_to: nextDay(day.today),
+        reason: o.capped ? 'Kept today to what you usually finish — this moves to tomorrow.' : 'No room left in today’s free windows.',
+      });
     }
   }
 

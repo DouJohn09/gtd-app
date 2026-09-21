@@ -3,7 +3,7 @@ import { Outlet, NavLink } from 'react-router-dom';
 import {
   LayoutDashboard, Inbox, FolderKanban, ListTodo, Clock, CloudSun,
   Sparkles, Target, LogOut, CheckCircle2, RotateCcw, CalendarDays,
-  Command, Settings, MoreHorizontal, X, Plus, List,
+  Command, Settings, MoreHorizontal, X, Plus, List, BarChart3,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useAiMode } from '../hooks/useAiMode';
@@ -37,6 +37,7 @@ const navGroups = [
     items: [
       { to: '/habits',    icon: Target,        label: 'Habits' },
       { to: '/review',    icon: RotateCcw,     label: 'Weekly Review' },
+      { to: '/insights',  icon: BarChart3,     label: 'Insights' },
       { to: '/ai',        icon: Sparkles,      label: 'AI Assistant' },
       { to: '/completed', icon: CheckCircle2,  label: 'Completed' },
     ],
