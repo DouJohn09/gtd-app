@@ -239,24 +239,26 @@ export function validatePlanWeek(taskCount, allowedDates) {
     const problems = [];
     if (!Array.isArray(r.placements)) return ['placements must be an array'];
     if (r.unplaced != null && !Array.isArray(r.unplaced)) problems.push('unplaced must be an array or omitted');
+    // Drop, don't reject. With 20+ candidates the model reliably invents an
+    // index or two (seen live 2026-09-21: gpt-4.1-mini failed the repair loop
+    // twice on "task_index must be 1-22"). The route's reconcile pass already
+    // handles missing/duplicate tasks and out-of-window dates, so a bad entry
+    // costs nothing; a rejected response costs the whole call.
     const seen = new Set();
-    r.placements.forEach((pl, i) => {
-      const label = `placements[${i}].`;
+    const keepPlacement = (pl) => {
       coerce(pl, 'task_index', { numeric: true });
-      if (!Number.isInteger(pl.task_index) || pl.task_index < 1 || pl.task_index > taskCount) {
-        problems.push(`${label}task_index must be an integer 1-${taskCount}`);
-      } else if (seen.has(pl.task_index)) {
-        problems.push(`${label}task_index ${pl.task_index} appears twice`);
-      } else seen.add(pl.task_index);
-      checkDate(pl, 'date', problems, label);
-      if (pl.date && !allowed.has(pl.date)) problems.push(`${label}date ${pl.date} is outside the week (${allowedDates[0]}..${allowedDates[allowedDates.length - 1]})`);
-    });
-    (Array.isArray(r.unplaced) ? r.unplaced : []).forEach((u, i) => {
-      const label = `unplaced[${i}].`;
+      if (!Number.isInteger(pl.task_index) || pl.task_index < 1 || pl.task_index > taskCount) return false;
+      if (seen.has(pl.task_index)) return false;
+      seen.add(pl.task_index);
+      coerce(pl, 'date');
+      if (!pl.date || !allowed.has(pl.date)) pl.date = null; // reconcile picks a day within bounds
+      return true;
+    };
+    r.placements = r.placements.filter(pl => pl && typeof pl === 'object' && keepPlacement(pl));
+    r.unplaced = (Array.isArray(r.unplaced) ? r.unplaced : []).filter(u => {
+      if (!u || typeof u !== 'object') return false;
       coerce(u, 'task_index', { numeric: true });
-      if (!Number.isInteger(u.task_index) || u.task_index < 1 || u.task_index > taskCount) {
-        problems.push(`${label}task_index must be an integer 1-${taskCount}`);
-      }
+      return Number.isInteger(u.task_index) && u.task_index >= 1 && u.task_index <= taskCount && !seen.has(u.task_index);
     });
     return problems;
   };

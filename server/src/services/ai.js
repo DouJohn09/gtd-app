@@ -33,26 +33,34 @@ const PROVIDERS = { openai, groq };
 // behaves — JSON-schema adherence is Llama's one known weak spot, and this is
 // the safety net for it. Flip a task's primary to Groq once its eval passes
 // (see scripts/eval-*); the fallback keeps production safe meanwhile.
-const GROQ = 'llama-3.3-70b-versatile';
+// Groq's model. Overridable per environment so the next decommission is a
+// variable change, not a deploy. History: llama-3.3-70b-versatile vanished
+// from Groq on 2026-09-21 (404) and every Groq-first task limped through the
+// OpenAI fallback; the free tier that day was 8k tokens/min and 1k output
+// tokens/min per model — enough for short capture calls, not for planners.
+const GROQ = process.env.GROQ_MODEL || 'openai/gpt-oss-20b';
+const GROQ_FAST = { provider: 'groq', model: GROQ };
+const OAI_MINI = { provider: 'openai', model: 'gpt-4.1-mini' };
+const OAI_NANO = { provider: 'openai', model: 'gpt-4o-mini' };
 const ROUTING = {
-  // Migrated to Groq (eval-verified parity, see scripts/eval-smart-capture.mjs + eval-heavy-ops.mjs):
-  'smart-capture':     { primary: { provider: 'groq',   model: GROQ },     fallback: { provider: 'openai', model: 'gpt-4o-mini' } },
-  'process-inbox':     { primary: { provider: 'groq',   model: GROQ },     fallback: { provider: 'openai', model: 'gpt-4.1-mini' } },
-  'import-notes':      { primary: { provider: 'groq',   model: GROQ },     fallback: { provider: 'openai', model: 'gpt-4.1-mini' } },
-  'find-duplicates':   { primary: { provider: 'groq',   model: GROQ },     fallback: { provider: 'openai', model: 'gpt-4.1-mini' } },
-  'url-extract':       { primary: { provider: 'groq',   model: GROQ },     fallback: { provider: 'openai', model: 'gpt-4o-mini' } },
-  // Advisory ops (low-frequency, high-judgment). Flipped to Groq primary on
-  // 2026-06-30 after OpenAI hit a billing/quota 429 that left all four dead
-  // (fallback was null). Structural parity was proven in eval
-  // (scripts/eval-heavy-ops.mjs). Fallback downgraded gpt-4o → gpt-4.1-mini
-  // 2026-07-06: gpt-4o is legacy-priced (~6x the cost) and these ops only see
-  // the fallback when Groq is down or throttled — eval-verified parity below.
-  'daily-priorities':  { primary: { provider: 'groq', model: GROQ }, fallback: { provider: 'openai', model: 'gpt-4.1-mini' } },
-  'plan-day':          { primary: { provider: 'groq', model: GROQ }, fallback: { provider: 'openai', model: 'gpt-4.1-mini' } },
-  'plan-week':         { primary: { provider: 'groq', model: GROQ }, fallback: { provider: 'openai', model: 'gpt-4.1-mini' } },
-  'analyze-task':      { primary: { provider: 'groq', model: GROQ }, fallback: { provider: 'openai', model: 'gpt-4.1-mini' } },
-  'project-breakdown': { primary: { provider: 'groq', model: GROQ }, fallback: { provider: 'openai', model: 'gpt-4.1-mini' } },
-  'weekly-review':     { primary: { provider: 'groq', model: GROQ }, fallback: { provider: 'openai', model: 'gpt-4.1-mini' } },
+  // Short, latency-sensitive calls stay Groq-first (speed is the point of
+  // Smart Capture); OpenAI catches 429s and outages.
+  'smart-capture':     { primary: GROQ_FAST, fallback: OAI_NANO },
+  'url-extract':       { primary: GROQ_FAST, fallback: OAI_NANO },
+  // Everything with a long prompt or a long answer is OpenAI-first since
+  // 2026-09-21: Groq's free-tier per-minute caps make these 429 on a normal
+  // day, and each 429 is a wasted second before the fallback. gpt-4.1-mini
+  // passed the schema + ground-truth evals at 100% (scripts/eval-heavy-ops.mjs,
+  // eval-plan-day.mjs, 2026-07-27). Groq remains the fallback.
+  'process-inbox':     { primary: OAI_MINI, fallback: GROQ_FAST },
+  'import-notes':      { primary: OAI_MINI, fallback: GROQ_FAST },
+  'find-duplicates':   { primary: OAI_MINI, fallback: GROQ_FAST },
+  'daily-priorities':  { primary: OAI_MINI, fallback: GROQ_FAST },
+  'plan-day':          { primary: OAI_MINI, fallback: GROQ_FAST },
+  'plan-week':         { primary: OAI_MINI, fallback: GROQ_FAST },
+  'analyze-task':      { primary: OAI_MINI, fallback: GROQ_FAST },
+  'project-breakdown': { primary: OAI_MINI, fallback: GROQ_FAST },
+  'weekly-review':     { primary: OAI_MINI, fallback: GROQ_FAST },
 };
 
 // Per-task sampling + output caps. Classification/extraction tasks run at
@@ -69,7 +77,7 @@ const TASK_PARAMS = {
   'url-extract':       { temperature: 0 },
   'daily-priorities':  { temperature: 0.2, max_tokens: 1500 },
   'plan-day':          { temperature: 0.2, max_tokens: 2000 },
-  'plan-week':         { temperature: 0.2, max_tokens: 3000 },
+  'plan-week':         { temperature: 0.2, max_tokens: 4000 },
   'analyze-task':      { temperature: 0.2, max_tokens: 800 },
   'project-breakdown': { temperature: 0.4, max_tokens: 2048 },
   'weekly-review':     { temperature: 0.4, max_tokens: 3000 },
@@ -103,7 +111,10 @@ async function complete(task, params, validate = null) {
     try {
       let messages = params.messages;
       for (let round = 0; round < 2; round++) {
-        const res = await client.chat.completions.create({ ...tuning, ...params, messages, model });
+        // gpt-oss on Groq spends its max_tokens on hidden reasoning first;
+        // low effort keeps the JSON from being truncated on longer answers.
+        const extra = provider === 'groq' && /gpt-oss/.test(model) ? { reasoning_effort: 'low' } : {};
+        const res = await client.chat.completions.create({ ...tuning, ...params, ...extra, messages, model });
         const choice = res.choices[0];
         if (choice.finish_reason === 'length') throw new Error('response truncated (finish_reason=length)');
         const parsed = JSON.parse(choice.message.content);

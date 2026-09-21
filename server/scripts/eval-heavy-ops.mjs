@@ -112,11 +112,11 @@ const TESTS = {
 };
 
 // Models come from argv as provider:model (e.g. `node scripts/eval-heavy-ops.mjs
-// openai:gpt-4.1-mini groq:llama-3.3-70b-versatile`); no args = the original
+// openai:gpt-4.1-mini groq:openai/gpt-oss-20b`); no args = the original
 // baseline pair.
 const DEFAULT_MODELS = [
   { label: 'gpt-4o (baseline)', route: { provider: 'openai', model: 'gpt-4o' } },
-  { label: 'llama-3.3-70b (groq)', route: { provider: 'groq', model: 'llama-3.3-70b-versatile' } },
+  { label: 'gpt-oss-20b (groq)', route: { provider: 'groq', model: 'openai/gpt-oss-20b' } },
 ];
 const MODELS = process.argv.slice(2).length
   ? process.argv.slice(2).map(spec => {

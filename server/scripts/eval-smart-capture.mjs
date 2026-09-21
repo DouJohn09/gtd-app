@@ -16,7 +16,7 @@ const groq = new OpenAI({ apiKey: process.env.GROQ_API_KEY, baseURL: 'https://ap
 
 const MODELS = [
   { label: 'gpt-4o-mini (baseline)', client: openai, model: 'gpt-4o-mini' },
-  { label: 'llama-3.3-70b (groq)',   client: groq,   model: 'llama-3.3-70b-versatile' },
+  { label: 'gpt-oss-20b (groq)',      client: groq,   model: 'openai/gpt-oss-20b' },
 ];
 
 // Fixed "today" so date assertions are deterministic. 2026-06-01 is a Monday.

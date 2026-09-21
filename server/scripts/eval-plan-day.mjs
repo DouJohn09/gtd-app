@@ -5,7 +5,7 @@
 // overload, respect due-today, leave breathing room, write real reasons.
 //
 //   node scripts/eval-plan-day.mjs                       # default: groq + gpt-4.1-mini
-//   node scripts/eval-plan-day.mjs groq:llama-3.3-70b-versatile
+//   node scripts/eval-plan-day.mjs groq:openai/gpt-oss-20b
 import '../src/env.js';
 import { __setForceRoute, planDay } from '../src/services/ai.js';
 import { timeToMinutes } from '../src/services/scheduling.js';
@@ -115,7 +115,7 @@ function invariantProblems(r, day) {
 }
 
 const args = process.argv.slice(2);
-const MODELS = (args.length ? args : ['groq:llama-3.3-70b-versatile', 'openai:gpt-4.1-mini']).map(spec => {
+const MODELS = (args.length ? args : ['openai:gpt-4.1-mini', 'groq:openai/gpt-oss-20b']).map(spec => {
   const [provider, ...rest] = spec.split(':');
   return { label: spec, route: { provider, model: rest.join(':') } };
 });
