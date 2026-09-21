@@ -288,6 +288,7 @@ export default function Dashboard() {
           result={planResult}
           onApplied={() => { setPlanResult(null); setBriefBump(b => b + 1); fetchData(); }}
           onCancel={() => setPlanResult(null)}
+          onOpenTask={(task) => { setEditingTask(task); setShowModal(true); }}
         />
       )}
 
@@ -455,7 +456,13 @@ export default function Dashboard() {
           task={editingTask}
           projects={projects}
           onClose={() => { setShowModal(false); setEditingTask(null); }}
-          onSave={fetchData}
+          onSave={(saved) => {
+            fetchData();
+            // Keep an open plan draft in sync with the edit (title, estimate, context).
+            if (saved && planResult?.tasks) {
+              setPlanResult(prev => prev ? { ...prev, tasks: prev.tasks.map(t => (t.id === saved.id ? { ...t, ...saved } : t)) } : prev);
+            }
+          }}
         />
       )}
     </div>

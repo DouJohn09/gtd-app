@@ -365,9 +365,17 @@ function buildMeetings(dayShape, today, timeZone) {
 
 // Unscheduled next actions — what the planner would plan. Shared by plan-day
 // and the brief so their counts agree.
+// A date on a task is its do-date in Cleartable (apply-plan writes due_date =
+// today), so a task dated for a later day is already placed and must not be
+// pulled into today. Tasks already time-blocked today are busy ranges, not
+// candidates. Undated, overdue and due-today tasks remain.
 async function planCandidates(userId, today) {
   const nextActions = await TaskModel.getAll('next_actions', userId, today);
-  return nextActions.filter(t => !(t.due_date === today && t.scheduled_time));
+  return nextActions.filter(t => {
+    const due = t.due_date ? String(t.due_date).slice(0, 10) : null;
+    if (due && due > today) return false;
+    return !(due === today && t.scheduled_time);
+  });
 }
 
 // The morning brief: the deterministic half of the planning ritual. No AI

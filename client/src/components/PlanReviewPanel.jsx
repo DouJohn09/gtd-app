@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { CalendarClock, Check, Clock, ArrowRight, AlertTriangle } from 'lucide-react';
+import { CalendarClock, Check, Clock, ArrowRight, AlertTriangle, Minus, Plus, PencilLine } from 'lucide-react';
 import { api } from '../lib/api';
 import { contextLabel } from '../lib/context';
 import { useToast } from './Toast';
@@ -12,13 +12,25 @@ import { aiToast } from '../lib/aiError';
  * already guaranteed the block times are conflict-free (packPlan), so this
  * panel is about consent, not correction.
  */
-export default function PlanReviewPanel({ result, onApplied, onCancel }) {
+export default function PlanReviewPanel({ result, onApplied, onCancel, onOpenTask }) {
   const { addToast } = useToast();
-  const plan = result?.plan || [];
+  const basePlan = result?.plan || [];
   const deferred = result?.deferred || [];
   const tasks = result?.tasks || [];
   const [skipped, setSkipped] = useState(() => new Set());
   const [applying, setApplying] = useState(false);
+  // Per-block duration overrides (task_index → minutes). The server packed the
+  // proposal conflict-free at the proposed lengths; a nudge here is the user's
+  // call and apply-plan writes whatever they chose.
+  const [durations, setDurations] = useState(() => ({}));
+  const plan = basePlan.map(b => ({ ...b, duration_mins: durations[b.task_index] ?? b.duration_mins }));
+
+  const nudge = (idx, delta) => {
+    setDurations(prev => {
+      const cur = prev[idx] ?? basePlan.find(b => b.task_index === idx)?.duration_mins ?? 30;
+      return { ...prev, [idx]: Math.min(480, Math.max(5, cur + delta)) };
+    });
+  };
 
   const taskFor = (idx) => tasks[idx - 1];
   const keptBlocks = plan.filter(b => !skipped.has(b.task_index));
@@ -111,10 +123,32 @@ export default function PlanReviewPanel({ result, onApplied, onCancel }) {
               <div className="flex-1 min-w-0">
                 <div className="text-[13.5px] leading-snug [overflow-wrap:anywhere]">{task.title}</div>
                 <div className="flex items-center gap-2 mt-1 flex-wrap">
-                  <span className="font-mono text-[10.5px] text-text-3 inline-flex items-center gap-1">
-                    <Clock className="w-3 h-3" />{b.duration_mins}m
+                  <span
+                    className="font-mono text-[10.5px] text-text-3 inline-flex items-center gap-1 rounded-md"
+                    onClick={(e) => e.stopPropagation()}
+                    style={{ boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.08)' }}
+                  >
+                    <span role="button" tabIndex={0} title="15 minutes shorter" className="px-1 py-0.5 hover:text-text-1"
+                      onClick={(e) => { e.stopPropagation(); nudge(b.task_index, -15); }}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); nudge(b.task_index, -15); } }}>
+                      <Minus className="w-3 h-3" />
+                    </span>
+                    <span className="inline-flex items-center gap-1"><Clock className="w-3 h-3" />{b.duration_mins}m</span>
+                    <span role="button" tabIndex={0} title="15 minutes longer" className="px-1 py-0.5 hover:text-text-1"
+                      onClick={(e) => { e.stopPropagation(); nudge(b.task_index, 15); }}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); nudge(b.task_index, 15); } }}>
+                      <Plus className="w-3 h-3" />
+                    </span>
                   </span>
                   {task.context && <span className="context-badge">{contextLabel(task.context)}</span>}
+                  {onOpenTask && (
+                    <span role="button" tabIndex={0} title="Open task"
+                      className="font-mono text-[10.5px] text-text-3 hover:text-violet-glow inline-flex items-center gap-1 ml-auto"
+                      onClick={(e) => { e.stopPropagation(); onOpenTask(task); }}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); onOpenTask(task); } }}>
+                      <PencilLine className="w-3 h-3" /> open
+                    </span>
+                  )}
                 </div>
                 {b.reason && <p className="text-[11.5px] text-text-3 mt-1 leading-relaxed">{b.reason}</p>}
               </div>

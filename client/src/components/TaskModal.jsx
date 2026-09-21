@@ -449,6 +449,26 @@ export default function TaskModal({ task, projects, onClose, onSave }) {
                 min="1"
                 placeholder="30"
               />
+              <div className="flex flex-wrap gap-1 mt-1.5">
+                {[10, 15, 30, 45, 60, 90].map((m) => {
+                  const active = Number(form.time_estimate) === m;
+                  return (
+                    <button
+                      key={m}
+                      type="button"
+                      onClick={() => setForm({ ...form, time_estimate: active ? '' : String(m) })}
+                      className="font-mono text-[10.5px] px-2 py-0.5 rounded-full transition-colors"
+                      style={{
+                        background: active ? 'rgb(var(--violet) / 0.18)' : 'rgba(255,255,255,0.03)',
+                        color: active ? 'rgb(var(--violet-glow))' : 'rgb(var(--text-3))',
+                        boxShadow: `inset 0 0 0 1px ${active ? 'rgb(var(--violet) / 0.35)' : 'rgba(255,255,255,0.08)'}`,
+                      }}
+                    >
+                      {m}m
+                    </button>
+                  );
+                })}
+              </div>
             </div>
             <div>
               <label className="gtd-label">Start Date</label>

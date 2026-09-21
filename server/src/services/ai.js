@@ -701,7 +701,7 @@ ${day.profile ? `\n${day.profile}\n` : ''}
 PLANNING RULES:
 - Place blocks INSIDE the free windows only; blocks must not overlap each other or the busy times.
 - Be realistic, not ambitious: plan at most ~80% of the free minutes. ${day.maxBlocks ? `This person's history says ${day.maxBlocks} blocks is the real ceiling today — do not exceed it.` : '3-6 blocks is a good day; fewer is fine.'}
-- duration_mins comes from the task's time estimate; when unknown, guess honestly (30 is a sane default).
+- duration_mins: use the task's time estimate when it has one. When it says "unknown", estimate from the task itself in 5-minute steps — small admin like "reply to", "call", "print", "send", "book" is usually 10–15; a focused piece of work 45–90; do NOT default everything to 30 or 60.
 - Tasks due TODAY or OVERDUE come first unless clearly superseded.
 - Match energy to the day: high-energy/deep work in the longest early windows, shallow tasks in short gaps.
 - A task with "Starts:" in the future is deferred by the user — never plan it.
