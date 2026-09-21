@@ -43,10 +43,13 @@ const GROQ_FAST = { provider: 'groq', model: GROQ };
 const OAI_MINI = { provider: 'openai', model: 'gpt-4.1-mini' };
 const OAI_NANO = { provider: 'openai', model: 'gpt-4o-mini' };
 const ROUTING = {
-  // Short, latency-sensitive calls stay Groq-first (speed is the point of
-  // Smart Capture); OpenAI catches 429s and outages.
-  'smart-capture':     { primary: GROQ_FAST, fallback: OAI_NANO },
-  'url-extract':       { primary: GROQ_FAST, fallback: OAI_NANO },
+  // Smart Capture was Groq-first for latency, but gpt-oss-20b in Groq's JSON
+  // mode failed 12/49 eval captures with "Failed to validate JSON" and
+  // averaged 34 s under the free-tier caps (scripts/eval-smart-capture.mjs,
+  // 2026-09-21), against 49/49 at 2.6 s for gpt-4o-mini. OpenAI-first; Groq
+  // stays as the outage fallback.
+  'smart-capture':     { primary: OAI_NANO, fallback: GROQ_FAST },
+  'url-extract':       { primary: OAI_NANO, fallback: GROQ_FAST },
   // Everything with a long prompt or a long answer is OpenAI-first since
   // 2026-09-21: Groq's free-tier per-minute caps make these 429 on a normal
   // day, and each 429 is a wasted second before the fallback. gpt-4.1-mini
