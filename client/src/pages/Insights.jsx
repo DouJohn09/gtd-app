@@ -114,8 +114,8 @@ export default function Insights() {
   const reality = data?.reality;
 
   return (
-    <div className="max-w-3xl">
-      <div className="mb-8 fresh-stagger">
+    <div className="px-6 lg:px-12 pt-10 pb-20 max-w-[1400px]">
+      <div className="mb-10 fresh-stagger">
         <MonoLabel className="mb-3">patterns · last 8 weeks</MonoLabel>
         <h1 className="font-display text-[52px] md:text-[60px] leading-[1] tracking-tight">Insights</h1>
         <p className="mt-4 text-[15px] max-w-xl text-text-2">
@@ -128,7 +128,7 @@ export default function Insights() {
       {!data && !error && <p className="text-[13px] text-text-3">Reading your history…</p>}
 
       {data && (
-        <div className="grid gap-5 md:grid-cols-2">
+        <div className="grid gap-5 md:grid-cols-2 max-w-5xl">
           <Card icon={Clock} label="productive hours" title="When you finish things">
             <Sentence text={hours.hoursSentence} fallback={`Finish ${Math.max(0, hours.minimum - hours.total)} more tasks and this fills in. (${hours.total} so far.)`} />
             <HourStrip values={hours.byHour} peak={hours.peak} />
