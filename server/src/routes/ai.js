@@ -3,7 +3,7 @@ import { TaskModel, ProjectModel, WeeklyReviewModel } from '../db/models.js';
 import { pool } from '../db/pool.js';
 import { processInbox, getDailyPriorities, importNotes, findDuplicates, weeklyReviewAnalysis, smartCapture, planDay, planWeek } from '../services/ai.js';
 import { syncTaskToCalendar } from '../services/googleCalendar.js';
-import { findFreeSlot, freeRangesFor, timeToMinutes, eventMinutesOnDay, clampRangesToNow } from '../services/scheduling.js';
+import { findFreeSlot, freeRangesFor, timeToMinutes, minutesToTime, eventMinutesOnDay, clampRangesToNow, packPlan } from '../services/scheduling.js';
 import { check, charge, getStatus } from '../services/aiUsage.js';
 import { enforceAiLimit, requireAiEnabled, chargeAiUsage } from '../middleware/aiLimit.js';
 import { getAiMode } from '../services/userPrefs.js';
@@ -797,9 +797,77 @@ router.post('/plan-week', requireAiEnabled, enforceAiLimit, async (req, res) => 
   }
 });
 
-// POST /api/ai/apply-week { start, items: [{ taskId, date }] } — writes the
-// do-date only. No times, no calendar events; "Plan my day" adds those each
-// morning. Additive: tasks not in `items` are untouched. No AI → no aiLimit.
+
+// POST /api/ai/week-times { start, placements: [{ taskId, date }] }
+// Deterministic time windows for a day-distributed week. No AI: the model
+// already chose the days; here each day's tasks are packed into that day's
+// free ranges (meetings and existing blocks respected, today clamped to now).
+// Heuristic order: due/overdue first, then priority, then energy — high-energy
+// work is proposed at the start of the day's longest window, everything else
+// takes the earliest slot that fits. Fine-tuning stays in the Calendar.
+router.post('/week-times', async (req, res) => {
+  try {
+    const start = /^\d{4}-\d{2}-\d{2}$/.test(req.body?.start || '') ? req.body.start : req.today;
+    const end = addDays(start, WEEK_DAYS - 1);
+    const placements = (Array.isArray(req.body?.placements) ? req.body.placements : [])
+      .filter(p => Number.isInteger(Number(p.taskId)) && /^\d{4}-\d{2}-\d{2}$/.test(p.date || '') && p.date >= start && p.date <= end);
+    if (placements.length === 0) return res.json({ times: [], unfit: [] });
+
+    const ids = [...new Set(placements.map(p => Number(p.taskId)))];
+    const { rows: taskRows } = await pool.query(
+      `SELECT id, title, due_date, priority, energy_level, time_estimate, duration FROM tasks WHERE user_id = $1 AND id = ANY($2::int[])`,
+      [req.user.id, ids]
+    );
+    const tasks = new Map(taskRows.map(t => [t.id, t]));
+    const nowMins = minutesNowIn(req.clientTimezone);
+    const times = [];
+    const unfit = [];
+
+    const byDate = new Map();
+    for (const p of placements) {
+      const t = tasks.get(Number(p.taskId));
+      if (!t) continue;
+      if (!byDate.has(p.date)) byDate.set(p.date, []);
+      byDate.get(p.date).push(t);
+    }
+
+    for (const [date, list] of byDate) {
+      const shape = await freeRangesFor(req.user.id, date, req.clientTimezone);
+      const free = date === req.today ? clampRangesToNow(shape.free, nowMins) : shape.free;
+      const longest = free.reduce((a, r) => (!a || (r.end - r.start) > (a.end - a.start) ? r : a), null);
+      const rank = (t) => {
+        const due = dateOnly(t.due_date);
+        const dueScore = due && due <= date ? 0 : 1;
+        const energy = { high: 0, medium: 1, low: 2 }[t.energy_level] ?? 1;
+        return [dueScore, -(t.priority || 0), energy, -(t.time_estimate || 30)];
+      };
+      const ordered = [...list].sort((a, b) => {
+        const ra = rank(a), rb = rank(b);
+        for (let i = 0; i < ra.length; i++) if (ra[i] !== rb[i]) return ra[i] - rb[i];
+        return 0;
+      });
+      const blocks = ordered.map((t, i) => ({
+        task_index: t.id,
+        duration: Math.min(480, Math.max(5, t.time_estimate || 30)),
+        // Only the first high-energy task claims the longest window; the rest
+        // flow into the earliest slot so mornings aren't all deep work.
+        start: (t.energy_level === 'high' && longest && i === ordered.findIndex(x => x.energy_level === 'high')) ? longest.start : null,
+      }));
+      const { placed, overflow } = packPlan(blocks, free);
+      for (const b of placed) times.push({ taskId: b.task_index, date, start: minutesToTime(b.start), duration: b.duration });
+      for (const b of overflow) unfit.push({ taskId: b.task_index, date });
+    }
+    res.json({ times, unfit });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// POST /api/ai/apply-week { start, items: [{ taskId, date, start?, duration? }] }
+// Writes the do-date; with `start` it also writes the time block (and the
+// Google Calendar sync picks it up). Additive: tasks not in `items` are
+// untouched. No AI → no aiLimit.
 router.post('/apply-week', async (req, res) => {
   try {
     const start = /^\d{4}-\d{2}-\d{2}$/.test(req.body?.start || '') ? req.body.start : req.today;
@@ -809,16 +877,29 @@ router.post('/apply-week', async (req, res) => {
     if (items.length === 0) return res.status(400).json({ error: 'Nothing to apply' });
 
     const updated = [];
+    const timedByDate = new Map();
     for (const item of items) {
+      const timed = /^([01]\d|2[0-3]):[0-5]\d$/.test(item.start || '');
       const task = await TaskModel.update(Number(item.taskId), {
         due_date: item.date,
-        scheduled_time: null,
+        // With time windows on, the week writes the block too; otherwise the
+        // morning planner does it and any old time is cleared.
+        scheduled_time: timed ? item.start : null,
+        ...(timed ? { duration: Math.min(480, Math.max(5, Number(item.duration) || 30)) } : {}),
         is_daily_focus: false,
       }, req.user.id);
       if (task) {
         updated.push(task);
+        if (timed) {
+          if (!timedByDate.has(item.date)) timedByDate.set(item.date, []);
+          timedByDate.get(item.date).push({ taskId: task.id, start: item.start, duration: task.duration || 30 });
+        }
         syncTaskToCalendar(req.user.id, task, req.clientTimezone).catch(err => console.error('syncTaskToCalendar (apply-week):', err));
       }
+    }
+    // Timed blocks are planned days as far as Insights and calibration are concerned.
+    for (const [date, blocks] of timedByDate) {
+      recordAppliedBlocks(req.user.id, date, blocks).catch(err => console.error('recordAppliedBlocks (apply-week):', err));
     }
     await pool.query(
       `UPDATE weekly_plans

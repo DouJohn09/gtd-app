@@ -169,6 +169,7 @@ export const api = {
     weekBrief: (start) => fetchApi(`/ai/week-brief${start ? `?start=${start}` : ''}`),
     planWeek: (start) => fetchApi('/ai/plan-week', { method: 'POST', body: JSON.stringify({ start }) }),
     applyWeek: (start, items) => fetchApi('/ai/apply-week', { method: 'POST', body: JSON.stringify({ start, items }) }),
+    weekTimes: (start, placements) => fetchApi('/ai/week-times', { method: 'POST', body: JSON.stringify({ start, placements }) }),
   },
 
   preferences: {

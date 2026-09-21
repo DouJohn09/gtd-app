@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import { CalendarRange, Check, Clock, PencilLine, Sparkles, CheckCircle2, RefreshCw } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { CalendarRange, Check, Clock, PencilLine, Sparkles, CheckCircle2, RefreshCw, CalendarClock } from 'lucide-react';
 import ConfirmModal from './ui/ConfirmModal';
 import { api } from '../lib/api';
 import { contextLabel } from '../lib/context';
@@ -67,6 +67,32 @@ export default function WeekPlanBoard({ result, onApplied, onCancel, onOpenTask,
   const unplaced = liveTasks.filter(t => !where.has(t.id));
   const keptCount = [...where.entries()].filter(([id, d]) => d && !omitted.has(id)).length;
 
+  // Time windows: optional second pass. With it on, every change to the board
+  // re-packs each day's tasks into that day's free ranges on the server
+  // (deterministic, no AI) and Apply writes the blocks + Google Calendar events.
+  const [withTimes, setWithTimes] = useState(false);
+  const [times, setTimes] = useState(() => new Map()); // taskId → { start, duration }
+  const [unfit, setUnfit] = useState(() => new Set());
+  const [timing, setTiming] = useState(false);
+  const timesReq = useRef(0);
+  const placementsKey = [...where.entries()].filter(([id, d]) => d && !omitted.has(id) && !completed.has(id)).map(([id, d]) => `${id}:${d}`).sort().join(',');
+  useEffect(() => {
+    if (!withTimes) return;
+    const placements = [...where.entries()].filter(([id, d]) => d && !omitted.has(id) && !completed.has(id)).map(([taskId, date]) => ({ taskId, date }));
+    const seq = ++timesReq.current;
+    setTiming(true);
+    api.ai.weekTimes(start, placements)
+      .then((r) => {
+        if (seq !== timesReq.current) return;
+        setTimes(new Map((r.times || []).map(t => [t.taskId, { start: t.start, duration: t.duration }])));
+        setUnfit(new Set((r.unfit || []).map(u => u.taskId)));
+      })
+      .catch((err) => { if (seq === timesReq.current) addToast(...aiToast(err, 'Could not compute time windows.')); })
+      .finally(() => { if (seq === timesReq.current) setTiming(false); });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [withTimes, placementsKey, start]);
+  const endOf = (t) => { const [h, m] = t.start.split(':').map(Number); const e = h * 60 + m + t.duration; return `${String(Math.floor(e / 60)).padStart(2, '0')}:${String(e % 60).padStart(2, '0')}`; };
+
   const moveTo = (taskId, date) => setWhere(prev => { const n = new Map(prev); n.set(taskId, date); return n; });
   const toggleOmit = (taskId) => setOmitted(prev => { const n = new Set(prev); if (n.has(taskId)) n.delete(taskId); else n.add(taskId); return n; });
 
@@ -85,9 +111,12 @@ export default function WeekPlanBoard({ result, onApplied, onCancel, onOpenTask,
   const apply = async () => {
     setApplying(true);
     try {
-      const items = [...where.entries()].filter(([id, d]) => d && !omitted.has(id)).map(([taskId, date]) => ({ taskId, date }));
+      const items = [...where.entries()].filter(([id, d]) => d && !omitted.has(id)).map(([taskId, date]) => {
+        const t = withTimes ? times.get(taskId) : null;
+        return t ? { taskId, date, start: t.start, duration: t.duration } : { taskId, date };
+      });
       const r = await api.ai.applyWeek(start, items);
-      addToast(`Week planned — ${r.applied} task${r.applied === 1 ? '' : 's'} given a day.`, 'success');
+      addToast(withTimes ? `Week planned — ${r.applied} task${r.applied === 1 ? '' : 's'} time-blocked.` : `Week planned — ${r.applied} task${r.applied === 1 ? '' : 's'} given a day.`, 'success');
       onApplied?.();
     } catch (err) {
       addToast(...aiToast(err, 'Could not apply the week. Nothing was changed.'));
@@ -104,6 +133,16 @@ export default function WeekPlanBoard({ result, onApplied, onCancel, onOpenTask,
           <CalendarRange className="w-3.5 h-3.5" /> the week ahead · {keptCount} task{keptCount === 1 ? '' : 's'} placed
         </span>
         <div className="flex items-center gap-3">
+          <button
+            onClick={() => setWithTimes(v => !v)}
+            className="font-mono text-[10.5px] uppercase tracking-wider inline-flex items-center gap-1 px-2 py-0.5 rounded-md transition-colors"
+            style={withTimes
+              ? { color: 'rgb(var(--violet-glow))', background: 'rgb(var(--violet) / 0.14)', boxShadow: 'inset 0 0 0 1px rgb(var(--violet) / 0.3)' }
+              : { color: 'rgb(var(--text-3))', boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.08)' }}
+            title={withTimes ? 'Back to days only' : 'Pack each day into time blocks and sync them to Google Calendar on apply'}
+          >
+            <CalendarClock className={`w-3 h-3 ${timing ? 'animate-pulse' : ''}`} /> {withTimes ? 'with times' : 'days only'}
+          </button>
           {onReplan && (
             <button onClick={() => setConfirmReplan(true)} disabled={replanning} className="font-mono text-[10.5px] uppercase tracking-wider text-text-3 hover:text-text-1 transition-colors inline-flex items-center gap-1 disabled:opacity-60" title="Ask the AI again with your current estimates and dates">
               <RefreshCw className={`w-3 h-3 ${replanning ? 'animate-spin' : ''}`} /> {replanning ? 'replanning' : 'replan'}
@@ -126,7 +165,8 @@ export default function WeekPlanBoard({ result, onApplied, onCancel, onOpenTask,
           const cap = d.capacityMins;
           const ratio = cap > 0 ? Math.min(1.2, planned / cap) : (planned > 0 ? 1.2 : 0);
           const over = cap > 0 ? planned > cap : planned > 0;
-          const cards = liveTasks.filter(t => where.get(t.id) === d.date);
+          const cards = liveTasks.filter(t => where.get(t.id) === d.date)
+            .sort((a, b) => (withTimes ? (times.get(a.id)?.start || '99').localeCompare(times.get(b.id)?.start || '99') : 0));
           const isOver = dragOver === d.date;
           return (
             <div
@@ -167,6 +207,7 @@ export default function WeekPlanBoard({ result, onApplied, onCancel, onOpenTask,
               <div className="space-y-1.5 flex-1">
                 {cards.map(t => (
                   <Card key={t.id} task={t} reason={reasons.get(t.id)} omitted={omitted.has(t.id)}
+                    time={withTimes ? (times.get(t.id) ? `${times.get(t.id).start}–${endOf(times.get(t.id))}` : (unfit.has(t.id) ? 'no slot' : null)) : null}
                     onToggle={() => toggleOmit(t.id)} onOpen={onOpenTask ? () => onOpenTask(t) : null} onComplete={() => completeTask(t)} onDragStart={(e) => onDragStart(e, t.id)} />
                 ))}
                 {cards.length === 0 && <div className="text-[11px] text-text-3 px-1 py-3 text-center">drop tasks here</div>}
@@ -196,7 +237,9 @@ export default function WeekPlanBoard({ result, onApplied, onCancel, onOpenTask,
       </div>
 
       <div className="flex items-center justify-between gap-3 mt-4 flex-wrap">
-        <p className="text-[11.5px] text-text-3 inline-flex items-center gap-1.5"><Sparkles className="w-3 h-3" /> Days only. Each morning, “Plan my day” puts that day’s tasks into time blocks.</p>
+        <p className="text-[11.5px] text-text-3 inline-flex items-center gap-1.5"><Sparkles className="w-3 h-3" /> {withTimes
+          ? 'Time blocks go to your calendar on apply; drag them in the Calendar to fine-tune.'
+          : 'Days only. Each morning, “Plan my day” puts that day’s tasks into time blocks.'}</p>
         <div className="flex items-center gap-2">
           <button onClick={onCancel} className="gtd-btn gtd-btn-secondary text-[12.5px]">Cancel</button>
           <button onClick={apply} disabled={applying || keptCount === 0} className="gtd-btn gtd-btn-primary inline-flex items-center gap-2 text-[12.5px] disabled:opacity-60">
@@ -219,7 +262,7 @@ export default function WeekPlanBoard({ result, onApplied, onCancel, onOpenTask,
   );
 }
 
-function Card({ task, reason, omitted = false, muted = false, onToggle, onOpen, onComplete, onDragStart }) {
+function Card({ task, reason, time = null, omitted = false, muted = false, onToggle, onOpen, onComplete, onDragStart }) {
   return (
     <div
       draggable
@@ -237,6 +280,9 @@ function Card({ task, reason, omitted = false, muted = false, onToggle, onOpen, 
           </button>
         )}
         <div className="flex-1 min-w-0">
+          {time && (
+            <div className="font-mono text-[10px] mb-0.5" style={{ color: time === 'no slot' ? 'rgb(var(--rose-glow))' : 'rgb(var(--violet-glow))' }}>{time}</div>
+          )}
           <div className="text-[12px] leading-snug [overflow-wrap:anywhere]">{task.title}</div>
           <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
             <span className="font-mono text-[9.5px] text-text-3 inline-flex items-center gap-0.5"><Clock className="w-2.5 h-2.5" />{task.time_estimate || 30}m</span>
