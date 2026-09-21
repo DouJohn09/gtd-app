@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { CalendarClock, Check, Clock, ArrowRight, AlertTriangle, Minus, Plus, PencilLine } from 'lucide-react';
+import { CalendarClock, Check, Clock, ArrowRight, AlertTriangle, Minus, Plus, PencilLine, CheckCircle2, RefreshCw } from 'lucide-react';
+import ConfirmModal from './ui/ConfirmModal';
 import { api } from '../lib/api';
 import { contextLabel } from '../lib/context';
 import { useToast } from './Toast';
@@ -12,7 +13,7 @@ import { aiToast } from '../lib/aiError';
  * already guaranteed the block times are conflict-free (packPlan), so this
  * panel is about consent, not correction.
  */
-export default function PlanReviewPanel({ result, onApplied, onCancel, onOpenTask }) {
+export default function PlanReviewPanel({ result, onApplied, onCancel, onOpenTask, onReplan }) {
   const { addToast } = useToast();
   const basePlan = result?.plan || [];
   const deferred = result?.deferred || [];
@@ -23,7 +24,29 @@ export default function PlanReviewPanel({ result, onApplied, onCancel, onOpenTas
   // proposal conflict-free at the proposed lengths; a nudge here is the user's
   // call and apply-plan writes whatever they chose.
   const [durations, setDurations] = useState(() => ({}));
-  const plan = basePlan.map(b => ({ ...b, duration_mins: durations[b.task_index] ?? b.duration_mins }));
+  // Blocks whose task was ticked off from the draft — completed server-side, dropped here.
+  const [completedIdx, setCompletedIdx] = useState(() => new Set());
+  const [confirmReplan, setConfirmReplan] = useState(false);
+  const [replanning, setReplanning] = useState(false);
+  const plan = basePlan
+    .filter(b => !completedIdx.has(b.task_index))
+    .map(b => ({ ...b, duration_mins: durations[b.task_index] ?? b.duration_mins }));
+
+  const completeBlock = async (b, task) => {
+    try {
+      await api.tasks.complete(task.id);
+      setCompletedIdx(prev => new Set(prev).add(b.task_index));
+      addToast(`Done: ${task.title}`, 'success');
+    } catch (err) {
+      addToast(err.message || 'Could not complete the task.', 'error');
+    }
+  };
+  const replan = async () => {
+    setConfirmReplan(false);
+    if (!onReplan) return;
+    setReplanning(true);
+    try { await onReplan(); } finally { setReplanning(false); }
+  };
 
   const nudge = (idx, delta) => {
     setDurations(prev => {
@@ -76,12 +99,19 @@ export default function PlanReviewPanel({ result, onApplied, onCancel, onOpenTas
         <span className="inline-flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-wider" style={{ color: 'rgb(var(--violet-glow))' }}>
           <CalendarClock className="w-3.5 h-3.5" /> today&rsquo;s plan · {plan.length} block{plan.length === 1 ? '' : 's'}
         </span>
-        <button
-          onClick={onCancel}
-          className="font-mono text-[10.5px] uppercase tracking-wider text-text-3 hover:text-text-1 transition-colors"
-        >
-          cancel
-        </button>
+        <div className="flex items-center gap-3">
+          {onReplan && (
+            <button onClick={() => setConfirmReplan(true)} disabled={replanning} className="font-mono text-[10.5px] uppercase tracking-wider text-text-3 hover:text-text-1 transition-colors inline-flex items-center gap-1 disabled:opacity-60" title="Ask the AI again with your current estimates">
+              <RefreshCw className={`w-3 h-3 ${replanning ? 'animate-spin' : ''}`} /> {replanning ? 'replanning' : 'replan'}
+            </button>
+          )}
+          <button
+            onClick={onCancel}
+            className="font-mono text-[10.5px] uppercase tracking-wider text-text-3 hover:text-text-1 transition-colors"
+          >
+            cancel
+          </button>
+        </div>
       </div>
 
       {result.summary && (
@@ -141,14 +171,22 @@ export default function PlanReviewPanel({ result, onApplied, onCancel, onOpenTas
                     </span>
                   </span>
                   {task.context && <span className="context-badge">{contextLabel(task.context)}</span>}
-                  {onOpenTask && (
-                    <span role="button" tabIndex={0} title="Open task"
-                      className="font-mono text-[10.5px] text-text-3 hover:text-violet-glow inline-flex items-center gap-1 ml-auto"
-                      onClick={(e) => { e.stopPropagation(); onOpenTask(task); }}
-                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); onOpenTask(task); } }}>
-                      <PencilLine className="w-3 h-3" /> open
+                  <span className="ml-auto inline-flex items-center gap-2.5">
+                    <span role="button" tabIndex={0} title="Already done — complete it"
+                      className="font-mono text-[10.5px] text-text-3 hover:text-mint-glow inline-flex items-center gap-1"
+                      onClick={(e) => { e.stopPropagation(); completeBlock(b, task); }}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); completeBlock(b, task); } }}>
+                      <CheckCircle2 className="w-3 h-3" /> done
                     </span>
-                  )}
+                    {onOpenTask && (
+                      <span role="button" tabIndex={0} title="Open task"
+                        className="font-mono text-[10.5px] text-text-3 hover:text-violet-glow inline-flex items-center gap-1"
+                        onClick={(e) => { e.stopPropagation(); onOpenTask(task); }}
+                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); onOpenTask(task); } }}>
+                        <PencilLine className="w-3 h-3" /> open
+                      </span>
+                    )}
+                  </span>
                 </div>
                 {b.reason && <p className="text-[11.5px] text-text-3 mt-1 leading-relaxed">{b.reason}</p>}
               </div>
@@ -191,6 +229,17 @@ export default function PlanReviewPanel({ result, onApplied, onCancel, onOpenTas
           Not today
         </button>
       </div>
+
+      {confirmReplan && (
+        <ConfirmModal
+          title="Replan today?"
+          message="The AI will plan the day again with your current estimates and what's already done. Blocks you skipped or resized in this draft will be lost — apply first if you want to keep them."
+          confirmLabel="Replan"
+          tone="violet"
+          onConfirm={replan}
+          onCancel={() => setConfirmReplan(false)}
+        />
+      )}
     </div>
   );
 }

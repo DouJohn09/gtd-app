@@ -101,7 +101,7 @@ export default function Dashboard() {
       if ((result.plan || []).length === 0 && (result.deferred || []).length === 0) {
         addToast(result.summary || 'Nothing to plan right now.', 'info');
       } else {
-        setPlanResult(result);
+        setPlanResult({ ...result, _nonce: Date.now() });
       }
     } catch (err) {
       // 402 limit_reached already opened the global upgrade prompt.
@@ -285,7 +285,9 @@ export default function Dashboard() {
 
       {planResult && (
         <PlanReviewPanel
+          key={planResult._nonce}
           result={planResult}
+          onReplan={runPlanDay}
           onApplied={() => { setPlanResult(null); setBriefBump(b => b + 1); fetchData(); }}
           onCancel={() => setPlanResult(null)}
           onOpenTask={(task) => { setEditingTask(task); setShowModal(true); }}

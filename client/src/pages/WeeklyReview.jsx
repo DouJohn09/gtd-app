@@ -112,7 +112,7 @@ export default function WeeklyReview() {
   const [planningWeek, setPlanningWeek] = useState(false);
   const planWeekAhead = async () => {
     setPlanningWeek(true);
-    try { setWeekPlan(await api.ai.planWeek()); }
+    try { setWeekPlan({ ...(await api.ai.planWeek()), _nonce: Date.now() }); }
     catch (err) { addToast(...aiToast(err, 'Could not plan the week right now.')); }
     finally { setPlanningWeek(false); }
   };
@@ -137,6 +137,7 @@ export default function WeeklyReview() {
   // triage marks and any analysis they've already run).
   const handleTaskSaved = (updated) => {
     if (!updated?.id) return;
+    setWeekPlan(prev => prev ? { ...prev, tasks: prev.tasks.map(t => (t.id === updated.id ? { ...t, ...updated } : t)) } : prev);
     setReviewData(prev => {
       if (!prev) return prev;
       const patch = (arr) => arr?.map(t => (t.id === updated.id ? { ...t, ...updated } : t));
@@ -841,7 +842,9 @@ export default function WeeklyReview() {
               {!weekAiOff && (
                 weekPlan ? (
                   <WeekPlanBoard
+                    key={weekPlan._nonce}
                     result={weekPlan}
+                    onReplan={planWeekAhead}
                     compact
                     onApplied={() => { setWeekPlan(null); setWeekPlanned(true); }}
                     onCancel={() => setWeekPlan(null)}

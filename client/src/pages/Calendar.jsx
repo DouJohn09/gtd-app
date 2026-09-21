@@ -49,7 +49,7 @@ export default function Calendar() {
   const planWeek = async () => {
     setPlanningWeek(true);
     try {
-      setWeekPlan(await api.ai.planWeek());
+      setWeekPlan({ ...(await api.ai.planWeek()), _nonce: Date.now() });
     } catch (err) {
       addToast(...aiToast(err, 'Could not plan the week right now.'));
     } finally {
@@ -211,10 +211,14 @@ export default function Calendar() {
     } catch (err) { addToast(err.message, 'error'); }
   };
 
-  const handleModalSave = () => {
+  const handleModalSave = (saved) => {
     setShowModal(false);
     setEditingTask(null);
     fetchData();
+    // Keep an open week draft in sync with the edit (estimate, title, dates).
+    if (saved?.id) {
+      setWeekPlan(prev => prev ? { ...prev, tasks: prev.tasks.map(t => (t.id === saved.id ? { ...t, ...saved } : t)) } : prev);
+    }
   };
 
   const connectGoogleCalendar = useGoogleLogin({
@@ -337,7 +341,9 @@ export default function Calendar() {
 
       {weekPlan && (
         <WeekPlanBoard
+          key={weekPlan._nonce}
           result={weekPlan}
+          onReplan={planWeek}
           onApplied={() => { setWeekPlan(null); fetchData(); }}
           onCancel={() => setWeekPlan(null)}
           onOpenTask={handleEdit}

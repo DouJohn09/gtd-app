@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
-import { CalendarRange, Check, Clock, PencilLine, Sparkles } from 'lucide-react';
+import { CalendarRange, Check, Clock, PencilLine, Sparkles, CheckCircle2, RefreshCw } from 'lucide-react';
+import ConfirmModal from './ui/ConfirmModal';
 import { api } from '../lib/api';
 import { contextLabel } from '../lib/context';
 import { useToast } from './Toast';
@@ -15,7 +16,7 @@ import { aiToast } from '../lib/aiError';
  * `result` is the /ai/plan-week response; `onOpenTask(task)` opens the editor;
  * `onApplied()` / `onCancel()` close the board.
  */
-export default function WeekPlanBoard({ result, onApplied, onCancel, onOpenTask, compact = false }) {
+export default function WeekPlanBoard({ result, onApplied, onCancel, onOpenTask, onReplan, compact = false }) {
   const { addToast } = useToast();
   const tasks = useMemo(() => new Map((result?.tasks || []).map(t => [t.id, t])), [result]);
   const days = result?.days || [];
@@ -36,11 +37,34 @@ export default function WeekPlanBoard({ result, onApplied, onCancel, onOpenTask,
   });
   const [dragOver, setDragOver] = useState(null);
   const [applying, setApplying] = useState(false);
+  // Tasks ticked off straight from the board: completed on the server, gone
+  // from the draft. Nothing else about the plan changes.
+  const [completed, setCompleted] = useState(() => new Set());
+  const [confirmReplan, setConfirmReplan] = useState(false);
+  const [replanning, setReplanning] = useState(false);
+  const liveTasks = (result?.tasks || []).filter(t => !completed.has(t.id));
+
+  const completeTask = async (task) => {
+    try {
+      await api.tasks.complete(task.id);
+      setCompleted(prev => new Set(prev).add(task.id));
+      setWhere(prev => { const n = new Map(prev); n.delete(task.id); return n; });
+      addToast(`Done: ${task.title}`, 'success');
+    } catch (err) {
+      addToast(err.message || 'Could not complete the task.', 'error');
+    }
+  };
+  const replan = async () => {
+    setConfirmReplan(false);
+    if (!onReplan) return;
+    setReplanning(true);
+    try { await onReplan(); } finally { setReplanning(false); }
+  };
   const [showWeekend, setShowWeekend] = useState(() => days.some(d => isWeekend(d.date) && (d.capacityMins > 0 && (result?.placements || []).some(p => p.date === d.date))));
 
   const minsOf = (t) => t?.time_estimate || 30;
   const plannedMins = (date) => [...where.entries()].filter(([id, d]) => d === date && !omitted.has(id)).reduce((s, [id]) => s + minsOf(tasks.get(id)), 0);
-  const unplaced = (result?.tasks || []).filter(t => !where.has(t.id));
+  const unplaced = liveTasks.filter(t => !where.has(t.id));
   const keptCount = [...where.entries()].filter(([id, d]) => d && !omitted.has(id)).length;
 
   const moveTo = (taskId, date) => setWhere(prev => { const n = new Map(prev); n.set(taskId, date); return n; });
@@ -80,6 +104,11 @@ export default function WeekPlanBoard({ result, onApplied, onCancel, onOpenTask,
           <CalendarRange className="w-3.5 h-3.5" /> the week ahead · {keptCount} task{keptCount === 1 ? '' : 's'} placed
         </span>
         <div className="flex items-center gap-3">
+          {onReplan && (
+            <button onClick={() => setConfirmReplan(true)} disabled={replanning} className="font-mono text-[10.5px] uppercase tracking-wider text-text-3 hover:text-text-1 transition-colors inline-flex items-center gap-1 disabled:opacity-60" title="Ask the AI again with your current estimates and dates">
+              <RefreshCw className={`w-3 h-3 ${replanning ? 'animate-spin' : ''}`} /> {replanning ? 'replanning' : 'replan'}
+            </button>
+          )}
           {days.some(d => isWeekend(d.date) && d.date !== start) && (
             <button onClick={() => setShowWeekend(v => !v)} className="font-mono text-[10.5px] uppercase tracking-wider text-text-3 hover:text-text-1 transition-colors">
               {showWeekend ? 'hide weekend' : 'show weekend'}
@@ -97,7 +126,7 @@ export default function WeekPlanBoard({ result, onApplied, onCancel, onOpenTask,
           const cap = d.capacityMins;
           const ratio = cap > 0 ? Math.min(1.2, planned / cap) : (planned > 0 ? 1.2 : 0);
           const over = cap > 0 ? planned > cap : planned > 0;
-          const cards = (result?.tasks || []).filter(t => where.get(t.id) === d.date);
+          const cards = liveTasks.filter(t => where.get(t.id) === d.date);
           const isOver = dragOver === d.date;
           return (
             <div
@@ -138,7 +167,7 @@ export default function WeekPlanBoard({ result, onApplied, onCancel, onOpenTask,
               <div className="space-y-1.5 flex-1">
                 {cards.map(t => (
                   <Card key={t.id} task={t} reason={reasons.get(t.id)} omitted={omitted.has(t.id)}
-                    onToggle={() => toggleOmit(t.id)} onOpen={onOpenTask ? () => onOpenTask(t) : null} onDragStart={(e) => onDragStart(e, t.id)} />
+                    onToggle={() => toggleOmit(t.id)} onOpen={onOpenTask ? () => onOpenTask(t) : null} onComplete={() => completeTask(t)} onDragStart={(e) => onDragStart(e, t.id)} />
                 ))}
                 {cards.length === 0 && <div className="text-[11px] text-text-3 px-1 py-3 text-center">drop tasks here</div>}
               </div>
@@ -160,7 +189,7 @@ export default function WeekPlanBoard({ result, onApplied, onCancel, onOpenTask,
         ) : (
           <div className="grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3">
             {unplaced.map(t => (
-              <Card key={t.id} task={t} reason={reasons.get(t.id)} muted onOpen={onOpenTask ? () => onOpenTask(t) : null} onDragStart={(e) => onDragStart(e, t.id)} />
+              <Card key={t.id} task={t} reason={reasons.get(t.id)} muted onOpen={onOpenTask ? () => onOpenTask(t) : null} onComplete={() => completeTask(t)} onDragStart={(e) => onDragStart(e, t.id)} />
             ))}
           </div>
         )}
@@ -175,11 +204,22 @@ export default function WeekPlanBoard({ result, onApplied, onCancel, onOpenTask,
           </button>
         </div>
       </div>
+
+      {confirmReplan && (
+        <ConfirmModal
+          title="Replan the week?"
+          message="The AI will lay the week out again using your current estimates, dates and what's already done. Any cards you moved, left out or reordered on this board will be lost — apply first if you want to keep them."
+          confirmLabel="Replan"
+          tone="violet"
+          onConfirm={replan}
+          onCancel={() => setConfirmReplan(false)}
+        />
+      )}
     </div>
   );
 }
 
-function Card({ task, reason, omitted = false, muted = false, onToggle, onOpen, onDragStart }) {
+function Card({ task, reason, omitted = false, muted = false, onToggle, onOpen, onComplete, onDragStart }) {
   return (
     <div
       draggable
@@ -202,11 +242,18 @@ function Card({ task, reason, omitted = false, muted = false, onToggle, onOpen, 
             <span className="font-mono text-[9.5px] text-text-3 inline-flex items-center gap-0.5"><Clock className="w-2.5 h-2.5" />{task.time_estimate || 30}m</span>
             {task.context && <span className="font-mono text-[9.5px] text-text-3">{contextLabel(task.context)}</span>}
             {task.due_date && <span className="font-mono text-[9.5px]" style={{ color: 'rgb(var(--amber-glow))' }}>due {String(task.due_date).slice(5, 10)}</span>}
-            {onOpen && (
-              <button type="button" onClick={onOpen} className="ml-auto font-mono text-[9.5px] text-text-3 hover:text-violet-glow inline-flex items-center gap-0.5">
-                <PencilLine className="w-2.5 h-2.5" /> open
-              </button>
-            )}
+            <span className="ml-auto inline-flex items-center gap-2">
+              {onComplete && (
+                <button type="button" onClick={onComplete} title="Already done — complete it" className="font-mono text-[9.5px] text-text-3 hover:text-mint-glow inline-flex items-center gap-0.5">
+                  <CheckCircle2 className="w-2.5 h-2.5" /> done
+                </button>
+              )}
+              {onOpen && (
+                <button type="button" onClick={onOpen} className="font-mono text-[9.5px] text-text-3 hover:text-violet-glow inline-flex items-center gap-0.5">
+                  <PencilLine className="w-2.5 h-2.5" /> open
+                </button>
+              )}
+            </span>
           </div>
         </div>
       </div>
