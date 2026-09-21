@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { AlertTriangle } from 'lucide-react';
 
 export default function ConfirmModal({ title = 'Are you sure?', message, confirmLabel = 'Delete', tone = 'rose', onConfirm, onCancel }) {
@@ -10,7 +11,10 @@ export default function ConfirmModal({ title = 'Are you sure?', message, confirm
     return () => window.removeEventListener('keydown', handler);
   }, [onCancel]);
 
-  return (
+  // Portalled: a position:fixed overlay inside a .glass card (backdrop-filter)
+  // gets contained by the card and rendered dim and clipped — seen live on the
+  // week planner's replan prompt.
+  return createPortal(
     <div
       className="fixed inset-0 z-[60] flex items-center justify-center p-4"
       style={{ background: 'rgba(8,8,14,0.55)', backdropFilter: 'blur(8px)' }}
@@ -44,6 +48,7 @@ export default function ConfirmModal({ title = 'Are you sure?', message, confirm
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

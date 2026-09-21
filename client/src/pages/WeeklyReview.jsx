@@ -16,7 +16,8 @@ const STEPS = [
   { num: 1, label: 'Get Clear',   tone: 'amber' },
   { num: 2, label: 'Get Current', tone: 'mint'  },
   { num: 3, label: 'Get Creative', tone: 'violet' },
-  { num: 4, label: 'Complete',    tone: 'mint'  },
+  { num: 4, label: 'Plan Ahead',  tone: 'violet' },
+  { num: 5, label: 'Complete',    tone: 'mint'  },
 ];
 
 function StepIndicator({ current }) {
@@ -769,14 +770,68 @@ export default function WeeklyReview() {
           <div className="flex justify-between">
             <button onClick={() => setStep(2)} className="gtd-btn gtd-btn-secondary text-[12.5px]">Back</button>
             <button onClick={() => setStep(4)} className="gtd-btn gtd-btn-primary inline-flex items-center gap-2 text-[12.5px]">
+              Next: Plan Ahead <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Step 4: Plan Ahead — the planning half of the ritual */}
+      {step === 4 && (
+        <div className="space-y-5">
+          {weekAiOff ? (
+            <div className="rounded-2xl glass p-6">
+              <div className="mono-label mb-2" style={{ color: 'rgb(var(--violet-glow))' }}>step_04</div>
+              <h2 className="font-display text-[26px] leading-none mb-3">Plan the week ahead</h2>
+              <p className="text-[13.5px] text-text-2 leading-relaxed">
+                AI is off, so this one is yours: open the <Link to="/calendar" className="text-violet-glow underline-offset-4 hover:underline">Calendar</Link> and drag next actions onto the days they belong to.
+              </p>
+            </div>
+          ) : (
+                weekPlan ? (
+                  <WeekPlanBoard
+                    key={weekPlan._nonce}
+                    result={weekPlan}
+                    onReplan={planWeekAhead}
+                    compact
+                    onApplied={() => { setWeekPlan(null); setWeekPlanned(true); }}
+                    onCancel={() => setWeekPlan(null)}
+                    onOpenTask={(t) => setEditingTask(t)}
+                  />
+                ) : (
+                  <div className="rounded-2xl glass p-6">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="grid place-items-center w-9 h-9 rounded-xl" style={{ background: 'rgb(var(--violet) / 0.12)', boxShadow: 'inset 0 0 0 1px rgb(var(--violet) / 0.22)' }}>
+                        <Sparkles className="w-4 h-4" style={{ color: 'rgb(var(--violet-glow))' }} />
+                      </div>
+                      <div>
+                        <div className="mono-label" style={{ color: 'rgb(var(--violet-glow))' }}>step_04</div>
+                        <h2 className="font-display text-[26px] leading-none mt-1">Plan the week ahead</h2>
+                      </div>
+                    </div>
+                    <p className="text-[13.5px] text-text-2 leading-relaxed mb-4">
+                      {weekPlanned
+                        ? 'Your week has its shape. Each morning, “Plan my day” turns that day into time blocks.'
+                        : 'Let the AI propose a day for every open next action, sized to your meetings and what you usually finish. You move things around, then apply. No times yet — mornings handle those.'}
+                    </p>
+                    <button onClick={planWeekAhead} disabled={planningWeek} className="gtd-btn gtd-btn-primary inline-flex items-center gap-2 text-[12.5px] disabled:opacity-60">
+                      {planningWeek ? 'Planning…' : weekPlanned ? 'Plan again' : 'Plan my week'} <Sparkles className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                )
+          )}
+
+          <div className="flex justify-between">
+            <button onClick={() => setStep(3)} className="gtd-btn gtd-btn-secondary text-[12.5px]">Back</button>
+            <button onClick={() => setStep(5)} className="gtd-btn gtd-btn-primary inline-flex items-center gap-2 text-[12.5px]">
               Next: Complete <ArrowRight className="w-3.5 h-3.5" />
             </button>
           </div>
         </div>
       )}
 
-      {/* Step 4: Complete */}
-      {step === 4 && (
+      {/* Step 5: Complete */}
+      {step === 5 && (
         <div className="space-y-5">
           {done ? (
             <div className="rounded-2xl glass p-12 text-center relative overflow-hidden">
@@ -826,7 +881,7 @@ export default function WeeklyReview() {
                     <CheckCircle2 className="w-4 h-4" style={{ color: 'rgb(var(--mint-glow))' }} />
                   </div>
                   <div>
-                    <div className="mono-label" style={{ color: 'rgb(var(--mint-glow))' }}>step_04</div>
+                    <div className="mono-label" style={{ color: 'rgb(var(--mint-glow))' }}>step_05</div>
                     <h2 className="font-display text-[26px] leading-none mt-1">Review Summary</h2>
                   </div>
                 </div>
@@ -838,43 +893,8 @@ export default function WeeklyReview() {
                 </div>
               </div>
 
-              {/* Plan the week ahead — the "planning" half of the ritual. */}
-              {!weekAiOff && (
-                weekPlan ? (
-                  <WeekPlanBoard
-                    key={weekPlan._nonce}
-                    result={weekPlan}
-                    onReplan={planWeekAhead}
-                    compact
-                    onApplied={() => { setWeekPlan(null); setWeekPlanned(true); }}
-                    onCancel={() => setWeekPlan(null)}
-                    onOpenTask={(t) => setEditingTask(t)}
-                  />
-                ) : (
-                  <div className="rounded-2xl glass p-6">
-                    <div className="flex items-center gap-3 mb-3">
-                      <div className="grid place-items-center w-9 h-9 rounded-xl" style={{ background: 'rgb(var(--violet) / 0.12)', boxShadow: 'inset 0 0 0 1px rgb(var(--violet) / 0.22)' }}>
-                        <Sparkles className="w-4 h-4" style={{ color: 'rgb(var(--violet-glow))' }} />
-                      </div>
-                      <div>
-                        <div className="mono-label" style={{ color: 'rgb(var(--violet-glow))' }}>plan_ahead</div>
-                        <h2 className="font-display text-[26px] leading-none mt-1">The week ahead</h2>
-                      </div>
-                    </div>
-                    <p className="text-[13.5px] text-text-2 leading-relaxed mb-4">
-                      {weekPlanned
-                        ? 'Your week has its shape. Each morning, “Plan my day” turns that day into time blocks.'
-                        : 'Let the AI propose a day for every open next action, sized to your meetings and what you usually finish. You move things around, then apply. No times yet — mornings handle those.'}
-                    </p>
-                    <button onClick={planWeekAhead} disabled={planningWeek} className="gtd-btn gtd-btn-primary inline-flex items-center gap-2 text-[12.5px] disabled:opacity-60">
-                      {planningWeek ? 'Planning…' : weekPlanned ? 'Plan again' : 'Plan my week'} <Sparkles className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                )
-              )}
-
               <div className="flex justify-between">
-                <button onClick={() => setStep(3)} className="gtd-btn gtd-btn-secondary text-[12.5px]">Back</button>
+                <button onClick={() => setStep(4)} className="gtd-btn gtd-btn-secondary text-[12.5px]">Back</button>
                 <button
                   onClick={handleCompleteReview}
                   disabled={completing}
