@@ -16,6 +16,7 @@ const PLANS = [
 const PRO_PERKS = [
   'AI plans your day — every day, not 3 a month',
   'Unlimited projects, custom lists & habits',
+  'Insights: your productive hours, your week, your habits, plan vs reality',
   'Much higher daily AI limit',
 ];
 

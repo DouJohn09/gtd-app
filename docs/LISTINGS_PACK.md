@@ -63,7 +63,7 @@ Projects with next actions, contexts, defer/start dates, recurring tasks with fl
 People juggling work and life in one head: freelancers, small-team leads, students, anyone who has tried Todoist or TickTick and wanted a planner, or tried Motion and wanted calm and a lower price.
 
 **Pricing**
-Free forever: 8 projects, 1 list, 3 habits, daily AI allowance, 3 AI-planned days a month. Pro: unlimited everything plus AI planning every day, $4/month or $36/year. Founder plan: $30/year locked in for the first 30 subscribers, refundable within 30 days. Prices include VAT. Payments by Paddle.
+Free forever: 8 projects, 1 list, 3 habits, daily AI allowance, 3 AI-planned days a month. Pro: unlimited everything, AI planning every day, and Insights (when you really finish things, when habits stick, planned vs finished — and a planner that learns from it), $4/month or $36/year. Founder plan: $30/year locked in for the first 30 subscribers, refundable within 30 days. Prices include VAT. Payments by Paddle.
 
 **Privacy**
 Tasks are stored privately, never sold, never used to train AI models. AI providers are called on demand only. Google Calendar access is optional and revocable in one click.
