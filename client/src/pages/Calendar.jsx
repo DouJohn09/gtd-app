@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { ChevronLeft, ChevronRight, PanelRightOpen, Link as LinkIcon, Unlink, AlertCircle } from 'lucide-react';
+import { ChevronLeft, ChevronRight, PanelRightOpen, Link as LinkIcon, Unlink, AlertCircle, CalendarRange } from 'lucide-react';
 import { useGoogleLogin } from '@react-oauth/google';
 import { api } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
@@ -10,6 +10,9 @@ import WeekView from '../components/calendar/WeekView';
 import DayView from '../components/calendar/DayView';
 import UnscheduledSidebar from '../components/calendar/UnscheduledSidebar';
 import MonoLabel from '../components/ui/MonoLabel';
+import WeekPlanBoard from '../components/WeekPlanBoard';
+import { useAiMode } from '../hooks/useAiMode';
+import { aiToast } from '../lib/aiError';
 import {
   formatDateKey,
   getMonthDays,
@@ -38,6 +41,21 @@ export default function Calendar() {
   const [calendarLoading, setCalendarLoading] = useState(false);
   const { user } = useAuth();
   const { addToast } = useToast();
+  const { aiOff } = useAiMode();
+  // "Plan my week": one AI call proposes a day for every open next action;
+  // the board below the header lets the user move/omit before applying.
+  const [weekPlan, setWeekPlan] = useState(null);
+  const [planningWeek, setPlanningWeek] = useState(false);
+  const planWeek = async () => {
+    setPlanningWeek(true);
+    try {
+      setWeekPlan(await api.ai.planWeek());
+    } catch (err) {
+      addToast(...aiToast(err, 'Could not plan the week right now.'));
+    } finally {
+      setPlanningWeek(false);
+    }
+  };
 
   const dateKey = formatDateKey(currentDate);
   const year = currentDate.getFullYear();
@@ -274,6 +292,18 @@ export default function Calendar() {
             </button>
           )}
 
+          {!aiOff && (
+            <button
+              onClick={planWeek}
+              disabled={planningWeek || !!weekPlan}
+              className="gtd-btn gtd-btn-primary inline-flex items-center gap-1.5 text-[12.5px] disabled:opacity-60"
+              title="AI proposes a day for each open task; you adjust, then apply"
+            >
+              <CalendarRange className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">{planningWeek ? 'Planning…' : 'Plan my week'}</span>
+            </button>
+          )}
+
           {/* View segmented */}
           <div className="rounded-xl glass p-1 flex">
             {VIEW_TYPES.map(v => {
@@ -304,6 +334,15 @@ export default function Calendar() {
           </button>
         </div>
       </div>
+
+      {weekPlan && (
+        <WeekPlanBoard
+          result={weekPlan}
+          onApplied={() => { setWeekPlan(null); fetchData(); }}
+          onCancel={() => setWeekPlan(null)}
+          onOpenTask={handleEdit}
+        />
+      )}
 
       {/* Re-consent banner: connected but no write scope */}
       {calendarConnected && !hasWriteScope && (

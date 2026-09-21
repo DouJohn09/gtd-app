@@ -166,6 +166,9 @@ export const api = {
     dayBrief: () => fetchApi('/ai/day-brief'),
     shutdownDefer: (taskId, mode) => fetchApi('/ai/shutdown-defer', { method: 'POST', body: JSON.stringify({ taskId, mode }) }),
     applyPlan: (items, deferred) => fetchApi('/ai/apply-plan', { method: 'POST', body: JSON.stringify({ items, deferred }) }),
+    weekBrief: (start) => fetchApi(`/ai/week-brief${start ? `?start=${start}` : ''}`),
+    planWeek: (start) => fetchApi('/ai/plan-week', { method: 'POST', body: JSON.stringify({ start }) }),
+    applyWeek: (start, items) => fetchApi('/ai/apply-week', { method: 'POST', body: JSON.stringify({ start, items }) }),
   },
 
   preferences: {

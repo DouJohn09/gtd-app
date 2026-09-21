@@ -4,8 +4,7 @@ import net from 'node:net';
 import {
   validateSmartCapture, validateProcessInbox, validateImportNotes,
   validateDailyPriorities, validateFindDuplicates, validateWeeklyReview,
-  validateAnalyzeTask, validateProjectBreakdown, validatePlanDay,
-} from './aiSchema.js';
+  validateAnalyzeTask, validateProjectBreakdown, validatePlanDay, validatePlanWeek } from './aiSchema.js';
 import { packPlan, timeToMinutes, minutesToTime } from './scheduling.js';
 
 // Provider clients. OpenAI is the paid/reliable baseline; Groq is the fast,
@@ -50,6 +49,7 @@ const ROUTING = {
   // the fallback when Groq is down or throttled — eval-verified parity below.
   'daily-priorities':  { primary: { provider: 'groq', model: GROQ }, fallback: { provider: 'openai', model: 'gpt-4.1-mini' } },
   'plan-day':          { primary: { provider: 'groq', model: GROQ }, fallback: { provider: 'openai', model: 'gpt-4.1-mini' } },
+  'plan-week':         { primary: { provider: 'groq', model: GROQ }, fallback: { provider: 'openai', model: 'gpt-4.1-mini' } },
   'analyze-task':      { primary: { provider: 'groq', model: GROQ }, fallback: { provider: 'openai', model: 'gpt-4.1-mini' } },
   'project-breakdown': { primary: { provider: 'groq', model: GROQ }, fallback: { provider: 'openai', model: 'gpt-4.1-mini' } },
   'weekly-review':     { primary: { provider: 'groq', model: GROQ }, fallback: { provider: 'openai', model: 'gpt-4.1-mini' } },
@@ -69,6 +69,7 @@ const TASK_PARAMS = {
   'url-extract':       { temperature: 0 },
   'daily-priorities':  { temperature: 0.2, max_tokens: 1500 },
   'plan-day':          { temperature: 0.2, max_tokens: 2000 },
+  'plan-week':         { temperature: 0.2, max_tokens: 3000 },
   'analyze-task':      { temperature: 0.2, max_tokens: 800 },
   'project-breakdown': { temperature: 0.4, max_tokens: 2048 },
   'weekly-review':     { temperature: 0.4, max_tokens: 3000 },
@@ -778,6 +779,74 @@ Respond with JSON:
     deferred,
     summary: typeof parsed.summary === 'string' ? parsed.summary : '',
     overloaded: parsed.overloaded === true || overflow.length > 0,
+  };
+}
+
+// Plan the week: distribute candidate tasks across the next days — WHICH day,
+// not what time. Times are the morning planner's job. The route passes each
+// day's real capacity (free minutes after meetings and already-placed tasks,
+// scaled by the person's finish rate) and the same "what we know about you"
+// profile the daily planner reads. A deterministic pass in the route enforces
+// capacity and start/due bounds regardless of what the model returns.
+export async function planWeek(tasks, week, userContexts) {
+  if (!openai && !groq) return { error: 'AI provider not configured' };
+
+  const taskList = tasks.map((t, i) => {
+    const parts = [`${i + 1}. "${t.title}" [${t.context || 'no context'}]`];
+    if (t.project_name) parts.push(`(Project: ${t.project_name})`);
+    if (t.due_date) {
+      const due = String(t.due_date).slice(0, 10);
+      parts.push(due < week.days[0].date ? `Due: ${due} (OVERDUE)` : `Due: ${due}`);
+    }
+    if (t.start_date) parts.push(`Not before: ${String(t.start_date).slice(0, 10)}`);
+    if (t.priority) parts.push(`Priority: ${t.priority}/5`);
+    parts.push(`Energy: ${t.energy_level || 'unknown'}, Time: ${t.time_estimate || 30}min`);
+    return parts.join(' ');
+  }).join('\n');
+
+  const daysLine = week.days.map(d =>
+    `${d.date} ${d.dayName}: ${d.capacityMins} min available for tasks` +
+    (d.meetings ? ` (${d.meetings} meeting${d.meetings === 1 ? '' : 's'}, ${d.busyMins} min busy)` : '') +
+    (d.fixed.length ? `; already planned that day: ${d.fixed.map(f => `"${f.title}"`).join(', ')}` : '')
+  ).join('\n');
+
+  const parsed = await complete('plan-week', {
+    messages: [
+      { role: 'system', content: getSystemPrompt(userContexts) },
+      {
+        role: 'user',
+        content: `Today is ${week.days[0].dayName}, ${week.days[0].date}. Distribute the candidate tasks across the next ${week.days.length} days. Decide WHICH DAY each task belongs to — not the time of day.
+
+THE DAYS (capacity already accounts for meetings, existing plans and how much this person really finishes):
+${daysLine}
+${week.profile ? `\n${week.profile}\n` : ''}
+CANDIDATE TASKS:
+${taskList}
+
+RULES:
+- The sum of "Time" of tasks placed on a day must not exceed that day's available minutes. Leave slack; do not fill days to the brim.
+- A task with "Due:" must land on or before its due date; OVERDUE tasks go on the first day.
+- A task with "Not before:" must not land earlier than that date.
+- Front-load what matters (priority, due dates); spread deep work so no day gets all of it; batch shallow tasks together.
+- Put lower-priority or unclear items in "unplaced" with an honest reason when the week is genuinely full. Leaving things out is the plan protecting the week.
+- "summary": ONE calm sentence about the shape of the week.
+
+Respond with JSON:
+{
+  "placements": [{ "task_index": number, "date": "YYYY-MM-DD", "reason": "why that day, plain language" }],
+  "unplaced": [{ "task_index": number, "reason": "honest reason" }],
+  "summary": "one calm sentence"
+}`
+      }
+    ],
+    response_format: { type: 'json_object' }
+  }, validatePlanWeek(tasks.length, week.days.map(d => d.date)));
+
+  if (!parsed || parsed.error) return parsed;
+  return {
+    placements: (parsed.placements || []).map(pl => ({ task_index: pl.task_index, date: pl.date, reason: pl.reason || '' })),
+    unplaced: (Array.isArray(parsed.unplaced) ? parsed.unplaced : []).map(u => ({ task_index: u.task_index, reason: u.reason || '' })),
+    summary: typeof parsed.summary === 'string' ? parsed.summary : '',
   };
 }
 

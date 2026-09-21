@@ -13,6 +13,7 @@ const RESOURCE = {
   insights:     { noun: 'insights',      line: 'See your week, your habits, and how your planned days really go.' },
   // Server resource key for the daily-planning gate (billing.js assertPlanWithinLimit).
   'planned days this month': { noun: 'planned days this month', line: 'Let AI plan every day, not three a month.' },
+  'planned weeks this month': { noun: 'planned weeks this month', line: 'Let AI lay out every week, not one a month.' },
   // Daily AI budget (middleware/aiLimit.js). Unlike the capacity gates this one
   // arrives as a 429, and only for Free users — Pro over the cap gets a plain toast.
   'AI actions today': { noun: 'AI actions a day', line: 'Pro raises the ceiling well past any normal day.' },

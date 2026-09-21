@@ -1,13 +1,13 @@
 import { Router } from 'express';
 import { TaskModel, ProjectModel, WeeklyReviewModel } from '../db/models.js';
 import { pool } from '../db/pool.js';
-import { processInbox, getDailyPriorities, importNotes, findDuplicates, weeklyReviewAnalysis, smartCapture, planDay } from '../services/ai.js';
+import { processInbox, getDailyPriorities, importNotes, findDuplicates, weeklyReviewAnalysis, smartCapture, planDay, planWeek } from '../services/ai.js';
 import { syncTaskToCalendar } from '../services/googleCalendar.js';
 import { findFreeSlot, freeRangesFor, timeToMinutes, eventMinutesOnDay, clampRangesToNow } from '../services/scheduling.js';
 import { check, charge, getStatus } from '../services/aiUsage.js';
 import { enforceAiLimit, requireAiEnabled, chargeAiUsage } from '../middleware/aiLimit.js';
 import { getAiMode } from '../services/userPrefs.js';
-import { assertPlanWithinLimit, LimitError } from '../services/billing.js';
+import { assertPlanWithinLimit, assertWeekPlanWithinLimit, LimitError } from '../services/billing.js';
 import { recordAppliedBlocks, closeBlock, planReality, planningProfileText, calibrationLine } from '../services/insights.js';
 
 async function getUserContexts(userId) {
@@ -597,6 +597,237 @@ router.post('/shutdown-defer', async (req, res) => {
     closeBlock(req.user.id, task.id, mode).catch(err => console.error('closeBlock (shutdown):', err));
     syncTaskToCalendar(req.user.id, task, req.clientTimezone).catch(err => console.error('syncTaskToCalendar (shutdown):', err));
     res.json({ task, mode, moved_to: updates.due_date, scheduled_time: updates.scheduled_time ?? null });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+
+// ---------------------------------------------------------------------------
+// Plan my week — WHICH day each task belongs to; the morning planner does times.
+
+const WEEK_DAYS = 7;
+const MAX_WEEK_CANDIDATES = 60;
+
+function addDays(dateStr, n) {
+  const d = new Date(dateStr + 'T12:00:00Z');
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+function dayNameOf(dateStr) {
+  return new Date(dateStr + 'T12:00:00Z').toLocaleDateString('en-US', { weekday: 'long', timeZone: 'UTC' });
+}
+const dateOnly = (v) => (v ? String(v).slice(0, 10) : null);
+
+// The shape of the coming days: free minutes after meetings and time blocks,
+// tasks already dated on each day (fixed, not candidates), and a capacity that
+// leaves slack and scales by how much of a planned day this person finishes.
+async function weekShape(userId, start, tz, reality) {
+  const dates = Array.from({ length: WEEK_DAYS }, (_, i) => addDays(start, i));
+  const end = dates[dates.length - 1];
+  const { rows: fixedRows } = await pool.query(
+    `SELECT id, title, due_date, scheduled_time, time_estimate, duration
+       FROM tasks
+      WHERE user_id = $1 AND list = 'next_actions'
+        AND due_date BETWEEN $2::date AND $3::date
+      ORDER BY due_date, scheduled_time NULLS LAST`,
+    [userId, start, end]
+  );
+  const finishFactor = reality && reality.level !== 'none'
+    ? Math.min(1, Math.max(0.5, reality.completionRate))
+    : 1;
+  const nowMins = minutesNowIn(tz);
+
+  const days = [];
+  for (const date of dates) {
+    const shape = await freeRangesFor(userId, date, tz);
+    const free = date === start ? clampRangesToNow(shape.free, nowMins) : shape.free;
+    const freeMins = free.reduce((sum, r) => sum + (r.end - r.start), 0);
+    const busyMins = shape.busy.reduce((sum, r) => sum + (r.end - r.start), 0);
+    const meetings = buildMeetings(shape, date, tz).length;
+    // Dated-but-untimed tasks already on this day eat capacity too (timed ones
+    // are already inside `busy`).
+    const fixed = fixedRows
+      .filter(r => dateOnly(r.due_date) === date)
+      .map(r => ({ id: r.id, title: r.title, mins: r.scheduled_time ? 0 : (r.time_estimate || r.duration || 30), timed: !!r.scheduled_time }));
+    const fixedMins = fixed.reduce((sum, f) => sum + f.mins, 0);
+    const capacityMins = Math.max(0, Math.round((freeMins * 0.8 - fixedMins) * finishFactor));
+    days.push({ date, dayName: dayNameOf(date), freeMins, busyMins, meetings, fixed, fixedMins, capacityMins, workStart: shape.workStart, workEnd: shape.workEnd });
+  }
+  return { days, start, end, finishFactor };
+}
+
+// Candidates: next actions that are not already dated inside the window and
+// that may start by the window's end. Overdue and undated tasks qualify.
+async function weekCandidates(userId, start, end, today) {
+  const all = await TaskModel.getAll('next_actions', userId, end);
+  return all
+    .filter(t => {
+      const due = dateOnly(t.due_date);
+      const from = dateOnly(t.start_date);
+      if (from && from > end) return false;
+      if (due && due >= start && due <= end) return false; // fixed on a day already
+      if (due === today && t.scheduled_time) return false;
+      return true;
+    })
+    .slice(0, MAX_WEEK_CANDIDATES);
+}
+
+// Deterministic guarantee layer: bounds and capacity hold whatever the model said.
+function reconcileWeek(proposal, tasks, days) {
+  const byDate = new Map(days.map(d => [d.date, { ...d, used: 0 }]));
+  const dates = days.map(d => d.date);
+  const start = dates[0], end = dates[dates.length - 1];
+  const placed = [];
+  const unplaced = [];
+  const seen = new Set();
+  const minsOf = (t) => t.time_estimate || 30;
+
+  // Overdue tasks are already late: any day this week beats "never", so they
+  // keep the whole window (the first day is still preferred via `wanted`).
+  const boundsFor = (t) => {
+    const from = dateOnly(t.start_date);
+    const due = dateOnly(t.due_date);
+    const lo = from && from > start ? from : start;
+    let hi = end;
+    if (due && due >= start && due < end) hi = due;
+    return { lo, hi: hi < lo ? lo : hi };
+  };
+
+  const tryPlace = (t, idx, wanted, reason) => {
+    const { lo, hi } = boundsFor(t);
+    const candidates = dates.filter(d => d >= lo && d <= hi);
+    const order = wanted && candidates.includes(wanted) ? [wanted, ...candidates.filter(d => d !== wanted)] : candidates;
+    for (const d of order) {
+      const day = byDate.get(d);
+      if (day.used + minsOf(t) <= day.capacityMins || (day.used === 0 && day.capacityMins > 0)) {
+        day.used += minsOf(t);
+        placed.push({ task_index: idx, taskId: t.id, date: d, reason: d === wanted ? reason : (reason ? `${reason} (moved to ${dayNameOf(d)} to fit)` : `Fits on ${dayNameOf(d)}.`) });
+        return true;
+      }
+    }
+    return false;
+  };
+
+  for (const pl of proposal.placements || []) {
+    const t = tasks[pl.task_index - 1];
+    if (!t || seen.has(pl.task_index)) continue;
+    seen.add(pl.task_index);
+    if (!tryPlace(t, pl.task_index, pl.date, pl.reason)) {
+      unplaced.push({ task_index: pl.task_index, taskId: t.id, reason: 'No room left in the week within its dates.' });
+    }
+  }
+  for (const u of proposal.unplaced || []) {
+    const t = tasks[u.task_index - 1];
+    if (!t || seen.has(u.task_index)) continue;
+    seen.add(u.task_index);
+    unplaced.push({ task_index: u.task_index, taskId: t.id, reason: u.reason || 'Left out to keep the week realistic.' });
+  }
+  // Anything the model forgot: overdue/due items get a forced attempt, the rest stays unplaced.
+  tasks.forEach((t, i) => {
+    const idx = i + 1;
+    if (seen.has(idx)) return;
+    const due = dateOnly(t.due_date);
+    if (due && due <= end && tryPlace(t, idx, null, 'Has a due date this week.')) return;
+    unplaced.push({ task_index: idx, taskId: t.id, reason: 'Not placed — the week is full or it can wait.' });
+  });
+
+  return {
+    placements: placed,
+    unplaced,
+    days: days.map(d => ({ ...d, plannedMins: byDate.get(d.date).used })),
+  };
+}
+
+// GET /api/ai/week-brief?start=YYYY-MM-DD — deterministic, no AI, no charge.
+router.get('/week-brief', async (req, res) => {
+  try {
+    const start = /^\d{4}-\d{2}-\d{2}$/.test(req.query.start || '') ? req.query.start : req.today;
+    const reality = await planReality(req.user.id, req.clientTimezone, { today: req.today }).catch(() => null);
+    const shape = await weekShape(req.user.id, start, req.clientTimezone, reality);
+    const candidates = await weekCandidates(req.user.id, shape.start, shape.end, req.today);
+    const { rows: [row] } = await pool.query(
+      'SELECT applied_at, created_at FROM weekly_plans WHERE user_id = $1 AND week_start = $2',
+      [req.user.id, start]
+    );
+    res.json({ ...shape, candidates: candidates.length, existingPlan: row ? { applied: !!row.applied_at, createdAt: row.created_at } : null });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// POST /api/ai/plan-week { start } — one AI call, charged like plan-day.
+router.post('/plan-week', requireAiEnabled, enforceAiLimit, async (req, res) => {
+  try {
+    const start = /^\d{4}-\d{2}-\d{2}$/.test(req.body?.start || '') ? req.body.start : req.today;
+    await assertWeekPlanWithinLimit(req.user.id, start);
+
+    const [reality, userContexts] = await Promise.all([
+      planReality(req.user.id, req.clientTimezone, { today: req.today }).catch(() => null),
+      getUserContexts(req.user.id),
+    ]);
+    const shape = await weekShape(req.user.id, start, req.clientTimezone, reality);
+    const candidates = await weekCandidates(req.user.id, shape.start, shape.end, req.today);
+
+    if (candidates.length === 0) {
+      return res.json({ ...shape, placements: [], unplaced: [], tasks: [], summary: 'Nothing to distribute — every next action is already dated or waiting on a start date.' });
+    }
+
+    const result = await planWeek(candidates, { days: shape.days, profile: planningProfileText(reality) }, userContexts);
+    if (aiFailed(res, result)) return;
+    await chargeAiUsage(req);
+
+    const reconciled = reconcileWeek(result, candidates, shape.days);
+    const payload = { ...reconciled, summary: result.summary, start: shape.start, end: shape.end, finishFactor: shape.finishFactor };
+    await pool.query(
+      `INSERT INTO weekly_plans (user_id, week_start, payload)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (user_id, week_start) DO UPDATE SET payload = $3, created_at = NOW()`,
+      [req.user.id, start, JSON.stringify(payload)]
+    );
+    res.json({ ...payload, tasks: candidates });
+  } catch (error) {
+    if (error instanceof LimitError) {
+      return res.status(402).json({ error: error.message, code: error.code, resource: error.resource, limit: error.limit });
+    }
+    console.error(error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// POST /api/ai/apply-week { start, items: [{ taskId, date }] } — writes the
+// do-date only. No times, no calendar events; "Plan my day" adds those each
+// morning. Additive: tasks not in `items` are untouched. No AI → no aiLimit.
+router.post('/apply-week', async (req, res) => {
+  try {
+    const start = /^\d{4}-\d{2}-\d{2}$/.test(req.body?.start || '') ? req.body.start : req.today;
+    const end = addDays(start, WEEK_DAYS - 1);
+    const items = (Array.isArray(req.body?.items) ? req.body.items : [])
+      .filter(i => Number.isInteger(Number(i.taskId)) && /^\d{4}-\d{2}-\d{2}$/.test(i.date || '') && i.date >= start && i.date <= end);
+    if (items.length === 0) return res.status(400).json({ error: 'Nothing to apply' });
+
+    const updated = [];
+    for (const item of items) {
+      const task = await TaskModel.update(Number(item.taskId), {
+        due_date: item.date,
+        scheduled_time: null,
+        is_daily_focus: false,
+      }, req.user.id);
+      if (task) {
+        updated.push(task);
+        syncTaskToCalendar(req.user.id, task, req.clientTimezone).catch(err => console.error('syncTaskToCalendar (apply-week):', err));
+      }
+    }
+    await pool.query(
+      `UPDATE weekly_plans
+          SET applied_at = NOW(),
+              payload = payload || jsonb_build_object('applied', $3::jsonb)
+        WHERE user_id = $1 AND week_start = $2`,
+      [req.user.id, start, JSON.stringify(items)]
+    );
+    res.json({ applied: updated.length, tasks: updated });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Internal server error' });

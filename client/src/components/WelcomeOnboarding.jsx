@@ -58,7 +58,7 @@ const NAV_GROUPS = [
     label: 'rituals',
     items: [
       { icon: Target,   name: 'Habits',        text: 'Small routines, tracked gently — no guilt streaks.' },
-      { icon: RotateCcw, name: 'Weekly Review', text: 'Ten minutes a week to keep the system trusted.' },
+      { icon: RotateCcw, name: 'Weekly Review & Planning', text: 'Ten minutes a week to keep the system trusted — then lay out the week ahead.' },
       { icon: Sparkles, name: 'AI Assistant',  text: 'Bulk tools: process the Inbox, plan your day.' },
     ],
   },

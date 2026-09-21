@@ -7,6 +7,8 @@ import QuickCapture from '../components/QuickCapture';
 import TaskCard from '../components/TaskCard';
 import TaskModal from '../components/TaskModal';
 import MonoLabel from '../components/ui/MonoLabel';
+import WeekPlanBoard from '../components/WeekPlanBoard';
+import { useAiMode } from '../hooks/useAiMode';
 import { linkify } from '../lib/linkify.jsx';
 import { aiToast } from '../lib/aiError';
 
@@ -104,6 +106,16 @@ export default function WeeklyReview() {
   const [done, setDone] = useState(false);
   const [resultStreak, setResultStreak] = useState(0);
   const [editingTask, setEditingTask] = useState(null);
+  const { aiOff: weekAiOff } = useAiMode();
+  const [weekPlan, setWeekPlan] = useState(null);
+  const [weekPlanned, setWeekPlanned] = useState(false);
+  const [planningWeek, setPlanningWeek] = useState(false);
+  const planWeekAhead = async () => {
+    setPlanningWeek(true);
+    try { setWeekPlan(await api.ai.planWeek()); }
+    catch (err) { addToast(...aiToast(err, 'Could not plan the week right now.')); }
+    finally { setPlanningWeek(false); }
+  };
   const [analyzing, setAnalyzing] = useState(false);
 
   // The one AI call in the ritual, run only when the user asks for it on step 3.
@@ -251,7 +263,7 @@ export default function WeeklyReview() {
       <div className="mb-8">
         <MonoLabel tone="violet" className="mb-3">ritual</MonoLabel>
         <h1 className="font-display text-[52px] md:text-[60px] leading-[1] tracking-tight flex items-baseline gap-3 flex-wrap">
-          Weekly Review
+          Weekly Review <span className="text-text-3">&amp;</span> Planning
           {reviewData.streak > 0 && (
             <span
               className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full font-mono text-[11px] align-middle"
@@ -824,6 +836,39 @@ export default function WeeklyReview() {
                   <SummaryStat tone="amber"  value={reviewData.completedThisWeek} label="this_week" />
                 </div>
               </div>
+
+              {/* Plan the week ahead — the "planning" half of the ritual. */}
+              {!weekAiOff && (
+                weekPlan ? (
+                  <WeekPlanBoard
+                    result={weekPlan}
+                    compact
+                    onApplied={() => { setWeekPlan(null); setWeekPlanned(true); }}
+                    onCancel={() => setWeekPlan(null)}
+                    onOpenTask={(t) => setEditingTask(t)}
+                  />
+                ) : (
+                  <div className="rounded-2xl glass p-6">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="grid place-items-center w-9 h-9 rounded-xl" style={{ background: 'rgb(var(--violet) / 0.12)', boxShadow: 'inset 0 0 0 1px rgb(var(--violet) / 0.22)' }}>
+                        <Sparkles className="w-4 h-4" style={{ color: 'rgb(var(--violet-glow))' }} />
+                      </div>
+                      <div>
+                        <div className="mono-label" style={{ color: 'rgb(var(--violet-glow))' }}>plan_ahead</div>
+                        <h2 className="font-display text-[26px] leading-none mt-1">The week ahead</h2>
+                      </div>
+                    </div>
+                    <p className="text-[13.5px] text-text-2 leading-relaxed mb-4">
+                      {weekPlanned
+                        ? 'Your week has its shape. Each morning, “Plan my day” turns that day into time blocks.'
+                        : 'Let the AI propose a day for every open next action, sized to your meetings and what you usually finish. You move things around, then apply. No times yet — mornings handle those.'}
+                    </p>
+                    <button onClick={planWeekAhead} disabled={planningWeek} className="gtd-btn gtd-btn-primary inline-flex items-center gap-2 text-[12.5px] disabled:opacity-60">
+                      {planningWeek ? 'Planning…' : weekPlanned ? 'Plan again' : 'Plan my week'} <Sparkles className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                )
+              )}
 
               <div className="flex justify-between">
                 <button onClick={() => setStep(3)} className="gtd-btn gtd-btn-secondary text-[12.5px]">Back</button>

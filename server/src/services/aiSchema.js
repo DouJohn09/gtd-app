@@ -231,6 +231,37 @@ export function validatePlanDay(taskCount) {
   };
 }
 
+// Plan-week: every task index at most once across placements+unplaced; dates
+// must be one of the window's days (the route re-checks start/due bounds).
+export function validatePlanWeek(taskCount, allowedDates) {
+  const allowed = new Set(allowedDates);
+  return (r) => {
+    const problems = [];
+    if (!Array.isArray(r.placements)) return ['placements must be an array'];
+    if (r.unplaced != null && !Array.isArray(r.unplaced)) problems.push('unplaced must be an array or omitted');
+    const seen = new Set();
+    r.placements.forEach((pl, i) => {
+      const label = `placements[${i}].`;
+      coerce(pl, 'task_index', { numeric: true });
+      if (!Number.isInteger(pl.task_index) || pl.task_index < 1 || pl.task_index > taskCount) {
+        problems.push(`${label}task_index must be an integer 1-${taskCount}`);
+      } else if (seen.has(pl.task_index)) {
+        problems.push(`${label}task_index ${pl.task_index} appears twice`);
+      } else seen.add(pl.task_index);
+      checkDate(pl, 'date', problems, label);
+      if (pl.date && !allowed.has(pl.date)) problems.push(`${label}date ${pl.date} is outside the week (${allowedDates[0]}..${allowedDates[allowedDates.length - 1]})`);
+    });
+    (Array.isArray(r.unplaced) ? r.unplaced : []).forEach((u, i) => {
+      const label = `unplaced[${i}].`;
+      coerce(u, 'task_index', { numeric: true });
+      if (!Number.isInteger(u.task_index) || u.task_index < 1 || u.task_index > taskCount) {
+        problems.push(`${label}task_index must be an integer 1-${taskCount}`);
+      }
+    });
+    return problems;
+  };
+}
+
 export function validateProjectBreakdown(r) {
   const problems = [];
   if (!Array.isArray(r.next_actions)) return ['next_actions must be an array'];

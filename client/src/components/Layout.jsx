@@ -36,7 +36,7 @@ const navGroups = [
     label: 'rituals',
     items: [
       { to: '/habits',    icon: Target,        label: 'Habits' },
-      { to: '/review',    icon: RotateCcw,     label: 'Weekly Review' },
+      { to: '/review',    icon: RotateCcw,     label: 'Review & Planning' },
       { to: '/insights',  icon: BarChart3,     label: 'Insights' },
       { to: '/ai',        icon: Sparkles,      label: 'AI Assistant' },
       { to: '/completed', icon: CheckCircle2,  label: 'Completed' },

@@ -94,3 +94,22 @@ export async function assertPlanWithinLimit(userId, planDate) {
     throw new LimitError('planned days this month', PLAN_DAYS_FREE_PER_MONTH);
   }
 }
+
+// Week-planning gate, same shape as the daily one: Free gets one applied week
+// plan per calendar month (re-planning the same window doesn't count twice).
+export const WEEK_PLANS_FREE_PER_MONTH = 1;
+export async function assertWeekPlanWithinLimit(userId, weekStart) {
+  if ((await getUserPlan(userId)) === 'pro') return;
+  const { rows } = await pool.query(
+    `SELECT COUNT(*)::int AS cnt FROM weekly_plans
+     WHERE user_id = $1
+       AND applied_at IS NOT NULL
+       AND week_start >= date_trunc('month', $2::date)
+       AND week_start < date_trunc('month', $2::date) + interval '1 month'
+       AND week_start != $2::date`,
+    [userId, weekStart]
+  );
+  if (rows[0].cnt >= WEEK_PLANS_FREE_PER_MONTH) {
+    throw new LimitError('planned weeks this month', WEEK_PLANS_FREE_PER_MONTH);
+  }
+}
