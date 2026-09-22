@@ -525,11 +525,19 @@ router.post('/apply-plan', async (req, res) => {
     }
 
     const updated = [];
+    const { rows: estRows } = await pool.query(
+      'SELECT id, time_estimate FROM tasks WHERE user_id = $1 AND id = ANY($2::int[])',
+      [req.user.id, items.map(i => Number(i.taskId)).filter(Number.isInteger)]
+    );
+    const hasEstimate = new Map(estRows.map(r => [r.id, !!r.time_estimate]));
     for (const item of items) {
       const task = await TaskModel.update(item.taskId, {
         due_date: req.today,
         scheduled_time: item.start,
         duration: item.duration || 30,
+        // A block the person accepted is the best estimate a task without one
+        // will get; keep it so tomorrow's plan doesn't start from 30 again.
+        ...(hasEstimate.get(Number(item.taskId)) === false ? { time_estimate: item.duration || 30 } : {}),
         is_daily_focus: true,
       }, req.user.id);
       if (task) {
@@ -682,7 +690,15 @@ function reconcileWeek(proposal, tasks, days) {
   const placed = [];
   const unplaced = [];
   const seen = new Set();
-  const minsOf = (t) => t.time_estimate || 30;
+  // Tasks without an estimate get the model's (asked for per task in the
+  // prompt); 30 only as the very last resort. Surfaced to the board and
+  // written back on apply so the estimate sticks for the daily planner.
+  const aiEstimates = new Map();
+  for (const pl of [...(proposal.placements || []), ...(proposal.unplaced || [])]) {
+    const t = tasks[pl.task_index - 1];
+    if (t && !t.time_estimate && pl.estimate_mins) aiEstimates.set(t.id, pl.estimate_mins);
+  }
+  const minsOf = (t) => t.time_estimate || aiEstimates.get(t.id) || 30;
 
   // Overdue tasks are already late: any day this week beats "never", so they
   // keep the whole window (the first day is still preferred via `wanted`).
@@ -736,6 +752,7 @@ function reconcileWeek(proposal, tasks, days) {
   return {
     placements: placed,
     unplaced,
+    estimates: Object.fromEntries(aiEstimates),
     days: days.map(d => ({ ...d, plannedMins: byDate.get(d.date).used })),
   };
 }
@@ -880,12 +897,16 @@ router.post('/apply-week', async (req, res) => {
     const timedByDate = new Map();
     for (const item of items) {
       const timed = /^([01]\d|2[0-3]):[0-5]\d$/.test(item.start || '');
+      const est = Number(item.estimate);
       const task = await TaskModel.update(Number(item.taskId), {
         due_date: item.date,
         // With time windows on, the week writes the block too; otherwise the
         // morning planner does it and any old time is cleared.
         scheduled_time: timed ? item.start : null,
         ...(timed ? { duration: Math.min(480, Math.max(5, Number(item.duration) || 30)) } : {}),
+        // The planner's estimate for a task that had none becomes the task's
+        // estimate, so the next plan (and the person) start from it.
+        ...(Number.isFinite(est) && est > 0 ? { time_estimate: Math.min(480, Math.max(5, Math.round(est))) } : {}),
         is_daily_focus: false,
       }, req.user.id);
       if (task) {

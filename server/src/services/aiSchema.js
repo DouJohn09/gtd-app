@@ -252,12 +252,16 @@ export function validatePlanWeek(taskCount, allowedDates) {
       seen.add(pl.task_index);
       coerce(pl, 'date');
       if (!pl.date || !allowed.has(pl.date)) pl.date = null; // reconcile picks a day within bounds
+      coerce(pl, 'estimate_mins', { numeric: true });
+      pl.estimate_mins = Number.isFinite(Number(pl.estimate_mins)) && pl.estimate_mins > 0 ? Math.min(480, Math.max(5, Math.round(Number(pl.estimate_mins)))) : null;
       return true;
     };
     r.placements = r.placements.filter(pl => pl && typeof pl === 'object' && keepPlacement(pl));
     r.unplaced = (Array.isArray(r.unplaced) ? r.unplaced : []).filter(u => {
       if (!u || typeof u !== 'object') return false;
       coerce(u, 'task_index', { numeric: true });
+      coerce(u, 'estimate_mins', { numeric: true });
+      u.estimate_mins = Number.isFinite(Number(u.estimate_mins)) && u.estimate_mins > 0 ? Math.min(480, Math.max(5, Math.round(Number(u.estimate_mins)))) : null;
       return Number.isInteger(u.task_index) && u.task_index >= 1 && u.task_index <= taskCount && !seen.has(u.task_index);
     });
     return problems;

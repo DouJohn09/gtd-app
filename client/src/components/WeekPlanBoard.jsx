@@ -62,7 +62,9 @@ export default function WeekPlanBoard({ result, onApplied, onCancel, onOpenTask,
   };
   const [showWeekend, setShowWeekend] = useState(() => days.some(d => isWeekend(d.date) && (d.capacityMins > 0 && (result?.placements || []).some(p => p.date === d.date))));
 
-  const minsOf = (t) => t?.time_estimate || 30;
+  // Estimates the planner made for tasks that had none (result.estimates).
+  const aiEst = result?.estimates || {};
+  const minsOf = (t) => t?.time_estimate || aiEst[t?.id] || 30;
   const plannedMins = (date) => [...where.entries()].filter(([id, d]) => d === date && !omitted.has(id)).reduce((s, [id]) => s + minsOf(tasks.get(id)), 0);
   const unplaced = liveTasks.filter(t => !where.has(t.id));
   const keptCount = [...where.entries()].filter(([id, d]) => d && !omitted.has(id)).length;
@@ -113,7 +115,8 @@ export default function WeekPlanBoard({ result, onApplied, onCancel, onOpenTask,
     try {
       const items = [...where.entries()].filter(([id, d]) => d && !omitted.has(id)).map(([taskId, date]) => {
         const t = withTimes ? times.get(taskId) : null;
-        return t ? { taskId, date, start: t.start, duration: t.duration } : { taskId, date };
+        const estimate = !tasks.get(taskId)?.time_estimate && aiEst[taskId] ? aiEst[taskId] : undefined;
+        return { taskId, date, ...(t ? { start: t.start, duration: t.duration } : {}), ...(estimate ? { estimate } : {}) };
       });
       const r = await api.ai.applyWeek(start, items);
       addToast(withTimes ? `Week planned — ${r.applied} task${r.applied === 1 ? '' : 's'} time-blocked.` : `Week planned — ${r.applied} task${r.applied === 1 ? '' : 's'} given a day.`, 'success');
@@ -206,7 +209,7 @@ export default function WeekPlanBoard({ result, onApplied, onCancel, onOpenTask,
 
               <div className="space-y-1.5 flex-1">
                 {cards.map(t => (
-                  <Card key={t.id} task={t} reason={reasons.get(t.id)} omitted={omitted.has(t.id)}
+                  <Card key={t.id} task={t} reason={reasons.get(t.id)} omitted={omitted.has(t.id)} aiEstimate={aiEst[t.id] || null}
                     time={withTimes ? (times.get(t.id) ? `${times.get(t.id).start}–${endOf(times.get(t.id))}` : (unfit.has(t.id) ? 'no slot' : null)) : null}
                     onToggle={() => toggleOmit(t.id)} onOpen={onOpenTask ? () => onOpenTask(t) : null} onComplete={() => completeTask(t)} onDragStart={(e) => onDragStart(e, t.id)} />
                 ))}
@@ -230,7 +233,7 @@ export default function WeekPlanBoard({ result, onApplied, onCancel, onOpenTask,
         ) : (
           <div className="grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3">
             {unplaced.map(t => (
-              <Card key={t.id} task={t} reason={reasons.get(t.id)} muted onOpen={onOpenTask ? () => onOpenTask(t) : null} onComplete={() => completeTask(t)} onDragStart={(e) => onDragStart(e, t.id)} />
+              <Card key={t.id} task={t} reason={reasons.get(t.id)} muted aiEstimate={aiEst[t.id] || null} onOpen={onOpenTask ? () => onOpenTask(t) : null} onComplete={() => completeTask(t)} onDragStart={(e) => onDragStart(e, t.id)} />
             ))}
           </div>
         )}
@@ -262,7 +265,7 @@ export default function WeekPlanBoard({ result, onApplied, onCancel, onOpenTask,
   );
 }
 
-function Card({ task, reason, time = null, omitted = false, muted = false, onToggle, onOpen, onComplete, onDragStart }) {
+function Card({ task, reason, time = null, aiEstimate = null, omitted = false, muted = false, onToggle, onOpen, onComplete, onDragStart }) {
   return (
     <div
       draggable
@@ -285,7 +288,9 @@ function Card({ task, reason, time = null, omitted = false, muted = false, onTog
           )}
           <div className="text-[12px] leading-snug [overflow-wrap:anywhere]">{task.title}</div>
           <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-            <span className="font-mono text-[9.5px] text-text-3 inline-flex items-center gap-0.5"><Clock className="w-2.5 h-2.5" />{task.time_estimate || 30}m</span>
+            <span className="font-mono text-[9.5px] text-text-3 inline-flex items-center gap-0.5" title={task.time_estimate ? 'Your estimate' : aiEstimate ? 'AI estimate — saved to the task on apply' : 'No estimate; 30 assumed'}>
+              <Clock className="w-2.5 h-2.5" />{task.time_estimate || aiEstimate || 30}m{!task.time_estimate && aiEstimate ? <Sparkles className="w-2 h-2 ml-0.5" style={{ color: 'rgb(var(--violet-glow))' }} /> : null}
+            </span>
             {task.context && <span className="font-mono text-[9.5px] text-text-3">{contextLabel(task.context)}</span>}
             {task.due_date && <span className="font-mono text-[9.5px]" style={{ color: 'rgb(var(--amber-glow))' }}>due {String(task.due_date).slice(5, 10)}</span>}
             <span className="ml-auto inline-flex items-center gap-2">

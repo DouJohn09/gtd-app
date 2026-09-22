@@ -333,7 +333,7 @@ Respond with JSON:
   "context": "${contextOptions}|null",
   "priority": "integer 1-5 (5 = most urgent/important) or null",
   "energy_level": "low|medium|high",
-  "time_estimate_minutes": number or null,
+  "time_estimate_minutes": number — ALWAYS estimate, never null: in 5-minute steps, from what the task involves (a reply, call, quick check or print = 5–15; a form, small fix or short meeting prep = 20–30; a document, design or debugging session = 45–90; only genuinely large work 120+),
   "due_date": "YYYY-MM-DD or null",
   "start_date": "YYYY-MM-DD or null",
   "scheduled_time": "HH:MM 24-hour or null",
@@ -814,7 +814,7 @@ export async function planWeek(tasks, week, userContexts) {
     }
     if (t.start_date) parts.push(`Not before: ${String(t.start_date).slice(0, 10)}`);
     if (t.priority) parts.push(`Priority: ${t.priority}/5`);
-    parts.push(`Energy: ${t.energy_level || 'unknown'}, Time: ${t.time_estimate || 30}min`);
+    parts.push(`Energy: ${t.energy_level || 'unknown'}, Time: ${t.time_estimate ? `${t.time_estimate}min` : 'unknown'}`);
     return parts.join(' ');
   }).join('\n');
 
@@ -839,6 +839,7 @@ ${taskList}
 
 RULES:
 - The sum of "Time" of tasks placed on a day must not exceed that day's available minutes. Leave slack; do not fill days to the brim.
+- When a task's Time is "unknown", estimate it yourself in 5-minute steps from what the task involves (reply/call/check = 5–15, small fix or prep = 20–30, a document or design or debugging = 45–90) and return it as "estimate_mins"; never default everything to 30.
 - A task with "Due:" must land on or before its due date; OVERDUE tasks go on the first day.
 - A task with "Not before:" must not land earlier than that date.
 - Front-load what matters (priority, due dates); spread deep work so no day gets all of it; batch shallow tasks together.
@@ -847,8 +848,8 @@ RULES:
 
 Respond with JSON:
 {
-  "placements": [{ "task_index": number, "date": "YYYY-MM-DD", "reason": "why that day, plain language" }],
-  "unplaced": [{ "task_index": number, "reason": "honest reason" }],
+  "placements": [{ "task_index": number, "date": "YYYY-MM-DD", "estimate_mins": number, "reason": "why that day, plain language" }],
+  "unplaced": [{ "task_index": number, "estimate_mins": number, "reason": "honest reason" }],
   "summary": "one calm sentence"
 }`
       }
@@ -858,8 +859,8 @@ Respond with JSON:
 
   if (!parsed || parsed.error) return parsed;
   return {
-    placements: (parsed.placements || []).map(pl => ({ task_index: pl.task_index, date: pl.date, reason: pl.reason || '' })),
-    unplaced: (Array.isArray(parsed.unplaced) ? parsed.unplaced : []).map(u => ({ task_index: u.task_index, reason: u.reason || '' })),
+    placements: (parsed.placements || []).map(pl => ({ task_index: pl.task_index, date: pl.date, estimate_mins: pl.estimate_mins ?? null, reason: pl.reason || '' })),
+    unplaced: (Array.isArray(parsed.unplaced) ? parsed.unplaced : []).map(u => ({ task_index: u.task_index, estimate_mins: u.estimate_mins ?? null, reason: u.reason || '' })),
     summary: typeof parsed.summary === 'string' ? parsed.summary : '',
   };
 }
