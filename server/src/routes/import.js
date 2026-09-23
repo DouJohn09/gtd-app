@@ -1,6 +1,7 @@
 import express from 'express';
 import { pool } from '../db/pool.js';
 import { remainingAllowance } from '../services/billing.js';
+import { serverError } from '../lib/httpErrors.js';
 
 const router = express.Router();
 
@@ -178,7 +179,7 @@ router.post('/preview', async (req, res) => {
     });
   } catch (err) {
     console.error('Import preview failed:', err);
-    res.status(500).json({ error: 'Failed to preview import' });
+    serverError(req, res, err, 'Failed to preview import');
   }
 });
 

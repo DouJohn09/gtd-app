@@ -9,6 +9,7 @@ import { enforceAiLimit, requireAiEnabled, chargeAiUsage } from '../middleware/a
 import { getAiMode } from '../services/userPrefs.js';
 import { assertPlanWithinLimit, assertWeekPlanWithinLimit, LimitError } from '../services/billing.js';
 import { recordAppliedBlocks, closeBlock, planReality, planningProfileText, calibrationLine } from '../services/insights.js';
+import { serverError } from '../lib/httpErrors.js';
 
 async function getUserContexts(userId) {
   const { rows } = await pool.query(
@@ -208,7 +209,7 @@ router.post('/smart-capture', async (req, res) => {
     syncTaskToCalendar(req.user.id, task, req.clientTimezone).catch(err => console.error('syncTaskToCalendar (smart-capture):', err));
   } catch (error) {
     console.error('Smart capture error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    serverError(req, res, error);
   }
 });
 
@@ -216,8 +217,7 @@ router.get('/usage', async (req, res) => {
   try {
     res.json(await getStatus(req.user.id, req.today));
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Internal server error' });
+    serverError(req, res, error);
   }
 });
 
@@ -262,8 +262,7 @@ router.post('/process-inbox', requireAiEnabled, enforceAiLimit, async (req, res)
     result.remaining = allInbox.length - inboxTasks.length;
     res.json(result);
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Internal server error' });
+    serverError(req, res, error);
   }
 });
 
@@ -289,8 +288,7 @@ router.post('/apply-inbox-processing', async (req, res) => {
 
     res.json(updatedTasks);
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Internal server error' });
+    serverError(req, res, error);
   }
 });
 
@@ -329,8 +327,7 @@ router.post('/daily-priorities', requireAiEnabled, enforceAiLimit, async (req, r
     result.tasks = nextActions;
     res.json(result);
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Internal server error' });
+    serverError(req, res, error);
   }
 });
 
@@ -425,8 +422,7 @@ router.get('/day-brief', async (req, res) => {
 
     res.json({ date: req.today, freeMins, meetings, candidates: candidates.length, plan, unfinished, daysPlanned: planned.cnt });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Internal server error' });
+    serverError(req, res, error);
   }
 });
 
@@ -506,8 +502,7 @@ router.post('/plan-day', requireAiEnabled, enforceAiLimit, async (req, res) => {
     if (error instanceof LimitError) {
       return res.status(402).json({ error: error.message, code: error.code, resource: error.resource, limit: error.limit });
     }
-    console.error(error);
-    res.status(500).json({ error: 'Internal server error' });
+    serverError(req, res, error);
   }
 });
 
@@ -582,8 +577,7 @@ router.post('/apply-plan', async (req, res) => {
 
     res.json({ applied: updated.length, deferred: deferred.length, tasks: updated });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Internal server error' });
+    serverError(req, res, error);
   }
 });
 
@@ -621,8 +615,7 @@ router.post('/shutdown-defer', async (req, res) => {
     syncTaskToCalendar(req.user.id, task, req.clientTimezone).catch(err => console.error('syncTaskToCalendar (shutdown):', err));
     res.json({ task, mode, moved_to: updates.due_date, scheduled_time: updates.scheduled_time ?? null });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Internal server error' });
+    serverError(req, res, error);
   }
 });
 
@@ -785,8 +778,7 @@ router.get('/week-brief', async (req, res) => {
     );
     res.json({ ...shape, candidates: candidates.length, existingPlan: row ? { applied: !!row.applied_at, createdAt: row.created_at } : null });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Internal server error' });
+    serverError(req, res, error);
   }
 });
 
@@ -824,8 +816,7 @@ router.post('/plan-week', requireAiEnabled, enforceAiLimit, async (req, res) => 
     if (error instanceof LimitError) {
       return res.status(402).json({ error: error.message, code: error.code, resource: error.resource, limit: error.limit });
     }
-    console.error(error);
-    res.status(500).json({ error: 'Internal server error' });
+    serverError(req, res, error);
   }
 });
 
@@ -891,8 +882,7 @@ router.post('/week-times', async (req, res) => {
     }
     res.json({ times, unfit });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Internal server error' });
+    serverError(req, res, error);
   }
 });
 
@@ -946,8 +936,7 @@ router.post('/apply-week', async (req, res) => {
     );
     res.json({ applied: updated.length, tasks: updated });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Internal server error' });
+    serverError(req, res, error);
   }
 });
 
@@ -988,8 +977,7 @@ router.post('/import-notes', requireAiEnabled, enforceAiLimit, async (req, res) 
 
     res.json(result);
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Internal server error' });
+    serverError(req, res, error);
   }
 });
 
@@ -1018,8 +1006,7 @@ router.post('/apply-import', async (req, res) => {
 
     res.json({ count: created.length, tasks: created });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Internal server error' });
+    serverError(req, res, error);
   }
 });
 
@@ -1041,8 +1028,7 @@ router.post('/apply-daily-focus', async (req, res) => {
 
     res.json(updatedTasks);
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Internal server error' });
+    serverError(req, res, error);
   }
 });
 
@@ -1090,8 +1076,7 @@ router.post('/find-duplicates', requireAiEnabled, enforceAiLimit, async (req, re
 
     res.json(result);
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Internal server error' });
+    serverError(req, res, error);
   }
 });
 
@@ -1105,8 +1090,7 @@ router.post('/apply-duplicates', async (req, res) => {
     await Promise.all(taskIds.map(id => TaskModel.delete(id, req.user.id)));
     res.json({ count: taskIds.length });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Internal server error' });
+    serverError(req, res, error);
   }
 });
 
@@ -1187,8 +1171,7 @@ router.post('/weekly-review', async (req, res) => {
     const { userContexts, staleItems, ...data } = await loadReviewData(userId, req);
     res.json({ ...data, aiAnalysis: aiMode === 'off' ? { error: 'ai_off' } : null });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Internal server error' });
+    serverError(req, res, error);
   }
 });
 
@@ -1207,8 +1190,7 @@ router.post('/weekly-review/analyze', requireAiEnabled, enforceAiLimit, async (r
     await chargeAiUsage(req);
     res.json({ aiAnalysis });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Internal server error' });
+    serverError(req, res, error);
   }
 });
 
@@ -1234,8 +1216,7 @@ router.post('/complete-review', async (req, res) => {
     const streak = await WeeklyReviewModel.getStreak(userId);
     res.json({ review, streak });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Internal server error' });
+    serverError(req, res, error);
   }
 });
 

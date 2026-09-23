@@ -1,5 +1,6 @@
 import express from 'express';
 import { pool } from '../db/pool.js';
+import { serverError } from '../lib/httpErrors.js';
 
 const router = express.Router();
 
@@ -84,7 +85,7 @@ router.get('/json', async (req, res) => {
     res.send(JSON.stringify(payload, null, 2));
   } catch (err) {
     console.error('Export JSON failed:', err);
-    res.status(500).json({ error: 'Failed to export' });
+    serverError(req, res, err, 'Failed to export');
   }
 });
 
@@ -162,7 +163,7 @@ router.get('/csv', async (req, res) => {
     res.send(lines.join('\n'));
   } catch (err) {
     console.error('Export CSV failed:', err);
-    res.status(500).json({ error: 'Failed to export' });
+    serverError(req, res, err, 'Failed to export');
   }
 });
 

@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { pool } from '../db/pool.js';
+import { serverError } from '../lib/httpErrors.js';
 
 const router = Router();
 
@@ -11,8 +12,7 @@ router.get('/', async (req, res) => {
     );
     res.json(rows);
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Internal server error' });
+    serverError(req, res, error);
   }
 });
 
@@ -37,7 +37,7 @@ router.post('/', async (req, res) => {
     if (error.code === '23505') {
       return res.status(409).json({ error: 'Context already exists' });
     }
-    res.status(500).json({ error: 'Internal server error' });
+    serverError(req, res, error);
   }
 });
 
@@ -49,8 +49,7 @@ router.delete('/:id', async (req, res) => {
     );
     res.status(204).send();
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Internal server error' });
+    serverError(req, res, error);
   }
 });
 

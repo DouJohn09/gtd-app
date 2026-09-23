@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { completionPatterns, habitPatterns, planReality } from '../services/insights.js';
 import { getUserPlan } from '../services/billing.js';
+import { serverError } from '../lib/httpErrors.js';
 
 const router = Router();
 
@@ -31,8 +32,7 @@ router.get('/', async (req, res) => {
       reality: pro ? reality : { locked: true },
     });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Internal server error' });
+    serverError(req, res, error);
   }
 });
 

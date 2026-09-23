@@ -4,6 +4,7 @@ import { extractUrlMetadata } from '../services/ai.js';
 import { enforceAiLimit, requireAiEnabled, chargeAiUsage } from '../middleware/aiLimit.js';
 import { aiRateLimiter } from '../middleware/rateLimit.js';
 import { assertWithinLimit, LimitError } from '../services/billing.js';
+import { serverError } from '../lib/httpErrors.js';
 
 const router = Router();
 
@@ -15,13 +16,13 @@ router.post('/extract-url', aiRateLimiter, requireAiEnabled, enforceAiLimit, asy
     if (!result) return res.status(422).json({ error: 'Could not extract metadata' });
     await chargeAiUsage(req);
     res.json(result);
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Internal server error' }); }
+  } catch (err) { serverError(req, res, err); }
 });
 
 router.get('/', async (req, res) => {
   try {
     res.json(await CustomListModel.getAll(req.user.id));
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Internal server error' }); }
+  } catch (err) { serverError(req, res, err); }
 });
 
 router.get('/:id', async (req, res) => {
@@ -29,7 +30,7 @@ router.get('/:id', async (req, res) => {
     const list = await CustomListModel.getById(req.params.id, req.user.id);
     if (!list) return res.status(404).json({ error: 'List not found' });
     res.json(list);
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Internal server error' }); }
+  } catch (err) { serverError(req, res, err); }
 });
 
 router.post('/', async (req, res) => {
@@ -41,7 +42,7 @@ router.post('/', async (req, res) => {
     if (err instanceof LimitError) {
       return res.status(402).json({ error: err.message, code: err.code, resource: err.resource, limit: err.limit });
     }
-    console.error(err); res.status(500).json({ error: 'Internal server error' });
+    serverError(req, res, err);
   }
 });
 
@@ -50,20 +51,20 @@ router.put('/:id', async (req, res) => {
     const list = await CustomListModel.update(req.params.id, req.body, req.user.id);
     if (!list) return res.status(404).json({ error: 'List not found' });
     res.json(list);
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Internal server error' }); }
+  } catch (err) { serverError(req, res, err); }
 });
 
 router.delete('/:id', async (req, res) => {
   try {
     await CustomListModel.delete(req.params.id, req.user.id);
     res.status(204).send();
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Internal server error' }); }
+  } catch (err) { serverError(req, res, err); }
 });
 
 router.post('/reorder', async (req, res) => {
   try {
     res.json(await CustomListModel.reorder(req.body.listIds, req.user.id));
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Internal server error' }); }
+  } catch (err) { serverError(req, res, err); }
 });
 
 // Items
@@ -71,7 +72,7 @@ router.post('/reorder', async (req, res) => {
 router.get('/:id/items', async (req, res) => {
   try {
     res.json(await ListItemModel.getByList(req.params.id, req.user.id));
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Internal server error' }); }
+  } catch (err) { serverError(req, res, err); }
 });
 
 router.post('/:id/items', async (req, res) => {
@@ -80,7 +81,7 @@ router.post('/:id/items', async (req, res) => {
     const item = await ListItemModel.create({ ...req.body, list_id: parseInt(req.params.id) }, req.user.id);
     if (!item) return res.status(404).json({ error: 'List not found' });
     res.status(201).json(item);
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Internal server error' }); }
+  } catch (err) { serverError(req, res, err); }
 });
 
 router.put('/:id/items/:itemId', async (req, res) => {
@@ -88,20 +89,20 @@ router.put('/:id/items/:itemId', async (req, res) => {
     const item = await ListItemModel.update(req.params.itemId, req.body, req.user.id);
     if (!item) return res.status(404).json({ error: 'Item not found' });
     res.json(item);
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Internal server error' }); }
+  } catch (err) { serverError(req, res, err); }
 });
 
 router.delete('/:id/items/:itemId', async (req, res) => {
   try {
     await ListItemModel.delete(req.params.itemId, req.user.id);
     res.status(204).send();
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Internal server error' }); }
+  } catch (err) { serverError(req, res, err); }
 });
 
 router.post('/:id/items/reorder', async (req, res) => {
   try {
     res.json(await ListItemModel.reorder(req.params.id, req.body.itemIds, req.user.id));
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Internal server error' }); }
+  } catch (err) { serverError(req, res, err); }
 });
 
 router.post('/:id/items/:itemId/promote', async (req, res) => {
@@ -110,7 +111,7 @@ router.post('/:id/items/:itemId/promote', async (req, res) => {
     if (!result) return res.status(404).json({ error: 'Item not found' });
     if (result.alreadyLinked) return res.status(409).json({ error: 'Item already linked to a task' });
     res.status(201).json(result);
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Internal server error' }); }
+  } catch (err) { serverError(req, res, err); }
 });
 
 export default router;

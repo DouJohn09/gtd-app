@@ -9,6 +9,7 @@ import { exchangeCodeForTokens, revokeCalendarAccess, isCalendarConnected } from
 import { isProActive } from '../services/billing.js';
 import { cancelSubscription } from '../services/paddle.js';
 import { isValidTimezone } from '../lib/dateTime.js';
+import { serverError } from '../lib/httpErrors.js';
 
 const router = Router();
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
@@ -170,8 +171,7 @@ router.get('/google-calendar/status', requireAuth, async (req, res) => {
     const connected = await isCalendarConnected(req.user.id);
     res.json({ connected });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Internal server error' });
+    serverError(req, res, error);
   }
 });
 
@@ -207,7 +207,7 @@ router.delete('/google-calendar', requireAuth, async (req, res) => {
     res.json({ connected: false });
   } catch (error) {
     console.error('Google Calendar disconnect error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    serverError(req, res, error);
   }
 });
 
@@ -245,7 +245,7 @@ router.delete('/account', requireAuth, async (req, res) => {
     res.json({ deleted: true });
   } catch (error) {
     console.error('Account deletion error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    serverError(req, res, error);
   }
 });
 

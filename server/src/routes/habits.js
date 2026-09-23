@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { pool } from '../db/pool.js';
 import { assertWithinLimit, LimitError } from '../services/billing.js';
+import { serverError } from '../lib/httpErrors.js';
 
 const router = Router();
 
@@ -37,8 +38,7 @@ router.get('/', async (req, res) => {
 
     res.json(result);
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Internal server error' });
+    serverError(req, res, error);
   }
 });
 
@@ -103,8 +103,7 @@ router.get('/stats', async (req, res) => {
 
     res.json({ habits: habitStats, heatmap });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Internal server error' });
+    serverError(req, res, error);
   }
 });
 
@@ -137,8 +136,7 @@ router.post('/rest-days', async (req, res) => {
     );
     res.json({ ok: true, created: rowCount });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Internal server error' });
+    serverError(req, res, error);
   }
 });
 
@@ -157,8 +155,7 @@ router.delete('/rest-days', async (req, res) => {
     );
     res.json({ ok: true, removed: rowCount });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Internal server error' });
+    serverError(req, res, error);
   }
 });
 
@@ -177,8 +174,7 @@ router.get('/:id/logs', async (req, res) => {
     );
     res.json(rows.map(r => ({ date: r.completed_date, status: r.status, note: r.note })));
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Internal server error' });
+    serverError(req, res, error);
   }
 });
 
@@ -198,8 +194,7 @@ router.put('/:id/logs/:date', async (req, res) => {
     if (rowCount === 0) return res.status(404).json({ error: 'No log for that day' });
     res.json({ ok: true, note });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Internal server error' });
+    serverError(req, res, error);
   }
 });
 
@@ -235,8 +230,7 @@ router.post('/', async (req, res) => {
     if (error instanceof LimitError) {
       return res.status(402).json({ error: error.message, code: error.code, resource: error.resource, limit: error.limit });
     }
-    console.error(error);
-    res.status(500).json({ error: 'Internal server error' });
+    serverError(req, res, error);
   }
 });
 
@@ -291,8 +285,7 @@ router.put('/:id', async (req, res) => {
     if (error instanceof LimitError) {
       return res.status(402).json({ error: error.message, code: error.code, resource: error.resource, limit: error.limit });
     }
-    console.error(error);
-    res.status(500).json({ error: 'Internal server error' });
+    serverError(req, res, error);
   }
 });
 
@@ -306,8 +299,7 @@ router.delete('/:id', async (req, res) => {
     );
     res.status(204).send();
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Internal server error' });
+    serverError(req, res, error);
   }
 });
 
@@ -387,8 +379,7 @@ router.post('/:id/toggle', async (req, res) => {
 
     res.json({ status, completed: status === 'done', date });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Internal server error' });
+    serverError(req, res, error);
   }
 });
 

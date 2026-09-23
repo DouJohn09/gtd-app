@@ -10,6 +10,7 @@ import {
   getPaddle,
 } from '../services/paddle.js';
 import { getUserPlan } from '../services/billing.js';
+import { serverError } from '../lib/httpErrors.js';
 
 const router = Router();
 
@@ -60,7 +61,7 @@ router.post('/checkout', async (req, res) => {
     res.json({ transactionId: txn.id });
   } catch (error) {
     console.error('[billing] checkout failed:', error);
-    res.status(500).json({ error: 'Could not start checkout' });
+    serverError(req, res, error, 'Could not start checkout');
   }
 });
 
@@ -80,7 +81,7 @@ router.get('/status', async (req, res) => {
     });
   } catch (error) {
     console.error('[billing] status failed:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    serverError(req, res, error);
   }
 });
 
@@ -108,7 +109,7 @@ router.get('/portal', async (req, res) => {
     res.json({ url: session?.urls?.general?.overview || null, session });
   } catch (error) {
     console.error('[billing] portal failed:', error);
-    res.status(500).json({ error: 'Could not open the billing portal' });
+    serverError(req, res, error, 'Could not open the billing portal');
   }
 });
 

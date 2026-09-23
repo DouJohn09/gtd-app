@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { pool } from '../db/pool.js';
 import { AI_MODES } from '../services/userPrefs.js';
+import { serverError } from '../lib/httpErrors.js';
 
 const router = Router();
 
@@ -14,7 +15,7 @@ router.put('/ai-mode', async (req, res) => {
     res.json({ ai_mode: mode });
   } catch (error) {
     console.error('Update ai_mode error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    serverError(req, res, error);
   }
 });
 
@@ -29,7 +30,7 @@ router.post('/onboarding-complete', async (req, res) => {
     res.json({ onboarded_at: rows[0]?.onboarded_at ?? null });
   } catch (error) {
     console.error('Onboarding-complete error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    serverError(req, res, error);
   }
 });
 
@@ -54,7 +55,7 @@ router.post('/ai-feedback', async (req, res) => {
     res.json({ ai_accept_streak: rows[0]?.ai_accept_streak ?? 0 });
   } catch (error) {
     console.error('AI feedback error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    serverError(req, res, error);
   }
 });
 
@@ -69,7 +70,7 @@ router.post('/ai-nudge-seen', async (req, res) => {
     res.json({ ok: true });
   } catch (error) {
     console.error('AI nudge-seen error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    serverError(req, res, error);
   }
 });
 

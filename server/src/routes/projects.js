@@ -4,6 +4,7 @@ import { pool } from '../db/pool.js';
 import { suggestProjectBreakdown } from '../services/ai.js';
 import { enforceAiLimit, requireAiEnabled, chargeAiUsage } from '../middleware/aiLimit.js';
 import { assertWithinLimit, LimitError } from '../services/billing.js';
+import { serverError } from '../lib/httpErrors.js';
 
 const router = Router();
 
@@ -12,8 +13,7 @@ router.get('/', async (req, res) => {
     const projects = await ProjectModel.getAll(req.user.id);
     res.json(projects);
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Internal server error' });
+    serverError(req, res, error);
   }
 });
 
@@ -25,8 +25,7 @@ router.get('/:id', async (req, res) => {
     }
     res.json(project);
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Internal server error' });
+    serverError(req, res, error);
   }
 });
 
@@ -39,8 +38,7 @@ router.post('/', async (req, res) => {
     if (error instanceof LimitError) {
       return res.status(402).json({ error: error.message, code: error.code, resource: error.resource, limit: error.limit });
     }
-    console.error(error);
-    res.status(500).json({ error: 'Internal server error' });
+    serverError(req, res, error);
   }
 });
 
@@ -52,8 +50,7 @@ router.put('/:id', async (req, res) => {
     }
     res.json(project);
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Internal server error' });
+    serverError(req, res, error);
   }
 });
 
@@ -62,8 +59,7 @@ router.delete('/:id', async (req, res) => {
     await ProjectModel.delete(req.params.id, req.user.id);
     res.status(204).send();
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Internal server error' });
+    serverError(req, res, error);
   }
 });
 
@@ -86,8 +82,7 @@ router.post('/:id/breakdown', requireAiEnabled, enforceAiLimit, async (req, res)
     await chargeAiUsage(req);
     res.json(breakdown);
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Internal server error' });
+    serverError(req, res, error);
   }
 });
 
@@ -109,8 +104,7 @@ router.post('/:id/apply-breakdown', async (req, res) => {
 
     res.json(createdTasks);
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Internal server error' });
+    serverError(req, res, error);
   }
 });
 
@@ -123,8 +117,7 @@ router.post('/:id/reorder', async (req, res) => {
     const tasks = await TaskModel.reorderTasks(req.params.id, taskIds, req.user.id);
     res.json(tasks);
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Internal server error' });
+    serverError(req, res, error);
   }
 });
 
