@@ -141,7 +141,7 @@ export default function WeeklyReview() {
     setWeekPlan(prev => prev ? { ...prev, tasks: prev.tasks.map(t => (t.id === updated.id ? { ...t, ...updated } : t)) } : prev);
     setReviewData(prev => {
       if (!prev) return prev;
-      const patch = (arr) => arr?.map(t => (t.id === updated.id ? { ...t, ...updated } : t));
+      const patch = (arr) => arr?.map(t => (t.id === updated.id ? { ...t, ...updated } : t)).filter(t => !t.deleted);
       return { ...prev, nextActions: patch(prev.nextActions), waitingFor: patch(prev.waitingFor), somedayMaybe: patch(prev.somedayMaybe) };
     });
   };

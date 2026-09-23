@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { CalendarRange, Check, Clock, PencilLine, Sparkles, CheckCircle2, RefreshCw, CalendarClock } from 'lucide-react';
+import { CalendarRange, Check, Clock, PencilLine, Sparkles, CheckCircle2, RefreshCw, CalendarClock, ArrowRightLeft } from 'lucide-react';
 import ConfirmModal from './ui/ConfirmModal';
 import { api } from '../lib/api';
 import { contextLabel } from '../lib/context';
@@ -42,7 +42,33 @@ export default function WeekPlanBoard({ result, onApplied, onCancel, onOpenTask,
   const [completed, setCompleted] = useState(() => new Set());
   const [confirmReplan, setConfirmReplan] = useState(false);
   const [replanning, setReplanning] = useState(false);
-  const liveTasks = (result?.tasks || []).filter(t => !completed.has(t.id));
+  const liveTasks = (result?.tasks || []).filter(t => !completed.has(t.id) && t.list !== 'completed' && !t.deleted);
+
+  // A task edited via "open" comes back through result.tasks. If its do-date
+  // changed in the editor, follow it — otherwise Apply would write the board's
+  // old day over the one just set. A date outside this window takes it off
+  // the board.
+  const prevTasks = useRef(tasks);
+  useEffect(() => {
+    const before = prevTasks.current;
+    prevTasks.current = tasks;
+    if (before === tasks) return;
+    const inWindow = new Set(days.map(d => d.date));
+    setWhere(prev => {
+      let next = null;
+      for (const [id, t] of tasks) {
+        const old = before.get(id);
+        const due = t.due_date ? String(t.due_date).slice(0, 10) : null;
+        const oldDue = old?.due_date ? String(old.due_date).slice(0, 10) : null;
+        if (!old || due === oldDue) continue;
+        next ||= new Map(prev);
+        if (due && inWindow.has(due)) next.set(id, due);
+        else next.delete(id);
+      }
+      return next || prev;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tasks]);
 
   const completeTask = async (task) => {
     try {
@@ -97,6 +123,24 @@ export default function WeekPlanBoard({ result, onApplied, onCancel, onOpenTask,
 
   const moveTo = (taskId, date) => setWhere(prev => { const n = new Map(prev); n.set(taskId, date); return n; });
   const toggleOmit = (taskId) => setOmitted(prev => { const n = new Set(prev); if (n.has(taskId)) n.delete(taskId); else n.add(taskId); return n; });
+
+  // Tap path for touch screens, where HTML5 drag-and-drop doesn't fire: each
+  // card has a "move" picker listing every day of the window plus "not this
+  // week". A native <select> gives the phone's own picker for free.
+  const moveOptions = [
+    ...days.map(d => ({ value: d.date, label: `${d.dayName}${d.date === start ? ' (today)' : ''} · ${Number(d.date.slice(8, 10))}` })),
+    { value: '', label: 'Not this week' },
+  ];
+  const moveCard = (taskId, date) => {
+    if (date) {
+      moveTo(taskId, date);
+      setOmitted(prev => { const n = new Set(prev); n.delete(taskId); return n; });
+      // A card moved onto a hidden weekend day would vanish from view.
+      if (isWeekend(date) && date !== start) setShowWeekend(true);
+    } else {
+      setWhere(prev => { const n = new Map(prev); n.delete(taskId); return n; });
+    }
+  };
 
   const onDragStart = (e, taskId) => { e.dataTransfer.setData('text/plain', String(taskId)); e.dataTransfer.effectAllowed = 'move'; };
   const onDropDay = (e, date) => {
@@ -211,9 +255,10 @@ export default function WeekPlanBoard({ result, onApplied, onCancel, onOpenTask,
                 {cards.map(t => (
                   <Card key={t.id} task={t} reason={reasons.get(t.id)} omitted={omitted.has(t.id)} aiEstimate={aiEst[t.id] || null}
                     time={withTimes ? (times.get(t.id) ? `${times.get(t.id).start}–${endOf(times.get(t.id))}` : (unfit.has(t.id) ? 'no slot' : null)) : null}
-                    onToggle={() => toggleOmit(t.id)} onOpen={onOpenTask ? () => onOpenTask(t) : null} onComplete={() => completeTask(t)} onDragStart={(e) => onDragStart(e, t.id)} />
+                    onToggle={() => toggleOmit(t.id)} onOpen={onOpenTask ? () => onOpenTask(t) : null} onComplete={() => completeTask(t)} onDragStart={(e) => onDragStart(e, t.id)}
+                    moveOptions={moveOptions} currentDay={d.date} onMove={(date) => moveCard(t.id, date)} />
                 ))}
-                {cards.length === 0 && <div className="text-[11px] text-text-3 px-1 py-3 text-center">drop tasks here</div>}
+                {cards.length === 0 && <div className="text-[11px] text-text-3 px-1 py-3 text-center">drop or move tasks here</div>}
               </div>
             </div>
           );
@@ -229,11 +274,12 @@ export default function WeekPlanBoard({ result, onApplied, onCancel, onOpenTask,
       >
         <div className="mono-label text-[9.5px] px-1 mb-1.5">not this week · {unplaced.length}</div>
         {unplaced.length === 0 ? (
-          <div className="text-[11px] text-text-3 px-1 pb-1">Everything found a day. Drag a card here to leave it for later.</div>
+          <div className="text-[11px] text-text-3 px-1 pb-1">Everything found a day. Drag a card here, or use “move”, to leave it for later.</div>
         ) : (
           <div className="grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3">
             {unplaced.map(t => (
-              <Card key={t.id} task={t} reason={reasons.get(t.id)} muted aiEstimate={aiEst[t.id] || null} onOpen={onOpenTask ? () => onOpenTask(t) : null} onComplete={() => completeTask(t)} onDragStart={(e) => onDragStart(e, t.id)} />
+              <Card key={t.id} task={t} reason={reasons.get(t.id)} muted aiEstimate={aiEst[t.id] || null} onOpen={onOpenTask ? () => onOpenTask(t) : null} onComplete={() => completeTask(t)} onDragStart={(e) => onDragStart(e, t.id)}
+                moveOptions={moveOptions} currentDay="" onMove={(date) => moveCard(t.id, date)} />
             ))}
           </div>
         )}
@@ -245,7 +291,7 @@ export default function WeekPlanBoard({ result, onApplied, onCancel, onOpenTask,
           : 'Days only. Each morning, “Plan my day” puts that day’s tasks into time blocks.'}</p>
         <div className="flex items-center gap-2">
           <button onClick={onCancel} className="gtd-btn gtd-btn-secondary text-[12.5px]">Cancel</button>
-          <button onClick={apply} disabled={applying || keptCount === 0} className="gtd-btn gtd-btn-primary inline-flex items-center gap-2 text-[12.5px] disabled:opacity-60">
+          <button onClick={apply} disabled={applying || timing || keptCount === 0} className="gtd-btn gtd-btn-primary inline-flex items-center gap-2 text-[12.5px] disabled:opacity-60">
             {applying ? 'Applying…' : `Apply week · ${keptCount}`} <Check className="w-3.5 h-3.5" />
           </button>
         </div>
@@ -265,7 +311,7 @@ export default function WeekPlanBoard({ result, onApplied, onCancel, onOpenTask,
   );
 }
 
-function Card({ task, reason, time = null, aiEstimate = null, omitted = false, muted = false, onToggle, onOpen, onComplete, onDragStart }) {
+function Card({ task, reason, time = null, aiEstimate = null, omitted = false, muted = false, onToggle, onOpen, onComplete, onDragStart, moveOptions = null, currentDay = '', onMove }) {
   return (
     <div
       draggable
@@ -294,6 +340,19 @@ function Card({ task, reason, time = null, aiEstimate = null, omitted = false, m
             {task.context && <span className="font-mono text-[9.5px] text-text-3">{contextLabel(task.context)}</span>}
             {task.due_date && <span className="font-mono text-[9.5px]" style={{ color: 'rgb(var(--amber-glow))' }}>due {String(task.due_date).slice(5, 10)}</span>}
             <span className="ml-auto inline-flex items-center gap-2">
+              {moveOptions && onMove && (
+                <label className="relative font-mono text-[9.5px] text-text-3 hover:text-violet-glow inline-flex items-center gap-0.5 cursor-pointer" title="Move to another day">
+                  <ArrowRightLeft className="w-2.5 h-2.5" /> move
+                  <select
+                    value={currentDay}
+                    onChange={(e) => onMove(e.target.value)}
+                    aria-label={`Move “${task.title}” to another day`}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                  >
+                    {moveOptions.map(o => <option key={o.value || 'none'} value={o.value}>{o.label}</option>)}
+                  </select>
+                </label>
+              )}
               {onComplete && (
                 <button type="button" onClick={onComplete} title="Already done — complete it" className="font-mono text-[9.5px] text-text-3 hover:text-mint-glow inline-flex items-center gap-0.5">
                   <CheckCircle2 className="w-2.5 h-2.5" /> done

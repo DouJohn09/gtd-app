@@ -297,7 +297,7 @@ export default function CustomList() {
                   )}
 
                   {/* Reorder */}
-                  <div className="flex flex-col opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="flex flex-col opacity-0 group-hover:opacity-100 touch-show transition-opacity">
                     <button
                       onClick={(e) => { e.stopPropagation(); handleReorder(item.id, -1); }}
                       className="text-text-3 hover:text-text-1 p-0.5"

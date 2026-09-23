@@ -29,7 +29,7 @@ function TaskRow({ task, onRestore, onDelete }) {
           <span className="font-mono text-[10.5px] text-text-3">{contextLabel(task.context)}</span>
         )}
       </div>
-      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 touch-show transition-opacity">
         <button
           onClick={() => onRestore(task.id)}
           className="p-1.5 text-text-3 hover:text-violet-glow rounded-lg transition-colors"

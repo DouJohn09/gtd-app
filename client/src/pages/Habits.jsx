@@ -207,7 +207,7 @@ export default function Habits() {
                         if (err.code !== 'limit_reached') addToast(err.message, 'error');
                       }
                     }}
-                    className="gtd-btn gtd-btn-secondary text-[11px] py-1 px-2.5 flex-shrink-0 opacity-70 group-hover:opacity-100 transition-opacity"
+                    className="gtd-btn gtd-btn-secondary text-[11px] py-1 px-2.5 flex-shrink-0 opacity-70 group-hover:opacity-100 touch-show transition-opacity"
                   >
                     Add
                   </button>

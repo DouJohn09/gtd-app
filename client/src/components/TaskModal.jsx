@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
-import { X, AlertCircle, Plus, Sparkles, ExternalLink, Repeat } from 'lucide-react';
+import { X, AlertCircle, Plus, Sparkles, ExternalLink, Repeat, Trash2 } from 'lucide-react';
 import { api } from '../lib/api';
 import { contextLabel } from '../lib/context';
 import { useToast } from './Toast';
 import GlassSelect from './ui/GlassSelect';
 import DatePicker from './ui/DatePicker';
 import TimePicker from './ui/TimePicker';
+import ConfirmModal from './ui/ConfirmModal';
 
 const LISTS = [
   { value: 'inbox',         label: 'Inbox',         tone: 'amber'  },
@@ -98,6 +99,26 @@ export default function TaskModal({ task, projects, onClose, onSave }) {
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [onClose]);
+
+  // Delete lives here too: the list pages' trash icons only appear on hover,
+  // so on a phone this is the only way to delete a task. Parents get
+  // onSave({ ...task, deleted: true }) so drafts holding the task can drop it,
+  // and the usual refresh event so lists refetch.
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const handleDelete = async () => {
+    setConfirmDelete(false);
+    setLoading(true);
+    try {
+      await api.tasks.delete(task.id);
+      addToast('Task deleted', 'success');
+      window.dispatchEvent(new CustomEvent('task-captured'));
+      onSave?.({ ...task, deleted: true });
+      onClose();
+    } catch (err) {
+      setError(err.message || 'Failed to delete task. Please try again.');
+      setLoading(false);
+    }
+  };
 
   const handleAddContext = async () => {
     if (!newContextName.trim()) return;
@@ -623,6 +644,18 @@ export default function TaskModal({ task, projects, onClose, onSave }) {
           </button>
 
           <div className="flex gap-2 pt-3 border-t border-white/[0.05]">
+            {task?.id && (
+              <button
+                type="button"
+                onClick={() => setConfirmDelete(true)}
+                disabled={loading}
+                aria-label="Delete task"
+                title="Delete task"
+                className="gtd-btn gtd-btn-secondary text-[12.5px] px-3 text-text-3 hover:text-rose-glow disabled:opacity-50"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            )}
             <button
               type="button"
               onClick={onClose}
@@ -640,6 +673,14 @@ export default function TaskModal({ task, projects, onClose, onSave }) {
           </div>
         </form>
       </div>
+      {confirmDelete && (
+        <ConfirmModal
+          title="Delete this task?"
+          message={`“${task.title}” will be removed. This can't be undone.`}
+          onConfirm={handleDelete}
+          onCancel={() => setConfirmDelete(false)}
+        />
+      )}
     </div>
   );
 }

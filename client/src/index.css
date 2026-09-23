@@ -240,3 +240,9 @@ input[type="number"] { -moz-appearance: textfield; }
 .fresh-stagger > *:nth-child(4) { animation-delay: 190ms; }
 .fresh-stagger > *:nth-child(5) { animation-delay: 240ms; }
 .fresh-stagger > *:nth-child(6) { animation-delay: 290ms; }
+
+/* Touch screens have no hover, so controls revealed on hover would never
+   appear. Anything marked touch-show is simply always visible there. */
+@media (hover: none) {
+  .touch-show { opacity: 1 !important; }
+}
