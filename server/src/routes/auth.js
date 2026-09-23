@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { sendWelcome, notifyFounderSignup } from '../services/email.js';
-import rateLimit from 'express-rate-limit';
+import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
+import net from 'node:net';
 import { OAuth2Client } from 'google-auth-library';
 import jwt from 'jsonwebtoken';
 import { pool } from '../db/pool.js';
@@ -16,13 +17,24 @@ const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 // Login attempts only — /me is hit on every app load and must stay unthrottled
 // (shared NAT / office IPs would lock legit users out). 20 per 15min per IP is
-// far above any honest login pattern. Needs `trust proxy` (set in index.js) so
-// req.ip is the real client behind Railway's proxy.
+// far above any honest login pattern.
+//
+// Keyed on CF-Connecting-IP when present: traffic arrives Cloudflare → Railway,
+// and with `trust proxy 1` req.ip is the Cloudflare edge address, shared by
+// many visitors — 20 failed logins from anyone behind the same edge would have
+// locked all of them out (M4). The header is only as trustworthy as the path
+// (a direct hit on the *.up.railway.app host can set it), which at worst lets
+// someone dodge this limiter; sign-in itself is a Google-verified ID token, so
+// there is nothing to brute-force.
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   limit: 20,
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: (req) => {
+    const cf = req.get('CF-Connecting-IP');
+    return ipKeyGenerator(cf && net.isIP(cf) ? cf : req.ip);
+  },
 });
 
 router.post('/google', loginLimiter, async (req, res) => {
