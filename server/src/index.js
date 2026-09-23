@@ -22,6 +22,7 @@ import customListsRouter from './routes/customLists.js';
 import billingRouter, { paddleWebhookHandler } from './routes/billing.js';
 import { isCheckoutEnabled, founderSpotsLeft, FOUNDER_CAP } from './services/paddle.js';
 import preferencesRouter from './routes/preferences.js';
+import { startModelWatchdog } from './services/aiRouter.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -234,6 +235,7 @@ async function start() {
   server = app.listen(PORT, () => {
     console.log(`Cleartable server running on http://localhost:${PORT}`);
   });
+  startModelWatchdog();
 }
 
 start().catch(async (err) => {

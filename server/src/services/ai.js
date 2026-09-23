@@ -1,4 +1,3 @@
-import OpenAI from 'openai';
 import { lookup } from 'node:dns/promises';
 import net from 'node:net';
 import {
@@ -6,139 +5,10 @@ import {
   validateDailyPriorities, validateFindDuplicates, validateWeeklyReview,
   validateAnalyzeTask, validateProjectBreakdown, validatePlanDay, validatePlanWeek } from './aiSchema.js';
 import { packPlan, timeToMinutes, minutesToTime } from './scheduling.js';
+import { complete, aiConfigured } from './aiRouter.js';
 
-// Provider clients. OpenAI is the paid/reliable baseline; Groq is the fast,
-// free, privacy-safe (Groq does not train on API data) provider for the
-// high-frequency, latency-sensitive calls. Either may be absent — routing
-// below degrades gracefully when a key isn't configured.
-const openai = process.env.OPENAI_API_KEY
-  ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
-  : null;
-
-// maxRetries: 0 + timeout: 15s — we have our OWN fallback (to OpenAI in
-// `complete`), so a Groq rate-limit (429), blip, or throttle-STALL should drop
-// straight to the fallback rather than burn seconds on SDK backoff or hang on
-// the SDK's 10-minute default timeout. (A free-tier TPM stall can otherwise hold
-// the connection for minutes — observed in the heavy-ops eval.) 15s is a circuit
-// breaker well above the ~1–2s happy path, not an expected wait.
-const groq = process.env.GROQ_API_KEY
-  ? new OpenAI({ apiKey: process.env.GROQ_API_KEY, baseURL: 'https://api.groq.com/openai/v1', maxRetries: 0, timeout: 15000 })
-  : null;
-
-const PROVIDERS = { openai, groq };
-
-// Per-task model routing. Each task tries `primary`; on ANY error OR a JSON
-// parse failure it falls back to `fallback`. Fallback is always OpenAI, so the
-// quality/reliability floor stays at gpt-4o(-mini) no matter how the free model
-// behaves — JSON-schema adherence is Llama's one known weak spot, and this is
-// the safety net for it. Flip a task's primary to Groq once its eval passes
-// (see scripts/eval-*); the fallback keeps production safe meanwhile.
-// Groq's model. Overridable per environment so the next decommission is a
-// variable change, not a deploy. History: llama-3.3-70b-versatile vanished
-// from Groq on 2026-09-21 (404) and every Groq-first task limped through the
-// OpenAI fallback; the free tier that day was 8k tokens/min and 1k output
-// tokens/min per model — enough for short capture calls, not for planners.
-const GROQ = process.env.GROQ_MODEL || 'openai/gpt-oss-20b';
-const GROQ_FAST = { provider: 'groq', model: GROQ };
-const OAI_MINI = { provider: 'openai', model: 'gpt-4.1-mini' };
-const OAI_NANO = { provider: 'openai', model: 'gpt-4o-mini' };
-const ROUTING = {
-  // Smart Capture was Groq-first for latency, but gpt-oss-20b in Groq's JSON
-  // mode failed 12/49 eval captures with "Failed to validate JSON" and
-  // averaged 34 s under the free-tier caps (scripts/eval-smart-capture.mjs,
-  // 2026-09-21), against 49/49 at 2.6 s for gpt-4o-mini. OpenAI-first; Groq
-  // stays as the outage fallback.
-  'smart-capture':     { primary: OAI_NANO, fallback: GROQ_FAST },
-  'url-extract':       { primary: OAI_NANO, fallback: GROQ_FAST },
-  // Everything with a long prompt or a long answer is OpenAI-first since
-  // 2026-09-21: Groq's free-tier per-minute caps make these 429 on a normal
-  // day, and each 429 is a wasted second before the fallback. gpt-4.1-mini
-  // passed the schema + ground-truth evals at 100% (scripts/eval-heavy-ops.mjs,
-  // eval-plan-day.mjs, 2026-07-27). Groq remains the fallback.
-  'process-inbox':     { primary: OAI_MINI, fallback: GROQ_FAST },
-  'import-notes':      { primary: OAI_MINI, fallback: GROQ_FAST },
-  'find-duplicates':   { primary: OAI_MINI, fallback: GROQ_FAST },
-  'daily-priorities':  { primary: OAI_MINI, fallback: GROQ_FAST },
-  'plan-day':          { primary: OAI_MINI, fallback: GROQ_FAST },
-  'plan-week':         { primary: OAI_MINI, fallback: GROQ_FAST },
-  'analyze-task':      { primary: OAI_MINI, fallback: GROQ_FAST },
-  'project-breakdown': { primary: OAI_MINI, fallback: GROQ_FAST },
-  'weekly-review':     { primary: OAI_MINI, fallback: GROQ_FAST },
-};
-
-// Per-task sampling + output caps. Classification/extraction tasks run at
-// temperature 0 — provider defaults (Groq: 1.0) made identical inputs classify
-// differently between runs, which users read as "the AI is flaky". Advisory
-// prose gets mild warmth. max_tokens is sized to each task's worst-case JSON so
-// a runaway response is cut (and caught via finish_reason) instead of hanging
-// or blowing the parse on a 100-item ramble.
-const TASK_PARAMS = {
-  'smart-capture':     { temperature: 0,   max_tokens: 1024 },
-  'process-inbox':     { temperature: 0,   max_tokens: 4096 },
-  'import-notes':      { temperature: 0,   max_tokens: 8192 },
-  'find-duplicates':   { temperature: 0,   max_tokens: 2048 },
-  'url-extract':       { temperature: 0 },
-  'daily-priorities':  { temperature: 0.2, max_tokens: 1500 },
-  'plan-day':          { temperature: 0.2, max_tokens: 2000 },
-  'plan-week':         { temperature: 0.2, max_tokens: 4000 },
-  'analyze-task':      { temperature: 0.2, max_tokens: 800 },
-  'project-breakdown': { temperature: 0.4, max_tokens: 2048 },
-  'weekly-review':     { temperature: 0.4, max_tokens: 3000 },
-};
-
-// Test-only: force every complete() call onto one {provider, model}, bypassing
-// ROUTING, so scripts/eval-* can A/B models against the real functions. Never set
-// in production code.
-let _forceRoute = null;
-export function __setForceRoute(r) { _forceRoute = r; }
-
-// Unified chat completion with provider routing + automatic fallback. Returns
-// parsed JSON, or null if every available provider fails (the caller then does
-// its own fallback — e.g. Smart Capture saves the raw text). A JSON.parse failure
-// or a truncated response (finish_reason=length) is treated as a provider
-// failure and advances to the fallback provider.
-//
-// `validate` (optional) is a fn(parsed) → array of problem strings. On problems,
-// ONE repair round-trip is made on the same provider (the model sees its own
-// output plus the problem list); if the repair still fails validation, the next
-// provider is tried. Keeps enum/typo-level slop out of the database without a
-// heavyweight schema library.
-async function complete(task, params, validate = null) {
-  const route = ROUTING[task];
-  const attempts = _forceRoute ? [_forceRoute] : [route?.primary, route?.fallback].filter(Boolean);
-  const tuning = TASK_PARAMS[task] || {};
-  let lastErr = null;
-  for (const { provider, model } of attempts) {
-    const client = PROVIDERS[provider];
-    if (!client) continue;
-    try {
-      let messages = params.messages;
-      for (let round = 0; round < 2; round++) {
-        // gpt-oss on Groq spends its max_tokens on hidden reasoning first;
-        // low effort keeps the JSON from being truncated on longer answers.
-        const extra = provider === 'groq' && /gpt-oss/.test(model) ? { reasoning_effort: 'low' } : {};
-        const res = await client.chat.completions.create({ ...tuning, ...params, ...extra, messages, model });
-        const choice = res.choices[0];
-        if (choice.finish_reason === 'length') throw new Error('response truncated (finish_reason=length)');
-        const parsed = JSON.parse(choice.message.content);
-        const problems = validate ? validate(parsed) : [];
-        if (!problems.length) return parsed;
-        if (round === 1) throw new Error(`schema validation failed after repair: ${problems.slice(0, 5).join('; ')}`);
-        console.warn(`AI[${task}] ${provider}/${model} schema problems, repairing: ${problems.slice(0, 5).join('; ')}`);
-        messages = [
-          ...params.messages,
-          { role: 'assistant', content: choice.message.content },
-          { role: 'user', content: `Your JSON response had these problems:\n- ${problems.join('\n- ')}\n\nReturn the FULL corrected JSON object only — same data, with these problems fixed.` },
-        ];
-      }
-    } catch (err) {
-      lastErr = err;
-      console.error(`AI[${task}] ${provider}/${model} failed: ${err.message}`);
-    }
-  }
-  if (lastErr) console.error(`AI[${task}] all providers exhausted.`);
-  return null;
-}
+// Test-only hook for scripts/eval-*, re-exported so they keep importing from here.
+export { __setForceRoute } from './aiRouter.js';
 
 function getSystemPrompt(userContexts) {
   const contextList = userContexts?.length
@@ -353,13 +223,13 @@ Respond with JSON:
 }
 
 export async function smartCapture(rawText, userContexts, projects, today, dayName, history = [], existingTitles = []) {
-  if (!groq && !openai) return null;
+  if (!aiConfigured()) return null;
   const messages = buildSmartCaptureMessages(rawText, userContexts, projects, today, dayName, history, existingTitles);
   return complete('smart-capture', { messages, response_format: { type: 'json_object' } }, validateSmartCapture);
 }
 
 export async function analyzeTask(task, userContexts, projects = [], today = null, dayName = null, history = []) {
-  if (!openai && !groq) return { error: 'AI provider not configured' };
+  if (!aiConfigured()) return { error: 'AI provider not configured' };
   const contextOptions = formatContextOptions(userContexts);
   const projectBlock = projects?.length
     ? `\nActive projects (suggest the EXACT name if this task belongs to one, otherwise null):\n${projects.map(p => `- ${p.name}`).join('\n')}\n`
@@ -397,7 +267,7 @@ Respond with JSON:
 }
 
 export async function suggestProjectBreakdown(project, userContexts, existingTasks = []) {
-  if (!openai && !groq) return { error: 'AI provider not configured' };
+  if (!aiConfigured()) return { error: 'AI provider not configured' };
   const contextOptions = formatContextOptions(userContexts);
   const existingBlock = existingTasks?.length
     ? `
@@ -442,7 +312,7 @@ Respond with JSON:
 }
 
 export async function processInbox(tasks, userContexts, { projects = [], today = null, dayName = null, history = [] } = {}) {
-  if (!openai && !groq) return { error: 'AI provider not configured' };
+  if (!aiConfigured()) return { error: 'AI provider not configured' };
   const contextOptions = formatContextOptions(userContexts);
   const taskList = tasks.map((t, i) => `${i + 1}. "${t.title}"${t.notes ? ` (Notes: ${t.notes})` : ''}`).join('\n');
   const projectBlock = projects?.length
@@ -501,7 +371,7 @@ For each item, respond with JSON:
 }
 
 export async function importNotes(rawText, userContexts, projects = [], today, dayName) {
-  if (!openai && !groq) return { error: 'AI provider not configured' };
+  if (!aiConfigured()) return { error: 'AI provider not configured' };
   const contextOptions = userContexts?.length
     ? userContexts.map(c => c.name || c).join('|')
     : '@home|@work|@errands|@computer|@phone|@anywhere';
@@ -573,7 +443,7 @@ Respond with JSON:
 }
 
 export async function getDailyPriorities(tasks, stats, userContexts, { today = null, dayName = null, scheduledToday = null } = {}) {
-  if (!openai && !groq) return { error: 'AI provider not configured' };
+  if (!aiConfigured()) return { error: 'AI provider not configured' };
     // Every date signal the model needs to reason about urgency: due date,
     // days overdue, deferred-until, priority. Without these it was picking
     // "today's focus" by title vibes alone.
@@ -665,7 +535,7 @@ const nextDay = (dateStr) => {
 //           meetings: [{title, start, end}]  (minutes-of-day),
 //           habits: [{name, completed_today}] }
 export async function planDay(tasks, day, userContexts) {
-  if (!openai && !groq) return { error: 'AI provider not configured' };
+  if (!aiConfigured()) return { error: 'AI provider not configured' };
 
   const taskList = tasks.map((t, i) => {
     const parts = [`${i + 1}. "${t.title}" [${t.context || 'no context'}]`];
@@ -803,7 +673,7 @@ Respond with JSON:
 // profile the daily planner reads. A deterministic pass in the route enforces
 // capacity and start/due bounds regardless of what the model returns.
 export async function planWeek(tasks, week, userContexts) {
-  if (!openai && !groq) return { error: 'AI provider not configured' };
+  if (!aiConfigured()) return { error: 'AI provider not configured' };
 
   const taskList = tasks.map((t, i) => {
     const parts = [`${i + 1}. "${t.title}" [${t.context || 'no context'}]`];
@@ -866,7 +736,7 @@ Respond with JSON:
 }
 
 export async function findDuplicates(tasks, userContexts) {
-  if (!openai && !groq) return { error: 'AI provider not configured' };
+  if (!aiConfigured()) return { error: 'AI provider not configured' };
     const taskList = tasks.map(t =>
       `[ID:${t.id}] "${t.title}"${t.notes ? ` (Notes: ${t.notes})` : ''} [List: ${t.list}]${t.context ? ` [Context: ${t.context}]` : ''}${t.recurrence_rule ? ` [Recurring: ${t.recurrence_rule}]` : ''}`
     ).join('\n');
@@ -905,7 +775,7 @@ If no duplicates exist, return an empty duplicate_groups array.`
 }
 
 export async function weeklyReviewAnalysis(data, userContexts) {
-  if (!openai && !groq) return { error: 'AI provider not configured' };
+  if (!aiConfigured()) return { error: 'AI provider not configured' };
     const nextActionsShown = Math.min(data.nextActions.length, 30);
     const waitingShown = Math.min(data.waitingFor.length, 20);
     const nextActionsList = data.nextActions.slice(0, 30).map(t => {
@@ -1052,7 +922,7 @@ const FETCH_HEADERS = {
 };
 
 export async function extractUrlMetadata(url) {
-  if (!openai && !groq) return null;
+  if (!aiConfigured()) return null;
 
   let pageTitle = '';
   let ogTitle = '';
