@@ -489,7 +489,7 @@ export default function WeeklyReview() {
                         </p>
                         {h.streak > 0 && (
                           <p className="font-mono text-[10px] mt-0.5 inline-flex items-center justify-center gap-1" style={{ color: 'rgb(var(--amber-glow))' }}>
-                            <Flame className="w-3 h-3" /> {h.streak}
+                            <Flame className="w-3 h-3" /> {h.streak}{h.streakUnit === 'week' ? 'w' : 'd'}
                           </p>
                         )}
                       </div>
@@ -756,7 +756,7 @@ export default function WeeklyReview() {
                         </p>
                         {h.streak > 0 && (
                           <p className="font-mono text-[10px] mt-0.5 inline-flex items-center justify-center gap-1" style={{ color: 'rgb(var(--amber-glow))' }}>
-                            <Flame className="w-3 h-3" /> {h.streak}
+                            <Flame className="w-3 h-3" /> {h.streak}{h.streakUnit === 'week' ? 'w' : 'd'}
                           </p>
                         )}
                       </div>

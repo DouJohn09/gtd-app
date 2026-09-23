@@ -10,6 +10,7 @@ import { getAiMode } from '../services/userPrefs.js';
 import { assertPlanWithinLimit, assertWeekPlanWithinLimit, LimitError } from '../services/billing.js';
 import { recordAppliedBlocks, closeBlock, planReality, planningProfileText, calibrationLine } from '../services/insights.js';
 import { serverError } from '../lib/httpErrors.js';
+import { summarizeHabits } from './habits.js';
 
 async function getUserContexts(userId) {
   const { rows } = await pool.query(
@@ -1135,47 +1136,20 @@ router.post('/apply-duplicates', async (req, res) => {
   }
 });
 
-async function getHabitStats(userId) {
+// Same numbers as the Habits page (schedule-aware, rest days, quit habits, the
+// user's own "today") — this used to be a second, older streak algorithm that
+// counted plain consecutive calendar days in UTC.
+async function getHabitStats(userId, today) {
+  const since = new Date(`${today}T00:00:00Z`);
+  since.setUTCDate(since.getUTCDate() - 365);
   const [{ rows: habits }, { rows: allLogs }] = await Promise.all([
     pool.query('SELECT * FROM habits WHERE user_id = $1 AND active = true ORDER BY name', [userId]),
-    (() => {
-      const ninetyDaysAgo = new Date();
-      ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
-      const startDate = ninetyDaysAgo.toISOString().split('T')[0];
-      return pool.query(
-        'SELECT habit_id, completed_date FROM habit_logs WHERE user_id = $1 AND completed_date >= $2',
-        [userId, startDate]
-      );
-    })(),
+    pool.query(
+      'SELECT habit_id, completed_date, status FROM habit_logs WHERE user_id = $1 AND completed_date >= $2',
+      [userId, since.toISOString().slice(0, 10)]
+    ),
   ]);
-
-  const today = new Date().toISOString().split('T')[0];
-  return {
-    habits: habits.map(habit => {
-      const logs = allLogs.filter(l => l.habit_id === habit.id);
-      const completedDates = new Set(logs.map(l => l.completed_date));
-      let streak = 0;
-      const d = new Date(today);
-      while (true) {
-        const dateStr = d.toISOString().split('T')[0];
-        if (completedDates.has(dateStr)) { streak++; d.setDate(d.getDate() - 1); }
-        else if (dateStr === today) { d.setDate(d.getDate() - 1); }
-        else break;
-      }
-      let expectedDays = 0, completedDays = 0;
-      for (let i = 0; i < 30; i++) {
-        const checkDate = new Date();
-        checkDate.setDate(checkDate.getDate() - i);
-        expectedDays++;
-        if (completedDates.has(checkDate.toISOString().split('T')[0])) completedDays++;
-      }
-      return {
-        id: habit.id, name: habit.name, color: habit.color, streak,
-        completionRate: expectedDays > 0 ? Math.round((completedDays / expectedDays) * 100) : 0,
-        completedLast30: completedDays, expectedLast30: expectedDays,
-      };
-    })
-  };
+  return { habits: summarizeHabits(habits, allLogs, today) };
 }
 
 // Everything the review needs, minus the AI. Shared by the page load and the
@@ -1191,7 +1165,7 @@ async function loadReviewData(userId, req) {
     WeeklyReviewModel.getStaleItems(userId),
     WeeklyReviewModel.getLastReview(userId),
     WeeklyReviewModel.getStreak(userId),
-    getHabitStats(userId),
+    getHabitStats(userId, req.today),
     getUserContexts(userId),
   ]);
   const since = lastReview?.completed_at || new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();

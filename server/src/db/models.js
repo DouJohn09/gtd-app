@@ -269,7 +269,8 @@ export const TaskModel = {
     // occurrence was done even though the row rolls forward.
     // Awaited: a recurring task's due date moves on below, which releases its
     // upcoming blocks — today's block must already be marked done by then.
-    if (task) await closeBlock(userId, task.id, 'done').catch(err => console.error('closeBlock (complete):', err));
+    // A recurring task's later blocks are for its later occurrences — keep them.
+    if (task) await closeBlock(userId, task.id, 'done', { retireFuture: !task.recurrence_rule }).catch(err => console.error('closeBlock (complete):', err));
 
     if (task && task.recurrence_rule) {
       return this._completeRecurring(task, userId, today);
@@ -298,30 +299,46 @@ export const TaskModel = {
   },
 
   async _completeRecurring(task, userId, today = utcToday()) {
-    // Create a completed snapshot for history
-    await pool.query(
-      `INSERT INTO tasks (
+    const nextDue = this._nextDueDate(task, today);
+    const nextStart = task.start_date ? this._advanceDate(task.start_date, task) : null;
+
+    // Roll the occurrence forward only if it is still the one this request
+    // read (compare-and-set on the dates), in one transaction with the history
+    // snapshot. A double-tap used to run twice: two history rows and a skipped
+    // occurrence (M9). The loser sees 0 rows and just returns the task.
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const { rowCount } = await client.query(
+        `UPDATE tasks SET due_date = $1, start_date = $2, is_daily_focus = false, completed_at = NULL, updated_at = NOW()
+          WHERE id = $3 AND user_id = $4
+            AND due_date IS NOT DISTINCT FROM $5::date AND start_date IS NOT DISTINCT FROM $6::date`,
+        [nextDue, nextStart, task.id, userId, task.due_date || null, task.start_date || null]
+      );
+      if (rowCount === 0) {
+        await client.query('ROLLBACK');
+        return this.getById(task.id, userId);
+      }
+      await client.query(
+        `INSERT INTO tasks (
         title, notes, list, context, project_id, waiting_for_person,
         due_date, start_date, scheduled_time, duration, energy_level,
         time_estimate, priority, is_daily_focus, position, completed_at, user_id
       ) VALUES ($1,$2,'completed',$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,false,$13,$14,$15)`,
-      [
-        task.title, task.notes, task.context, task.project_id, task.waiting_for_person,
-        task.due_date, task.start_date, task.scheduled_time, task.duration,
-        task.energy_level, task.time_estimate, task.priority, task.position,
-        new Date().toISOString(), userId,
-      ]
-    );
-
-    const nextDue = this._nextDueDate(task, today);
-    const nextStart = task.start_date ? this._advanceDate(task.start_date, task) : null;
-
-    await this.update(task.id, {
-      due_date: nextDue,
-      start_date: nextStart,
-      is_daily_focus: false,
-      completed_at: null,
-    }, userId);
+        [
+          task.title, task.notes, task.context, task.project_id, task.waiting_for_person,
+          task.due_date, task.start_date, task.scheduled_time, task.duration,
+          task.energy_level, task.time_estimate, task.priority, task.position,
+          new Date().toISOString(), userId,
+        ]
+      );
+      await client.query('COMMIT');
+    } catch (err) {
+      await client.query('ROLLBACK').catch(() => {});
+      throw err;
+    } finally {
+      client.release();
+    }
 
     return this.getById(task.id, userId);
   },

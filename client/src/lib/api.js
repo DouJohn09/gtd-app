@@ -72,6 +72,19 @@ async function fetchApi(endpoint, options = {}) {
   return response.json();
 }
 
+// One complete request per task at a time. A double-tap on a recurring task
+// used to send two requests; the second landed after the first had rolled the
+// task to its next occurrence and completed that one too (M9). The second tap
+// now shares the first request's result.
+const completing = new Map();
+function completeOnce(id) {
+  const key = String(id);
+  if (completing.has(key)) return completing.get(key);
+  const p = fetchApi(`/tasks/${id}/complete`, { method: 'POST' }).finally(() => completing.delete(key));
+  completing.set(key, p);
+  return p;
+}
+
 async function downloadFile(endpoint, fallbackName) {
   const token = localStorage.getItem('token');
   const response = await fetch(`${API_BASE}${endpoint}`, {
@@ -104,7 +117,7 @@ export const api = {
     create: (task) => fetchApi('/tasks', { method: 'POST', body: JSON.stringify(task) }),
     update: (id, updates) => fetchApi(`/tasks/${id}`, { method: 'PUT', body: JSON.stringify(updates) }),
     delete: (id) => fetchApi(`/tasks/${id}`, { method: 'DELETE' }),
-    complete: (id) => fetchApi(`/tasks/${id}/complete`, { method: 'POST' }),
+    complete: (id) => completeOnce(id),
     getDeferred: (list) => fetchApi(`/tasks/deferred?list=${list}`),
     analyze: (id) => fetchApi(`/tasks/${id}/analyze`, { method: 'POST' }),
   },

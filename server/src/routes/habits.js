@@ -42,6 +42,40 @@ router.get('/', async (req, res) => {
   }
 });
 
+// Streak + 30-day completion per habit — the one implementation, used by the
+// Habits page and the weekly review. `allLogs` rows need habit_id,
+// completed_date, status; fetch a year of them so streaks are exact.
+export function summarizeHabits(habits, allLogs, today) {
+  return habits.map(habit => {
+    const logs = allLogs.filter(l => l.habit_id === habit.id);
+
+    let streak, streakUnit, completionRate, completedLast30, expectedLast30;
+    if (habit.type === 'quit') {
+      const slipSet = new Set(logs.filter(l => l.status === 'slip').map(l => l.completed_date));
+      ({ streak, unit: streakUnit } = computeQuitStreak(habit, slipSet, today));
+      ({ completionRate, completedLast30, expectedLast30 } = computeQuitCompletion(habit, slipSet, today, 30));
+    } else {
+      const completedSet = new Set(logs.filter(l => l.status === 'done').map(l => l.completed_date));
+      const skippedSet = new Set(logs.filter(l => l.status === 'skipped').map(l => l.completed_date));
+      ({ streak, unit: streakUnit } = computeStreak(habit, completedSet, today, skippedSet));
+      ({ completionRate, completedLast30, expectedLast30 } = computeCompletion(habit, completedSet, today, 30, skippedSet));
+    }
+
+    return {
+      id: habit.id,
+      name: habit.name,
+      category: habit.category,
+      color: habit.color,
+      type: habit.type,
+      streak,
+      streakUnit,
+      completionRate,
+      completedLast30,
+      expectedLast30,
+    };
+  });
+}
+
 // GET /api/habits/stats - streaks, completion rates, heatmap data
 router.get('/stats', async (req, res) => {
   try {
@@ -63,35 +97,7 @@ router.get('/stats', async (req, res) => {
       ),
     ]);
 
-    const today = req.today;
-    const habitStats = habits.map(habit => {
-      const logs = allLogs.filter(l => l.habit_id === habit.id);
-
-      let streak, streakUnit, completionRate, completedLast30, expectedLast30;
-      if (habit.type === 'quit') {
-        const slipSet = new Set(logs.filter(l => l.status === 'slip').map(l => l.completed_date));
-        ({ streak, unit: streakUnit } = computeQuitStreak(habit, slipSet, today));
-        ({ completionRate, completedLast30, expectedLast30 } = computeQuitCompletion(habit, slipSet, today, 30));
-      } else {
-        const completedSet = new Set(logs.filter(l => l.status === 'done').map(l => l.completed_date));
-        const skippedSet = new Set(logs.filter(l => l.status === 'skipped').map(l => l.completed_date));
-        ({ streak, unit: streakUnit } = computeStreak(habit, completedSet, today, skippedSet));
-        ({ completionRate, completedLast30, expectedLast30 } = computeCompletion(habit, completedSet, today, 30, skippedSet));
-      }
-
-      return {
-        id: habit.id,
-        name: habit.name,
-        category: habit.category,
-        color: habit.color,
-        type: habit.type,
-        streak,
-        streakUnit,
-        completionRate,
-        completedLast30,
-        expectedLast30,
-      };
-    });
+    const habitStats = summarizeHabits(habits, allLogs, req.today);
 
     // Heatmap data: per-day completion counts for past 90 days. Only 'done' logs
     // count — a rest day is neutral, so it shows as an empty (calm) cell, not a miss.
@@ -476,8 +482,10 @@ export function isDueOn(habit, dateStr) {
 //
 // `skippedSet` holds days the user marked as a deliberate rest. A skipped due-day
 // is treated like a non-scheduled day: neutral — it neither extends nor breaks
-// the streak. Skip is a no-op for weekly habits (their target is per-week, not
-// per-day), so skippedSet is ignored there.
+// the streak. For weekly habits rest days shrink that week's target pro rata
+// (3×/week with a 4-day vacation → 2 that week), and a week that is all rest
+// is neutral. Ignoring them (M11) meant a vacation logged via rest days still
+// broke a weekly streak.
 export function computeStreak(habit, completedSet, todayStr, skippedSet = new Set()) {
   if (habit.frequency === 'weekly') {
     const target = weeklyTarget(habit);
@@ -485,7 +493,11 @@ export function computeStreak(habit, completedSet, todayStr, skippedSet = new Se
     let streak = 0;
     let week = currentWeek;
     for (let guard = 0; guard < 104; guard++) {
-      if (countCompletedInWeek(completedSet, week) >= target) {
+      const rest = countCompletedInWeek(skippedSet, week);
+      const needed = Math.ceil(target * (7 - rest) / 7);
+      if (needed === 0) {
+        // whole week off — neutral, keep looking back
+      } else if (countCompletedInWeek(completedSet, week) >= needed) {
         streak++;
       } else if (week !== currentWeek) {
         break; // the current week may still be in progress, so it never breaks

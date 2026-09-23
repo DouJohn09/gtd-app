@@ -220,7 +220,7 @@ export async function recordAppliedBlocks(userId, planDate, items) {
 // used to count one finished task several times — once per day it had been
 // planned and missed. A 'done' also retires any block planned for a later day
 // (finished early; that block will never happen).
-export async function closeBlock(userId, taskId, outcome) {
+export async function closeBlock(userId, taskId, outcome, { retireFuture = true } = {}) {
   await pool.query(
     `UPDATE plan_blocks SET outcome = $3, outcome_at = NOW()
       WHERE id = (
@@ -229,7 +229,7 @@ export async function closeBlock(userId, taskId, outcome) {
          ORDER BY plan_date DESC LIMIT 1)`,
     [userId, taskId, outcome]
   );
-  if (outcome === 'done') {
+  if (outcome === 'done' && retireFuture) {
     await pool.query(
       `UPDATE plan_blocks SET outcome = 'replanned', outcome_at = NOW()
         WHERE user_id = $1 AND task_id = $2 AND outcome IS NULL AND plan_date > ${USER_TODAY_SQL}`,

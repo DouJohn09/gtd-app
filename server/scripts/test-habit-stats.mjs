@@ -75,6 +75,23 @@ t("weekly streak: in-progress current week below target doesn't break", () => {
   assert.equal(streak, 2);
 });
 
+t('weekly streak: rest days shrink that week\'s target (M11)', () => {
+  const completed = set(
+    '2026-06-15', '2026-06-16', '2026-06-17', // current: 3 ✓
+    '2026-06-08', '2026-06-09',               // prior: 2 — but Wed–Sun resting
+    '2026-06-01', '2026-06-02', '2026-06-03', // before: 3 ✓
+  );
+  const rest = set('2026-06-10', '2026-06-11', '2026-06-12', '2026-06-13', '2026-06-14');
+  // 3 × 2/7 → ceil(0.86) = 1 needed in the prior week; 2 done
+  assert.equal(computeStreak(weekly3, completed, TODAY, rest).streak, 3);
+  assert.equal(computeStreak(weekly3, completed, TODAY).streak, 1); // without rest days it breaks
+});
+t('weekly streak: a whole week of rest is neutral', () => {
+  const completed = set('2026-06-15', '2026-06-16', '2026-06-17', '2026-06-01', '2026-06-02', '2026-06-03');
+  const rest = set('2026-06-08', '2026-06-09', '2026-06-10', '2026-06-11', '2026-06-12', '2026-06-13', '2026-06-14');
+  assert.equal(computeStreak(weekly3, completed, TODAY, rest).streak, 2);
+});
+
 // --- completion rate ---
 t('completion (daily, 7d window): 4 of 7', () => {
   const r = computeCompletion({ frequency: 'daily' },

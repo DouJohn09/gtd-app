@@ -811,7 +811,7 @@ export async function weeklyReviewAnalysis(data, userContexts) {
     }).join('\n');
 
     const habitSummary = data.habitStats?.habits?.map(h =>
-      `"${h.name}" — ${h.completionRate}% completion, ${h.streak} day streak`
+      `"${h.name}"${h.type === 'quit' ? ' (quitting)' : ''} — ${h.completionRate}% ${h.type === 'quit' ? 'clean days' : 'completion'}, ${h.streak}-${h.streakUnit === 'week' ? 'week' : 'day'} streak`
     ).join('\n') || 'No habits tracked';
 
     // A sample of someday/maybe items makes the "Get Creative" step real:
