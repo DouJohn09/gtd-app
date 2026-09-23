@@ -506,6 +506,13 @@ router.post('/plan-day', requireAiEnabled, enforceAiLimit, async (req, res) => {
   }
 });
 
+const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
+function isRealDate(s) {
+  if (typeof s !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
+  const t = Date.parse(`${s}T12:00:00Z`);
+  return !Number.isNaN(t) && new Date(t).toISOString().slice(0, 10) === s;
+}
+
 // A task listed twice in one apply would be written twice and synced twice
 // (and hit plan_blocks' unique index). Keep the last entry per task, the
 // person's final placement.
@@ -528,8 +535,15 @@ function lastPerTask(list) {
 // "plan the rest," not "replace the day." No AI call → no aiLimit.
 router.post('/apply-plan', async (req, res) => {
   try {
-    const items = lastPerTask(Array.isArray(req.body.items) ? req.body.items : []);
-    const deferred = lastPerTask(Array.isArray(req.body.deferred) ? req.body.deferred : []);
+    // Same shape checks as apply-week: a garbage time used to be stored as-is
+    // (and fail the Calendar sync), a garbage move-to date 500'd halfway
+    // through, after the kept blocks were already written.
+    const items = lastPerTask(Array.isArray(req.body.items) ? req.body.items : [])
+      .filter(i => Number.isInteger(Number(i.taskId)) && TIME_RE.test(i.start || ''))
+      .slice(0, 100);
+    const deferred = lastPerTask(Array.isArray(req.body.deferred) ? req.body.deferred : [])
+      .filter(d => Number.isInteger(Number(d.taskId)) && (!d.moveTo || isRealDate(d.moveTo)))
+      .slice(0, 100);
     if (items.length === 0 && deferred.length === 0) {
       return res.status(400).json({ error: 'Nothing to apply' });
     }
@@ -544,7 +558,7 @@ router.post('/apply-plan', async (req, res) => {
       const task = await TaskModel.update(item.taskId, {
         due_date: req.today,
         scheduled_time: item.start,
-        duration: item.duration || 30,
+        duration: Math.min(480, Math.max(5, Number(item.duration) || 30)),
         // A block the person accepted is the best estimate a task without one
         // will get; keep it so tomorrow's plan doesn't start from 30 again.
         ...(hasEstimate.get(Number(item.taskId)) === false ? { time_estimate: item.duration || 30 } : {}),
@@ -639,7 +653,7 @@ const dateOnly = (v) => (v ? String(v).slice(0, 10) : null);
 // The shape of the coming days: free minutes after meetings and time blocks,
 // tasks already dated on each day (fixed, not candidates), and a capacity that
 // leaves slack and scales by how much of a planned day this person finishes.
-async function weekShape(userId, start, tz, reality) {
+async function weekShape(userId, start, tz, reality, today = start) {
   const dates = Array.from({ length: WEEK_DAYS }, (_, i) => addDays(start, i));
   const end = dates[dates.length - 1];
   const { rows: fixedRows } = await pool.query(
@@ -658,7 +672,9 @@ async function weekShape(userId, start, tz, reality) {
   const days = [];
   for (const date of dates) {
     const shape = await freeRangesFor(userId, date, tz);
-    const free = date === start ? clampRangesToNow(shape.free, nowMins) : shape.free;
+    // Only today's remaining hours are shrunk to "from now"; a week that
+    // starts tomorrow keeps tomorrow whole.
+    const free = date === today ? clampRangesToNow(shape.free, nowMins) : shape.free;
     const freeMins = free.reduce((sum, r) => sum + (r.end - r.start), 0);
     const busyMins = shape.busy.reduce((sum, r) => sum + (r.end - r.start), 0);
     const meetings = buildMeetings(shape, date, tz).length;
@@ -770,7 +786,7 @@ router.get('/week-brief', async (req, res) => {
   try {
     const start = /^\d{4}-\d{2}-\d{2}$/.test(req.query.start || '') ? req.query.start : req.today;
     const reality = await planReality(req.user.id, req.clientTimezone, { today: req.today }).catch(() => null);
-    const shape = await weekShape(req.user.id, start, req.clientTimezone, reality);
+    const shape = await weekShape(req.user.id, start, req.clientTimezone, reality, req.today);
     const candidates = await weekCandidates(req.user.id, shape.start, shape.end, req.today);
     const { rows: [row] } = await pool.query(
       'SELECT applied_at, created_at FROM weekly_plans WHERE user_id = $1 AND week_start = $2',
@@ -782,17 +798,29 @@ router.get('/week-brief', async (req, res) => {
   }
 });
 
+// The week window starts today, or within the next few days if the client asks
+// (the free-plan gate counts applied weeks per month by week_start, so a start
+// picked freely — next month, or a date nobody planned — slipped past it).
+// Anything else, including impossible dates like 2026-13-45, becomes today.
+const WEEK_START_MAX_AHEAD_DAYS = 6;
+function weekStartFrom(req) {
+  const s = req.body?.start;
+  if (!isRealDate(s)) return req.today;
+  if (s < req.today || s > addDays(req.today, WEEK_START_MAX_AHEAD_DAYS)) return req.today;
+  return s;
+}
+
 // POST /api/ai/plan-week { start } — one AI call, charged like plan-day.
 router.post('/plan-week', requireAiEnabled, enforceAiLimit, async (req, res) => {
   try {
-    const start = /^\d{4}-\d{2}-\d{2}$/.test(req.body?.start || '') ? req.body.start : req.today;
+    const start = weekStartFrom(req);
     await assertWeekPlanWithinLimit(req.user.id, start);
 
     const [reality, userContexts] = await Promise.all([
       planReality(req.user.id, req.clientTimezone, { today: req.today }).catch(() => null),
       getUserContexts(req.user.id),
     ]);
-    const shape = await weekShape(req.user.id, start, req.clientTimezone, reality);
+    const shape = await weekShape(req.user.id, start, req.clientTimezone, reality, req.today);
     const candidates = await weekCandidates(req.user.id, shape.start, shape.end, req.today);
 
     if (candidates.length === 0) {
@@ -830,7 +858,7 @@ router.post('/plan-week', requireAiEnabled, enforceAiLimit, async (req, res) => 
 // takes the earliest slot that fits. Fine-tuning stays in the Calendar.
 router.post('/week-times', async (req, res) => {
   try {
-    const start = /^\d{4}-\d{2}-\d{2}$/.test(req.body?.start || '') ? req.body.start : req.today;
+    const start = weekStartFrom(req);
     const end = addDays(start, WEEK_DAYS - 1);
     const placements = (Array.isArray(req.body?.placements) ? req.body.placements : [])
       .filter(p => Number.isInteger(Number(p.taskId)) && /^\d{4}-\d{2}-\d{2}$/.test(p.date || '') && p.date >= start && p.date <= end);
@@ -892,11 +920,22 @@ router.post('/week-times', async (req, res) => {
 // untouched. No AI → no aiLimit.
 router.post('/apply-week', async (req, res) => {
   try {
-    const start = /^\d{4}-\d{2}-\d{2}$/.test(req.body?.start || '') ? req.body.start : req.today;
+    const start = weekStartFrom(req);
     const end = addDays(start, WEEK_DAYS - 1);
     const items = lastPerTask((Array.isArray(req.body?.items) ? req.body.items : [])
       .filter(i => Number.isInteger(Number(i.taskId)) && /^\d{4}-\d{2}-\d{2}$/.test(i.date || '') && i.date >= start && i.date <= end));
     if (items.length === 0) return res.status(400).json({ error: 'Nothing to apply' });
+    // Only a week that plan-week actually produced (and the free gate let
+    // through) can be applied; applying marks that row, which is what the gate
+    // counts next time.
+    const { rowCount: hasPlan } = await pool.query(
+      'SELECT 1 FROM weekly_plans WHERE user_id = $1 AND week_start = $2',
+      [req.user.id, start]
+    );
+    if (!hasPlan) {
+      return res.status(409).json({ error: 'no_week_plan', message: 'This week plan has expired — plan the week again and apply that.' });
+    }
+    if (items.length > 100) items.length = 100;
 
     const updated = [];
     const timedByDate = new Map();
