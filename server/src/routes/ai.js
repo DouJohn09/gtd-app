@@ -507,6 +507,17 @@ router.post('/plan-day', requireAiEnabled, enforceAiLimit, async (req, res) => {
   }
 });
 
+// A task listed twice in one apply would be written twice and synced twice
+// (and hit plan_blocks' unique index). Keep the last entry per task, the
+// person's final placement.
+function lastPerTask(list) {
+  const byId = new Map();
+  for (const item of list) {
+    if (item && item.taskId != null) byId.set(Number(item.taskId), item);
+  }
+  return [...byId.values()];
+}
+
 // Applies a reviewed plan: kept blocks become today's time-blocked focus,
 // deferred items move to their new date. ADDITIVE — it only touches the tasks in
 // the plan, and never clears focus on tasks the user didn't act on. The old
@@ -518,8 +529,8 @@ router.post('/plan-day', requireAiEnabled, enforceAiLimit, async (req, res) => {
 // "plan the rest," not "replace the day." No AI call → no aiLimit.
 router.post('/apply-plan', async (req, res) => {
   try {
-    const items = Array.isArray(req.body.items) ? req.body.items : [];
-    const deferred = Array.isArray(req.body.deferred) ? req.body.deferred : [];
+    const items = lastPerTask(Array.isArray(req.body.items) ? req.body.items : []);
+    const deferred = lastPerTask(Array.isArray(req.body.deferred) ? req.body.deferred : []);
     if (items.length === 0 && deferred.length === 0) {
       return res.status(400).json({ error: 'Nothing to apply' });
     }
@@ -562,7 +573,7 @@ router.post('/apply-plan', async (req, res) => {
     // Fact record for Insights + planner calibration: which task sat in which
     // block. Only blocks whose task update succeeded.
     const appliedIds = new Set(updated.map(t => t.id));
-    recordAppliedBlocks(req.user.id, req.today, items.filter(i => appliedIds.has(i.taskId)))
+    recordAppliedBlocks(req.user.id, req.today, items.filter(i => appliedIds.has(Number(i.taskId))))
       .catch(err => console.error('recordAppliedBlocks:', err));
 
     res.json({ applied: updated.length, deferred: deferred.length, tasks: updated });
@@ -889,8 +900,8 @@ router.post('/apply-week', async (req, res) => {
   try {
     const start = /^\d{4}-\d{2}-\d{2}$/.test(req.body?.start || '') ? req.body.start : req.today;
     const end = addDays(start, WEEK_DAYS - 1);
-    const items = (Array.isArray(req.body?.items) ? req.body.items : [])
-      .filter(i => Number.isInteger(Number(i.taskId)) && /^\d{4}-\d{2}-\d{2}$/.test(i.date || '') && i.date >= start && i.date <= end);
+    const items = lastPerTask((Array.isArray(req.body?.items) ? req.body.items : [])
+      .filter(i => Number.isInteger(Number(i.taskId)) && /^\d{4}-\d{2}-\d{2}$/.test(i.date || '') && i.date >= start && i.date <= end));
     if (items.length === 0) return res.status(400).json({ error: 'Nothing to apply' });
 
     const updated = [];

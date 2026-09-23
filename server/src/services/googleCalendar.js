@@ -234,8 +234,14 @@ async function getGtdCalendarId(userId) {
   return rows[0]?.gtd_calendar_id || null;
 }
 
-async function setGtdCalendarId(userId, id) {
-  await pool.query('UPDATE users SET gtd_calendar_id = $1 WHERE id = $2', [id, userId]);
+// Claims the slot only if it's still empty, so two racing creators can't both
+// win. Returns the id that ended up stored (ours or the one already there).
+async function claimGtdCalendarId(userId, id) {
+  const { rows } = await pool.query(
+    'UPDATE users SET gtd_calendar_id = $1 WHERE id = $2 AND gtd_calendar_id IS NULL RETURNING gtd_calendar_id',
+    [id, userId]
+  );
+  return rows[0]?.gtd_calendar_id || getGtdCalendarId(userId);
 }
 
 // One-time rename of legacy "GTD Flow" calendars to "Cleartable" after the rebrand.
@@ -292,8 +298,16 @@ async function ensureGtdCalendar(userId, accessToken) {
     throw new Error(`Failed to create Cleartable calendar: ${response.status} ${err}`);
   }
   const data = await response.json();
-  await setGtdCalendarId(userId, data.id);
-  return data.id;
+  const stored = await claimGtdCalendarId(userId, data.id);
+  if (stored !== data.id) {
+    // Another process created one first — drop ours rather than leave a
+    // second empty "Cleartable" calendar in the user's Google account.
+    fetch(`${CALENDAR_API_BASE}/calendars/${encodeURIComponent(data.id)}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${accessToken}` },
+    }).catch(err => console.error('Duplicate calendar cleanup failed:', err.message));
+  }
+  return stored;
 }
 
 function buildEventPayload(task, clientTimezone) {
@@ -387,12 +401,48 @@ async function clearTaskEventId(taskId) {
   await pool.query('UPDATE tasks SET google_event_id = NULL WHERE id = $1', [taskId]);
 }
 
+// Per-user promise chain. Callers fire syncs without awaiting (apply-week can
+// fire 60 at once); running them in parallel let every one of them see "no
+// Cleartable calendar yet" and create its own, and let two syncs of the same
+// task both see "no event yet" and create two events. One at a time per user,
+// each reading the task fresh, removes both races.
+const userSyncQueues = new Map();
+function enqueueForUser(userId, job) {
+  const prev = userSyncQueues.get(userId) || Promise.resolve();
+  const next = prev.then(job, job);
+  const tail = next.catch(() => {});
+  userSyncQueues.set(userId, tail);
+  tail.then(() => {
+    if (userSyncQueues.get(userId) === tail) userSyncQueues.delete(userId);
+  });
+  return next;
+}
+
+async function loadTaskForSync(userId, taskId) {
+  const { rows } = await pool.query(
+    `SELECT id, title, notes, list, due_date, scheduled_time, duration, google_event_id
+       FROM tasks WHERE id = $1 AND user_id = $2`,
+    [taskId, userId]
+  );
+  return rows[0] || null;
+}
+
 // Sync a task's state to its Google Calendar event.
 // Push when task has scheduled_time + due_date and isn't completed.
 // Delete when task lost its scheduled_time but still has an event id.
 // Skip on completed tasks (event remains as a time log).
-export async function syncTaskToCalendar(userId, task, clientTimezone) {
-  if (!task) return;
+// The passed task only identifies which row to sync: by the time a queued job
+// runs, the row may have changed (or gained an event id from an earlier job),
+// so the job always works from the current DB state.
+export function syncTaskToCalendar(userId, task, clientTimezone) {
+  if (!task?.id) return Promise.resolve();
+  return enqueueForUser(userId, async () => {
+    const fresh = await loadTaskForSync(userId, task.id);
+    if (fresh) await syncTaskNow(userId, fresh, clientTimezone);
+  });
+}
+
+async function syncTaskNow(userId, task, clientTimezone) {
   if (task.list === 'completed') return;
   if (task.scheduled_time && task.due_date) {
     await pushTaskToCalendar(userId, task, clientTimezone);
