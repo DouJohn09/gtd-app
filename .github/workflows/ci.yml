@@ -1,0 +1,42 @@
+# Runs on every push to main: server unit tests (habit stats + AI validators,
+# no network, no database) and a production build of the client. Railway
+# deploys from main regardless; this is the early warning, not a gate.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  server:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+      - run: npm ci
+      - run: npm test
+      - name: Syntax check
+        run: find src -name '*.js' -print0 | xargs -0 -n1 node --check
+
+  client:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: client
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+      - run: npm ci --include=dev
+      - run: npm run build
