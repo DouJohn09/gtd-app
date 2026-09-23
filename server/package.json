@@ -10,7 +10,9 @@
     "db:migrate:create": "node-pg-migrate create",
     "db:reset": "node-pg-migrate down 0 && node-pg-migrate up",
     "db:migrate-data": "node scripts/migrate-sqlite-to-pg.js",
-    "test:habits": "node scripts/test-habit-stats.mjs"
+    "test:habits": "node scripts/test-habit-stats.mjs",
+    "test:ai-schema": "node scripts/test-ai-schema.mjs",
+    "test": "node scripts/test-habit-stats.mjs && node scripts/test-ai-schema.mjs"
   },
   "dependencies": {
     "@paddle/paddle-node-sdk": "^3.8.0",

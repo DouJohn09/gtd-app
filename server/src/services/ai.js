@@ -620,7 +620,7 @@ Respond with JSON:
     .filter(b => !deferredByUser(b.task_index))
     .map(b => ({
       task_index: b.task_index,
-      start: timeToMinutes(b.start),
+      start: b.start ? timeToMinutes(b.start) : null, // null → packPlan's earliest fitting slot
       duration: b.duration_mins,
       reason: b.reason || '',
     }));

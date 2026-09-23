@@ -2,8 +2,9 @@
 // COERCES common LLM slop in place (string "null" → null, numeric strings →
 // numbers), then returns an array of problem strings. A non-empty array
 // triggers one "repair" round-trip in complete() before falling back to the
-// next provider — so validators should only report problems a model can fix
-// by re-emitting the JSON, not stylistic nits.
+// next model — so validators drop bad list items and clear bad optional
+// fields in place, and only report what leaves the answer unusable (wrong
+// top-level shape, a required field missing, every item unusable).
 
 const LISTS = ['inbox', 'next_actions', 'waiting_for', 'someday_maybe'];
 const CONFIDENCE = ['high', 'medium', 'low'];
@@ -41,40 +42,75 @@ function checkEnum(obj, field, allowed, problems, { nullable = true, label = '' 
   if (!allowed.includes(v)) problems.push(`${label}${field} is "${v}" but must be one of: ${allowed.join('|')}${nullable ? ' or null' : ''}`);
 }
 
-function checkPriority(obj, problems, label = '') {
+// ---- Salvage helpers. An optional field the model got wrong is cleared (or
+// clamped), not reported: losing an energy guess costs nothing, while a
+// rejected response costs a repair call, then a fallback call, then an error
+// in front of the user. Only a missing REQUIRED field is worth reporting, and
+// for list responses even that just drops the one item (see salvageItems).
+
+function softEnum(obj, field, allowed, fallback = null) {
+  coerce(obj, field);
+  if (obj[field] != null && !allowed.includes(obj[field])) obj[field] = fallback;
+}
+
+function softPriority(obj) {
   coerce(obj, 'priority', { numeric: true });
   const v = obj.priority;
   if (v == null) return;
-  if (!Number.isInteger(v) || v < 1 || v > 5) problems.push(`${label}priority is "${v}" but must be an integer 1-5 (5 = most important) or null`);
+  obj.priority = Number.isFinite(v) ? Math.min(5, Math.max(1, Math.round(v))) : null;
 }
 
-function checkDate(obj, field, problems, label = '') {
+function softDate(obj, field) {
   coerce(obj, field);
-  const v = obj[field];
-  if (v != null && !DATE_RE.test(v)) problems.push(`${label}${field} is "${v}" but must be YYYY-MM-DD or null`);
+  if (obj[field] != null && !(typeof obj[field] === 'string' && DATE_RE.test(obj[field]))) obj[field] = null;
 }
 
-function checkConfidenceObject(obj, keys, problems, label = '') {
-  if (obj.confidence == null || typeof obj.confidence !== 'object') return;
+function softTime(obj, field) {
+  coerce(obj, field);
+  if (obj[field] != null && !(typeof obj[field] === 'string' && TIME_RE.test(obj[field]))) obj[field] = null;
+}
+
+function softConfidence(obj, keys) {
+  if (obj.confidence == null) return;
+  if (typeof obj.confidence !== 'object' || Array.isArray(obj.confidence)) { obj.confidence = null; return; }
   for (const k of keys) {
-    if (obj.confidence[k] != null && !CONFIDENCE.includes(obj.confidence[k])) {
-      problems.push(`${label}confidence.${k} is "${obj.confidence[k]}" but must be high|medium|low`);
-    }
+    if (obj.confidence[k] != null && !CONFIDENCE.includes(obj.confidence[k])) delete obj.confidence[k];
   }
+}
+
+function inRangeInt(v, max) {
+  return Number.isInteger(v) && v >= 1 && v <= max;
+}
+
+// Filters r[field] in place to the items `keep` accepts (keep may also fix an
+// item up). Returns problems only when the model sent items and NONE survived —
+// then there's nothing to use and a repair is worth one call.
+function salvageItems(r, field, keep) {
+  if (!Array.isArray(r[field])) return [`${field} must be an array`];
+  const before = r[field].length;
+  const reasons = [];
+  r[field] = r[field].filter((item, i) => {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) { reasons.push(`${field}[${i}] is not an object`); return false; }
+    const why = keep(item);
+    if (why) { reasons.push(`${field}[${i}].${why}`); return false; }
+    return true;
+  });
+  if (reasons.length) console.warn(`[aiSchema] dropped ${reasons.length}/${before} ${field}: ${reasons.slice(0, 3).join('; ')}`);
+  return before > 0 && r[field].length === 0 ? reasons.slice(0, 5) : [];
 }
 
 export function validateSmartCapture(r) {
   const problems = [];
   if (typeof r.title !== 'string' || !r.title.trim()) problems.push('title must be a non-empty string');
   checkEnum(r, 'list', LISTS, problems, { nullable: false });
-  checkEnum(r, 'list_confidence', CONFIDENCE, problems, { nullable: false });
-  checkEnum(r, 'energy_level', ENERGY, problems);
-  checkPriority(r, problems);
-  checkDate(r, 'due_date', problems);
-  checkDate(r, 'start_date', problems);
-  coerce(r, 'scheduled_time');
-  if (r.scheduled_time != null && !TIME_RE.test(r.scheduled_time)) problems.push(`scheduled_time is "${r.scheduled_time}" but must be HH:MM 24-hour or null`);
-  checkEnum(r, 'recurrence_rule', RECURRENCE, problems);
+  softEnum(r, 'list_confidence', CONFIDENCE, 'low');
+  if (r.list_confidence == null) r.list_confidence = 'low';
+  softEnum(r, 'energy_level', ENERGY);
+  softPriority(r);
+  softDate(r, 'due_date');
+  softDate(r, 'start_date');
+  softTime(r, 'scheduled_time');
+  softEnum(r, 'recurrence_rule', RECURRENCE);
   coerce(r, 'time_estimate_minutes', { numeric: true });
   coerce(r, 'duration', { numeric: true });
   coerce(r, 'recurrence_interval', { numeric: true });
@@ -89,91 +125,93 @@ export function validateSmartCapture(r) {
 
 export function validateProcessInbox(taskCount) {
   return (r) => {
-    const problems = [];
-    if (!Array.isArray(r.processed_items)) return ['processed_items must be an array'];
-    r.processed_items.forEach((item, i) => {
-      const label = `processed_items[${i}].`;
+    const seen = new Set();
+    return salvageItems(r, 'processed_items', (item) => {
       coerce(item, 'original_index', { numeric: true });
-      if (!Number.isInteger(item.original_index) || item.original_index < 1 || item.original_index > taskCount) {
-        problems.push(`${label}original_index must be an integer 1-${taskCount}`);
-      }
-      checkEnum(item, 'recommended_list', LISTS, problems, { nullable: false, label });
-      checkEnum(item, 'energy_level', ENERGY, problems, { label });
-      checkPriority(item, problems, label);
-      checkDate(item, 'due_date', problems, label);
+      if (!inRangeInt(item.original_index, taskCount)) return `original_index must be an integer 1-${taskCount}`;
+      if (seen.has(item.original_index)) return 'original_index repeated';
+      coerce(item, 'recommended_list');
+      // An item the model can't place just stays in the inbox — safe to drop.
+      if (!LISTS.includes(item.recommended_list)) return `recommended_list must be one of: ${LISTS.join('|')}`;
+      seen.add(item.original_index);
+      softEnum(item, 'energy_level', ENERGY);
+      softPriority(item);
+      softDate(item, 'due_date');
       coerce(item, 'context');
       coerce(item, 'project_name');
       coerce(item, 'waiting_for_person');
       coerce(item, 'time_estimate_minutes', { numeric: true });
-      checkConfidenceObject(item, ['list', 'context', 'priority', 'due_date', 'project'], problems, label);
+      softConfidence(item, ['list', 'context', 'priority', 'due_date', 'project']);
+      return null;
     });
-    return problems;
   };
 }
 
 export function validateImportNotes(r) {
-  const problems = [];
-  if (!Array.isArray(r.items)) return ['items must be an array'];
-  r.items.forEach((item, i) => {
-    const label = `items[${i}].`;
-    if (typeof item.title !== 'string' || !item.title.trim()) problems.push(`${label}title must be a non-empty string`);
-    checkEnum(item, 'recommended_list', LISTS, problems, { nullable: false, label });
-    checkEnum(item, 'energy_level', ENERGY, problems, { label });
-    checkPriority(item, problems, label);
-    checkDate(item, 'due_date', problems, label);
+  return salvageItems(r, 'items', (item) => {
+    if (typeof item.title !== 'string' || !item.title.trim()) return 'title must be a non-empty string';
+    // A note the model couldn't classify still gets imported — to the inbox.
+    softEnum(item, 'recommended_list', LISTS, 'inbox');
+    if (item.recommended_list == null) item.recommended_list = 'inbox';
+    softEnum(item, 'energy_level', ENERGY);
+    softPriority(item);
+    softDate(item, 'due_date');
     coerce(item, 'context');
     coerce(item, 'project_name');
     coerce(item, 'waiting_for_person');
     coerce(item, 'time_estimate', { numeric: true });
-    checkConfidenceObject(item, ['list', 'context', 'project', 'due_date', 'energy', 'time', 'waiting_for', 'daily_focus'], problems, label);
+    softConfidence(item, ['list', 'context', 'project', 'due_date', 'energy', 'time', 'waiting_for', 'daily_focus']);
+    return null;
   });
-  return problems;
 }
 
 export function validateDailyPriorities(taskCount) {
   return (r) => {
-    const problems = [];
-    if (!Array.isArray(r.suggested_focus)) return ['suggested_focus must be an array'];
-    r.suggested_focus.forEach((s, i) => {
-      const label = `suggested_focus[${i}].`;
+    const seen = new Set();
+    return salvageItems(r, 'suggested_focus', (s) => {
       coerce(s, 'task_index', { numeric: true });
-      if (!Number.isInteger(s.task_index) || s.task_index < 1 || s.task_index > taskCount) {
-        problems.push(`${label}task_index must be an integer 1-${taskCount}`);
-      }
-      checkEnum(s, 'confidence', CONFIDENCE, problems, { nullable: false, label });
+      if (!inRangeInt(s.task_index, taskCount)) return `task_index must be an integer 1-${taskCount}`;
+      if (seen.has(s.task_index)) return 'task_index repeated';
+      seen.add(s.task_index);
+      softEnum(s, 'confidence', CONFIDENCE, 'medium');
+      if (s.confidence == null) s.confidence = 'medium';
+      return null;
     });
-    return problems;
   };
 }
 
+// The route re-checks ownership and keep counts too; groups that don't make
+// sense are dropped here so they never cost a repair.
 export function validateFindDuplicates(r) {
-  const problems = [];
-  if (!Array.isArray(r.duplicate_groups)) return ['duplicate_groups must be an array'];
-  r.duplicate_groups.forEach((g, i) => {
-    const label = `duplicate_groups[${i}].`;
-    if (!Array.isArray(g.tasks) || g.tasks.length < 2) {
-      problems.push(`${label}tasks must be an array of at least 2 tasks`);
-      return;
-    }
-    g.tasks.forEach(t => coerce(t, 'id', { numeric: true }));
+  return salvageItems(r, 'duplicate_groups', (g) => {
+    if (!Array.isArray(g.tasks) || g.tasks.length < 2) return 'tasks must be an array of at least 2 tasks';
+    g.tasks = g.tasks.filter(t => t && typeof t === 'object');
+    g.tasks.forEach(t => { coerce(t, 'id', { numeric: true }); coerceBool(t, 'keep'); });
     const keeps = g.tasks.filter(t => t.keep === true).length;
-    if (keeps !== 1) problems.push(`${label}tasks must have exactly one task with keep=true (found ${keeps})`);
+    if (g.tasks.length < 2 || keeps !== 1) return `tasks must have exactly one keep=true (found ${keeps})`;
+    return null;
   });
-  return problems;
 }
 
 export function validateWeeklyReview(r) {
   const problems = [];
   for (const arr of ['stale_items', 'projects_needing_attention', 'waiting_for_followups', 'recommendations']) {
-    if (r[arr] != null && !Array.isArray(r[arr])) problems.push(`${arr} must be an array`);
+    if (r[arr] == null) continue;
+    if (!Array.isArray(r[arr])) { r[arr] = []; continue; }
   }
-  (Array.isArray(r.stale_items) ? r.stale_items : []).forEach((s, i) => {
-    checkEnum(s, 'suggestion', ['delete', 'move_to_someday', 'follow_up', 'keep'], problems, { nullable: false, label: `stale_items[${i}].` });
-    coerce(s, 'id', { numeric: true });
-  });
+  if (Array.isArray(r.stale_items)) {
+    salvageItems(r, 'stale_items', (s) => {
+      coerce(s, 'id', { numeric: true });
+      coerce(s, 'suggestion');
+      if (!['delete', 'move_to_someday', 'follow_up', 'keep'].includes(s.suggestion)) return 'suggestion must be delete|move_to_someday|follow_up|keep';
+      return null;
+    });
+  }
   coerce(r, 'system_health_score', { numeric: true });
-  if (r.system_health_score != null && (typeof r.system_health_score !== 'number' || r.system_health_score < 1 || r.system_health_score > 10)) {
-    problems.push('system_health_score must be a number from 1 to 10');
+  if (r.system_health_score != null) {
+    r.system_health_score = Number.isFinite(r.system_health_score)
+      ? Math.min(10, Math.max(1, Math.round(r.system_health_score)))
+      : null;
   }
   return problems;
 }
@@ -181,7 +219,7 @@ export function validateWeeklyReview(r) {
 export function validateAnalyzeTask(r) {
   const problems = [];
   checkEnum(r, 'recommended_list', LISTS, problems, { nullable: false });
-  checkEnum(r, 'energy_level', ENERGY, problems);
+  softEnum(r, 'energy_level', ENERGY);
   coerce(r, 'suggested_context');
   coerce(r, 'time_estimate_minutes', { numeric: true });
   return problems;
@@ -189,44 +227,36 @@ export function validateAnalyzeTask(r) {
 
 // Schema-shape validation only. Whether blocks actually fit the day's free
 // windows is enforced deterministically AFTER the model responds (packPlan in
-// scheduling.js) — a repair round-trip is reserved for things a model can fix
-// by re-emitting (bad indexes, malformed times), not for slot arithmetic.
+// scheduling.js), and packPlan also places a block with no usable start in the
+// earliest slot — so a bad start is cleared, not repaired.
 export function validatePlanDay(taskCount) {
   return (r) => {
-    const problems = [];
-    if (!Array.isArray(r.plan)) return ['plan must be an array'];
-    if (r.deferred != null && !Array.isArray(r.deferred)) problems.push('deferred must be an array or omitted');
-    r.plan.forEach((b, i) => {
-      const label = `plan[${i}].`;
+    if (r.deferred != null && !Array.isArray(r.deferred)) r.deferred = [];
+    const seen = new Set();
+    const problems = salvageItems(r, 'plan', (b) => {
       coerce(b, 'task_index', { numeric: true });
-      if (!Number.isInteger(b.task_index) || b.task_index < 1 || b.task_index > taskCount) {
-        problems.push(`${label}task_index must be an integer 1-${taskCount}`);
-      }
-      coerce(b, 'start');
-      if (b.start == null || !TIME_RE.test(b.start)) problems.push(`${label}start is "${b.start}" but must be HH:MM 24-hour`);
+      if (!inRangeInt(b.task_index, taskCount)) return `task_index must be an integer 1-${taskCount}`;
+      if (seen.has(b.task_index)) return 'task_index repeated';
+      seen.add(b.task_index);
+      softTime(b, 'start');
       coerce(b, 'duration_mins', { numeric: true });
       // Clamp, don't reject. The prompt tells the model to use the task's own
       // estimate, so a large estimate (a 10-hour task → 600) would deadlock the
-      // repair loop against a ceiling it was instructed to exceed — same class as
-      // the min-floor deadlock seen live 2026-07-06. packPlan places or overflows
-      // any size deterministically, so we just bound it to a sane [5, 480] window.
-      // Only a genuinely non-numeric duration is a repairable problem.
-      if (b.duration_mins == null || !Number.isFinite(Number(b.duration_mins))) {
-        problems.push(`${label}duration_mins must be a number`);
-      } else {
-        b.duration_mins = Math.min(480, Math.max(5, Math.round(Number(b.duration_mins))));
-      }
+      // repair loop against a ceiling it was instructed to exceed — same class
+      // as the min-floor deadlock seen live 2026-07-06.
+      b.duration_mins = Number.isFinite(Number(b.duration_mins))
+        ? Math.min(480, Math.max(5, Math.round(Number(b.duration_mins))))
+        : 30;
+      return null;
     });
-    (Array.isArray(r.deferred) ? r.deferred : []).forEach((d, i) => {
-      const label = `deferred[${i}].`;
-      coerce(d, 'task_index', { numeric: true });
-      if (!Number.isInteger(d.task_index) || d.task_index < 1 || d.task_index > taskCount) {
-        problems.push(`${label}task_index must be an integer 1-${taskCount}`);
-      }
-      checkDate(d, 'move_to', problems, label);
-    });
-    const planIdx = r.plan.map(b => b.task_index);
-    if (new Set(planIdx).size !== planIdx.length) problems.push('plan contains the same task_index twice');
+    if (Array.isArray(r.deferred)) {
+      salvageItems(r, 'deferred', (d) => {
+        coerce(d, 'task_index', { numeric: true });
+        if (!inRangeInt(d.task_index, taskCount) || seen.has(d.task_index)) return 'task_index invalid or already planned';
+        softDate(d, 'move_to'); // null → the caller moves it to tomorrow
+        return null;
+      });
+    }
     return problems;
   };
 }
@@ -269,15 +299,12 @@ export function validatePlanWeek(taskCount, allowedDates) {
 }
 
 export function validateProjectBreakdown(r) {
-  const problems = [];
-  if (!Array.isArray(r.next_actions)) return ['next_actions must be an array'];
-  r.next_actions.forEach((a, i) => {
-    const label = `next_actions[${i}].`;
-    if (typeof a.title !== 'string' || !a.title.trim()) problems.push(`${label}title must be a non-empty string`);
-    checkEnum(a, 'energy_level', ENERGY, problems, { label });
+  return salvageItems(r, 'next_actions', (a) => {
+    if (typeof a.title !== 'string' || !a.title.trim()) return 'title must be a non-empty string';
+    softEnum(a, 'energy_level', ENERGY);
     coerce(a, 'context');
     coerce(a, 'time_estimate_minutes', { numeric: true });
     coerce(a, 'order', { numeric: true });
+    return null;
   });
-  return problems;
 }
