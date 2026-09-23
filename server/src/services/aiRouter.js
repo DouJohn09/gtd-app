@@ -93,7 +93,7 @@ const ROUTING = { ...DEFAULT_ROUTING, ...parseRoutingOverride(process.env.AI_ROU
 // or blowing the parse on a 100-item ramble.
 const TASK_PARAMS = {
   'smart-capture':     { temperature: 0,   max_tokens: 1024 },
-  'process-inbox':     { temperature: 0,   max_tokens: 4096 },
+  'process-inbox':     { temperature: 0,   max_tokens: 6000 },
   'import-notes':      { temperature: 0,   max_tokens: 8192 },
   'find-duplicates':   { temperature: 0,   max_tokens: 2048 },
   'url-extract':       { temperature: 0,   max_tokens: 300 },

@@ -88,6 +88,11 @@ export default function InboxProcessPanel({ result, kept, onToggleKept, onApply,
       <p className="font-mono text-[10px] text-text-3 mt-2 text-center">
         Tap a row to keep or skip · edit fields on the AI assistant
       </p>
+      {result?.remaining > 0 && (
+        <p className="text-[11.5px] text-text-3 mt-1.5 text-center">
+          {result.remaining} more inbox {result.remaining === 1 ? 'item waits' : 'items wait'} for the next run.
+        </p>
+      )}
     </div>
   );
 }

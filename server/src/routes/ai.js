@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { TaskModel, ProjectModel, WeeklyReviewModel } from '../db/models.js';
 import { pool } from '../db/pool.js';
-import { processInbox, getDailyPriorities, importNotes, findDuplicates, weeklyReviewAnalysis, smartCapture, planDay, planWeek } from '../services/ai.js';
+import { processInbox, getDailyPriorities, importNotes, findDuplicates, weeklyReviewAnalysis, smartCapture, planDay, planWeek, AI_INPUT_CAPS } from '../services/ai.js';
 import { syncTaskToCalendar } from '../services/googleCalendar.js';
 import { findFreeSlot, freeRangesFor, timeToMinutes, minutesToTime, eventMinutesOnDay, clampRangesToNow, packPlan } from '../services/scheduling.js';
 import { check, charge, getStatus } from '../services/aiUsage.js';
@@ -223,8 +223,8 @@ router.get('/usage', async (req, res) => {
 
 router.post('/process-inbox', requireAiEnabled, enforceAiLimit, async (req, res) => {
   try {
-    const inboxTasks = await TaskModel.getAll('inbox', req.user.id);
-    if (inboxTasks.length === 0) {
+    const allInbox = await TaskModel.getAll('inbox', req.user.id);
+    if (allInbox.length === 0) {
       return res.json({ message: 'Inbox is empty', processed_items: [] });
     }
 
@@ -234,6 +234,9 @@ router.post('/process-inbox', requireAiEnabled, enforceAiLimit, async (req, res)
       getRecentClassifiedTasks(req.user.id, 10),
     ]);
     const projects = allProjects.filter(p => p.status === 'active');
+    // One batch per call; the rest wait for the next run (the client shows
+    // what's left in the inbox). original_index refers to this batch.
+    const inboxTasks = allInbox.slice(0, AI_INPUT_CAPS.inboxItems);
     const dayName = new Date().toLocaleDateString('en-US', { weekday: 'long', timeZone: req.clientTimezone || 'UTC' });
     const result = await processInbox(inboxTasks, userContexts, {
       projects, today: req.today, dayName, history,
@@ -256,6 +259,7 @@ router.post('/process-inbox', requireAiEnabled, enforceAiLimit, async (req, res)
     }
 
     result.tasks = inboxTasks;
+    result.remaining = allInbox.length - inboxTasks.length;
     res.json(result);
   } catch (error) {
     console.error(error);
@@ -1049,7 +1053,11 @@ router.post('/find-duplicates', requireAiEnabled, enforceAiLimit, async (req, re
         TaskModel.getAll(list, req.user.id, req.today)
       )
     );
-    const allTasks = lists.flat();
+    // Most recently touched first: new duplicates are the ones worth catching,
+    // and the cap keeps a years-old backlog from becoming one giant prompt.
+    const allTasks = lists.flat()
+      .sort((a, b) => new Date(b.updated_at || 0) - new Date(a.updated_at || 0))
+      .slice(0, AI_INPUT_CAPS.duplicateTasks);
 
     if (allTasks.length < 2) {
       return res.json({ duplicate_groups: [], summary: 'Not enough tasks to compare' });

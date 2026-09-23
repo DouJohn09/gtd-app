@@ -10,6 +10,19 @@ import { complete, aiConfigured } from './aiRouter.js';
 // Test-only hook for scripts/eval-*, re-exported so they keep importing from here.
 export { __setForceRoute } from './aiRouter.js';
 
+// Prompt-size caps. Task titles and notes are unbounded in the DB and the
+// list-shaped prompts include every row, so without these one very full inbox
+// or task list turns into a huge prompt, a truncated answer, and a retry chain
+// across every model — none of it charged to the daily budget (failures are
+// free). Caps keep the worst case close to the normal case.
+export const AI_INPUT_CAPS = { inboxItems: 25, duplicateTasks: 150, reviewProjects: 30, reviewStale: 30 };
+const clip = (s, n) => {
+  const str = String(s ?? '');
+  return str.length > n ? `${str.slice(0, n)}…` : str;
+};
+const TITLE_MAX = 200;
+const NOTES_MAX = 300;
+
 function getSystemPrompt(userContexts) {
   const contextList = userContexts?.length
     ? userContexts.map(c => c.name || c).join(', ')
@@ -243,7 +256,7 @@ export async function analyzeTask(task, userContexts, projects = [], today = nul
           content: `${dateLine}Analyze this task and provide GTD recommendations:
 
 Task: "${task.title}"
-${task.notes ? `Notes: "${task.notes}"` : ''}
+${task.notes ? `Notes: "${clip(task.notes, 2000)}"` : ''}
 ${projectBlock}${formatHistoryBlock(history)}
 Respond with JSON:
 {
@@ -314,7 +327,7 @@ Respond with JSON:
 export async function processInbox(tasks, userContexts, { projects = [], today = null, dayName = null, history = [] } = {}) {
   if (!aiConfigured()) return { error: 'AI provider not configured' };
   const contextOptions = formatContextOptions(userContexts);
-  const taskList = tasks.map((t, i) => `${i + 1}. "${t.title}"${t.notes ? ` (Notes: ${t.notes})` : ''}`).join('\n');
+  const taskList = tasks.map((t, i) => `${i + 1}. "${clip(t.title, TITLE_MAX)}"${t.notes ? ` (Notes: ${clip(t.notes, NOTES_MAX)})` : ''}`).join('\n');
   const projectBlock = projects?.length
     ? `\nActive projects (use the EXACT name when an item clearly belongs to one, otherwise null):\n${projects.map(p => `- ${p.name}`).join('\n')}\n`
     : '';
@@ -738,7 +751,7 @@ Respond with JSON:
 export async function findDuplicates(tasks, userContexts) {
   if (!aiConfigured()) return { error: 'AI provider not configured' };
     const taskList = tasks.map(t =>
-      `[ID:${t.id}] "${t.title}"${t.notes ? ` (Notes: ${t.notes})` : ''} [List: ${t.list}]${t.context ? ` [Context: ${t.context}]` : ''}${t.recurrence_rule ? ` [Recurring: ${t.recurrence_rule}]` : ''}`
+      `[ID:${t.id}] "${clip(t.title, TITLE_MAX)}"${t.notes ? ` (Notes: ${clip(t.notes, NOTES_MAX)})` : ''} [List: ${t.list}]${t.context ? ` [Context: ${t.context}]` : ''}${t.recurrence_rule ? ` [Recurring: ${t.recurrence_rule}]` : ''}`
     ).join('\n');
 
     return complete('find-duplicates', {
@@ -788,11 +801,11 @@ export async function weeklyReviewAnalysis(data, userContexts) {
       return `[ID:${t.id}] "${t.title}" [Waiting for: ${t.waiting_for_person || 'unknown'}] (${age} days)`;
     }).join('\n');
 
-    const projectsList = data.projects.map(p =>
+    const projectsList = data.projects.slice(0, AI_INPUT_CAPS.reviewProjects).map(p =>
       `"${p.name}" [Status: ${p.status}] [Tasks: ${p.task_count}] [Mode: ${p.execution_mode || 'parallel'}] [Has next action: ${p.next_action ? 'yes' : 'NO'}]`
     ).join('\n');
 
-    const staleList = data.staleItems.map(t => {
+    const staleList = data.staleItems.slice(0, AI_INPUT_CAPS.reviewStale).map(t => {
       const age = Math.floor((Date.now() - new Date(t.updated_at).getTime()) / (1000 * 60 * 60 * 24));
       return `[ID:${t.id}] "${t.title}" [List: ${t.list}] (${age} days without update)`;
     }).join('\n');
@@ -829,10 +842,10 @@ ${nextActionsList || 'None'}
 Waiting For (showing ${waitingShown} of ${data.stats.waiting_for}):
 ${waitingForList || 'None'}
 
-Projects (${data.projects.length}):
+Projects (showing ${Math.min(data.projects.length, AI_INPUT_CAPS.reviewProjects)} of ${data.projects.length}):
 ${projectsList || 'None'}
 
-Stale Items (unchanged 14+ days):
+Stale Items (unchanged 14+ days, showing ${Math.min(data.staleItems.length, AI_INPUT_CAPS.reviewStale)} of ${data.staleItems.length}):
 ${staleList || 'None'}
 
 Someday/Maybe (showing ${somedayShown} of ${data.stats.someday_maybe}):
