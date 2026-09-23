@@ -169,16 +169,38 @@ export async function habitPatterns(userId, tz, weeks = 8) {
 
 // --- 4. Plan vs reality -------------------------------------------------------
 
-// Fact recording. Called by /apply-plan; additive like the route itself: a task
-// that gets re-planned the same day closes its old block as 'replanned'.
-export async function recordAppliedBlocks(userId, planDate, items) {
-  if (!items.length) return;
-  const taskIds = items.map(i => i.taskId);
+// "Today" for the user, in SQL, from the timezone stored on the account ($1 =
+// user id). Model-layer hooks have no request, so no header to read.
+const USER_TODAY_SQL = `(NOW() AT TIME ZONE COALESCE((SELECT timezone FROM users WHERE id = $1), 'UTC'))::date`;
+
+// Open blocks tell Insights "planned, not finished" once their day is over.
+// That's only true for days that actually happened: a block for today or later
+// whose task got moved, re-planned onto another day, or deleted never happened
+// at all. These helpers close exactly those, and leave past open blocks alone
+// (a missed block stays missed even if the task is re-planned later).
+
+// Called when a task's day/time changes, or it's re-planned.
+export async function releaseUpcomingBlocks(userId, taskIds, outcome = 'replanned') {
+  const ids = (Array.isArray(taskIds) ? taskIds : [taskIds]).map(Number).filter(Number.isInteger);
+  if (!ids.length) return;
   await pool.query(
-    `UPDATE plan_blocks SET outcome = 'replanned', outcome_at = NOW()
-      WHERE user_id = $1 AND plan_date = $2 AND outcome IS NULL AND task_id = ANY($3::int[])`,
-    [userId, planDate, taskIds]
+    `UPDATE plan_blocks SET outcome = $3, outcome_at = NOW()
+      WHERE user_id = $1 AND outcome IS NULL AND task_id = ANY($2::int[])
+        AND plan_date >= ${USER_TODAY_SQL}`,
+    [userId, ids, outcome]
   );
+}
+
+// Fact recording. Called by /apply-plan and /apply-week; additive like the
+// routes: any upcoming open block for these tasks (same day or another day of
+// the window) is closed as 'replanned' before the new one is written.
+export async function recordAppliedBlocks(userId, planDate, items) {
+  const byTask = new Map();
+  for (const i of items) if (Number.isInteger(Number(i.taskId))) byTask.set(Number(i.taskId), i);
+  items = [...byTask.values()];
+  if (!items.length) return;
+  const taskIds = [...byTask.keys()];
+  await releaseUpcomingBlocks(userId, taskIds);
   const { rows: est } = await pool.query(
     `SELECT id, time_estimate FROM tasks WHERE user_id = $1 AND id = ANY($2::int[])`,
     [userId, taskIds]
@@ -188,18 +210,32 @@ export async function recordAppliedBlocks(userId, planDate, items) {
     await pool.query(
       `INSERT INTO plan_blocks (user_id, task_id, plan_date, start_time, duration, estimate_at_plan)
        VALUES ($1, $2, $3, $4, $5, $6)`,
-      [userId, i.taskId, planDate, i.start, i.duration || 30, estimateOf.get(i.taskId) ?? null]
+      [userId, Number(i.taskId), planDate, i.start, i.duration || 30, estimateOf.get(Number(i.taskId)) ?? null]
     );
   }
 }
 
-// Closes the open block for a task. `outcome` is one of the CHECK values.
+// Closes the task's current block with `outcome` (one of the CHECK values):
+// the most recent open block dated today or earlier. Closing every open block
+// used to count one finished task several times — once per day it had been
+// planned and missed. A 'done' also retires any block planned for a later day
+// (finished early; that block will never happen).
 export async function closeBlock(userId, taskId, outcome) {
   await pool.query(
     `UPDATE plan_blocks SET outcome = $3, outcome_at = NOW()
-      WHERE user_id = $1 AND task_id = $2 AND outcome IS NULL`,
+      WHERE id = (
+        SELECT id FROM plan_blocks
+         WHERE user_id = $1 AND task_id = $2 AND outcome IS NULL AND plan_date <= ${USER_TODAY_SQL}
+         ORDER BY plan_date DESC LIMIT 1)`,
     [userId, taskId, outcome]
   );
+  if (outcome === 'done') {
+    await pool.query(
+      `UPDATE plan_blocks SET outcome = 'replanned', outcome_at = NOW()
+        WHERE user_id = $1 AND task_id = $2 AND outcome IS NULL AND plan_date > ${USER_TODAY_SQL}`,
+      [userId, taskId]
+    );
+  }
 }
 
 // A completed planned task that gets restored reopens its block, so an
@@ -208,7 +244,7 @@ export async function reopenBlock(userId, taskId) {
   await pool.query(
     `UPDATE plan_blocks SET outcome = NULL, outcome_at = NULL
       WHERE user_id = $1 AND task_id = $2 AND outcome = 'done'
-        AND plan_date >= (CURRENT_DATE - INTERVAL '2 days')`,
+        AND plan_date >= (${USER_TODAY_SQL} - 2)`,
     [userId, taskId]
   );
 }

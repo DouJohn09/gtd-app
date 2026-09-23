@@ -1,5 +1,5 @@
 import { pool } from './pool.js';
-import { closeBlock, reopenBlock } from '../services/insights.js';
+import { closeBlock, reopenBlock, releaseUpcomingBlocks } from '../services/insights.js';
 import { todayInTz, isValidTimezone } from '../lib/dateTime.js';
 
 // Default "today" when a caller doesn't supply a tz-resolved date — UTC, i.e.
@@ -209,10 +209,18 @@ export const TaskModel = {
     // Restoring a completed task reopens its planned block, so an accidental
     // tick doesn't count as a finished day in Insights. One extra read, only
     // when the list actually changes away from 'completed'.
+    // A new day or time for a task means its upcoming planned block won't
+    // happen as planned (moved in the calendar, re-planned, un-scheduled).
     let wasCompleted = false;
-    if (coerced.list && coerced.list !== 'completed') {
+    let rescheduled = false;
+    const touchesSchedule = 'due_date' in coerced || 'scheduled_time' in coerced;
+    if ((coerced.list && coerced.list !== 'completed') || touchesSchedule) {
       const prev = await this.getById(id, userId);
-      wasCompleted = prev?.list === 'completed';
+      wasCompleted = !!coerced.list && coerced.list !== 'completed' && prev?.list === 'completed';
+      rescheduled = !!prev && (
+        ('due_date' in coerced && String(coerced.due_date ?? '') !== String(prev.due_date ?? '')) ||
+        ('scheduled_time' in coerced && String(coerced.scheduled_time ?? '') !== String(prev.scheduled_time ?? ''))
+      );
     }
 
     await pool.query(
@@ -220,11 +228,17 @@ export const TaskModel = {
       values
     );
     if (wasCompleted) reopenBlock(userId, id).catch(err => console.error('reopenBlock (update):', err));
+    // Awaited: apply-plan / apply-week write the new block right after this
+    // update, and a late release would close the new block too.
+    if (rescheduled) await releaseUpcomingBlocks(userId, id).catch(err => console.error('releaseUpcomingBlocks (update):', err));
     return this.getById(id, userId);
   },
 
   async delete(id, userId) {
     const task = await this.getById(id, userId);
+    // Before the row goes (task_id becomes NULL): an upcoming block for a
+    // deleted task won't happen — close it as released, not "not finished".
+    if (task) await releaseUpcomingBlocks(userId, id, 'release').catch(err => console.error('releaseUpcomingBlocks (delete):', err));
     await pool.query('DELETE FROM tasks WHERE id = $1 AND user_id = $2', [id, userId]);
 
     // Auto-promote next task if deleted from sequential project
@@ -253,7 +267,9 @@ export const TaskModel = {
     // A planned block that gets finished is the one signal the planner learns
     // from (Insights → plan vs reality). Recurring tasks count too: the
     // occurrence was done even though the row rolls forward.
-    if (task) closeBlock(userId, task.id, 'done').catch(err => console.error('closeBlock (complete):', err));
+    // Awaited: a recurring task's due date moves on below, which releases its
+    // upcoming blocks — today's block must already be marked done by then.
+    if (task) await closeBlock(userId, task.id, 'done').catch(err => console.error('closeBlock (complete):', err));
 
     if (task && task.recurrence_rule) {
       return this._completeRecurring(task, userId, today);

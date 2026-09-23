@@ -623,9 +623,11 @@ router.post('/shutdown-defer', async (req, res) => {
       updates = { due_date: tomorrow, scheduled_time: null, is_daily_focus: false };
     }
 
+    // Record the outcome first: moving the task off today releases any open
+    // block for today as 'replanned', which would swallow this outcome.
+    await closeBlock(req.user.id, Number(taskId), mode).catch(err => console.error('closeBlock (shutdown):', err));
     const task = await TaskModel.update(taskId, updates, req.user.id);
     if (!task) return res.status(404).json({ error: 'Task not found' });
-    closeBlock(req.user.id, task.id, mode).catch(err => console.error('closeBlock (shutdown):', err));
     syncTaskToCalendar(req.user.id, task, req.clientTimezone).catch(err => console.error('syncTaskToCalendar (shutdown):', err));
     res.json({ task, mode, moved_to: updates.due_date, scheduled_time: updates.scheduled_time ?? null });
   } catch (error) {
