@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Outlet, NavLink } from 'react-router-dom';
+import { Outlet, NavLink, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, Inbox, FolderKanban, ListTodo, Clock, CloudSun,
   Sparkles, Target, LogOut, CheckCircle2, RotateCcw, CalendarDays,
@@ -13,6 +13,7 @@ import NewListModal from './NewListModal';
 import AuroraBackground from './AuroraBackground';
 import CommandCapture from './CommandCapture';
 import WelcomeOnboarding from './WelcomeOnboarding';
+import ErrorBoundary from './ErrorBoundary';
 
 const navGroups = [
   {
@@ -95,6 +96,7 @@ function NavItem({ to, icon: Icon, label, end, onClick }) {
 
 export default function Layout() {
   const { user, logout } = useAuth();
+  const location = useLocation();
   const { aiOff } = useAiMode();
   // With AI off, the AI Assistant page has nothing to offer — drop it from
   // navigation entirely rather than showing a dead entry.
@@ -260,7 +262,9 @@ export default function Layout() {
 
       {/* Main */}
       <main className="flex-1 overflow-auto relative z-10 pb-[76px] md:pb-0">
-        <Outlet context={{ refreshCustomLists }} />
+        <ErrorBoundary scope="page" resetKey={location.pathname}>
+          <Outlet context={{ refreshCustomLists }} />
+        </ErrorBoundary>
       </main>
 
       {/* Mobile bottom tab bar */}

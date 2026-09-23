@@ -7,7 +7,11 @@ import { AuthProvider } from './contexts/AuthContext';
 import { ToastProvider } from './components/Toast';
 import { UpgradeProvider } from './components/UpgradeModal';
 import UpdatePrompt from './components/UpdatePrompt';
+import ErrorBoundary from './components/ErrorBoundary';
+import { installGlobalErrorReporting } from './lib/reportError';
 import './index.css';
+
+installGlobalErrorReporting();
 
 function Root() {
   const [googleClientId, setGoogleClientId] = useState(import.meta.env.VITE_GOOGLE_CLIENT_ID || null);
@@ -48,6 +52,8 @@ function Root() {
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <Root />
+    <ErrorBoundary scope="app">
+      <Root />
+    </ErrorBoundary>
   </React.StrictMode>
 );
