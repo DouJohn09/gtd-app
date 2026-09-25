@@ -956,6 +956,18 @@ footer .footer-blog a {
 }
 
 footer .footer-blog a:hover { color: var(--violet); }
+footer .footer-badges {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  margin-top: 18px;
+}
+footer .footer-badges img {
+  display: block;
+  opacity: 0.75;
+  transition: opacity 0.2s ease;
+}
+footer .footer-badges a:hover img { opacity: 1; }
 
 @media (max-width: 640px) {
   footer .container { flex-direction: column; text-align: center; }
