@@ -1,6 +1,7 @@
 import express from 'express';
 import rateLimit from 'express-rate-limit';
 import { captureError } from '../lib/observability.js';
+import { recordOpsEvent } from '../lib/opsEvents.js';
 
 // Crash reports from the web app (React ErrorBoundary + window error handlers),
 // forwarded to the server's Sentry project so client crashes show up next to
@@ -35,6 +36,7 @@ router.post('/', limiter, (req, res) => {
       userAgent: clip(req.get('user-agent'), 300),
     },
   });
+  recordOpsEvent('client_error', `${clip(body.path, 80) || ''} · ${message.slice(0, 100)}`);
   console.warn(`[client-error] user ${req.user.id} ${clip(body.path, 200) || ''}: ${message}`);
   res.status(204).end();
 });
