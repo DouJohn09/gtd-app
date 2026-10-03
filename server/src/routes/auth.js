@@ -6,7 +6,7 @@ import { OAuth2Client } from 'google-auth-library';
 import jwt from 'jsonwebtoken';
 import { pool } from '../db/pool.js';
 import { requireAuth } from '../middleware/auth.js';
-import { exchangeCodeForTokens, revokeCalendarAccess, isCalendarConnected, calendarScopeFlags } from '../services/googleCalendar.js';
+import { exchangeCodeForTokens, revokeCalendarAccess, isCalendarConnected, calendarScopeFlags, syncUpcomingTasks } from '../services/googleCalendar.js';
 import { isProActive } from '../services/billing.js';
 import { cancelSubscription } from '../services/paddle.js';
 import { isValidTimezone } from '../lib/dateTime.js';
@@ -209,7 +209,8 @@ router.post('/google-calendar', requireAuth, async (req, res) => {
       );
     }
     const flags = calendarScopeFlags(tokens.scope);
-    res.json({ connected: true, hasWriteScope: flags.write, hasReadScope: flags.read });
+    const syncing = flags.write ? await syncUpcomingTasks(req.user.id, req.today, req.clientTimezone) : 0;
+    res.json({ connected: true, hasWriteScope: flags.write, hasReadScope: flags.read, syncing });
   } catch (error) {
     console.error('Google Calendar connect error:', error);
     res.status(400).json({ error: 'Failed to connect Google Calendar' });

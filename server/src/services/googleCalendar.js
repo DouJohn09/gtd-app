@@ -501,6 +501,26 @@ export function syncTaskToCalendar(userId, task, clientTimezone) {
   });
 }
 
+// Right after a (re)connect with write access: push every open, time-blocked
+// task from today on, so the calendar isn't empty until each one is touched.
+// Past blocks stay out. Capped; runs through the per-user queue like any sync.
+const BACKFILL_LIMIT = 200;
+export async function syncUpcomingTasks(userId, today, clientTimezone) {
+  const { rows } = await pool.query(
+    `SELECT id FROM tasks
+      WHERE user_id = $1 AND list <> 'completed'
+        AND scheduled_time IS NOT NULL AND due_date >= $2
+      ORDER BY due_date, scheduled_time
+      LIMIT ${BACKFILL_LIMIT}`,
+    [userId, today]
+  );
+  for (const { id } of rows) {
+    syncTaskToCalendar(userId, { id }, clientTimezone)
+      .catch(err => console.error('syncUpcomingTasks:', err.message));
+  }
+  return rows.length;
+}
+
 async function syncTaskNow(userId, task, clientTimezone) {
   if (task.list === 'completed') return;
   if (task.scheduled_time && task.due_date) {

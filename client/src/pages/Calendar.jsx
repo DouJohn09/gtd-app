@@ -251,7 +251,12 @@ export default function Calendar() {
         setHasWriteScope(!!result?.hasWriteScope);
         setHasReadScope(!!result?.hasReadScope);
         setSyncError(null);
-        if (result?.hasWriteScope) addToast('Google Calendar connected — time blocks will sync', 'success');
+        if (result?.hasWriteScope) {
+          const n = result.syncing || 0;
+          addToast(n
+            ? `Google Calendar connected — adding your ${n} upcoming time block${n === 1 ? '' : 's'}`
+            : 'Google Calendar connected — time blocks will sync', 'success');
+        }
         else if (result?.hasReadScope) addToast('Google Calendar connected (read-only)', 'success');
         else addToast("Google didn't share your calendar — tick the calendar permission when you connect", 'error');
         fetchData();
