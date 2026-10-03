@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { ChevronLeft, ChevronRight, PanelRightOpen, Link as LinkIcon, Unlink, AlertCircle, CalendarRange } from 'lucide-react';
 import { useGoogleLogin } from '@react-oauth/google';
 import { api } from '../lib/api';
@@ -38,6 +38,9 @@ export default function Calendar() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [calendarConnected, setCalendarConnected] = useState(false);
   const [hasWriteScope, setHasWriteScope] = useState(false);
+  const [hasReadScope, setHasReadScope] = useState(false);
+  const [syncError, setSyncError] = useState(null);
+  const connectedRef = useRef(false);
   const [calendarLoading, setCalendarLoading] = useState(false);
   const { user } = useAuth();
   const { addToast } = useToast();
@@ -68,7 +71,12 @@ export default function Calendar() {
     if (user?.google_calendar_write !== undefined) {
       setHasWriteScope(user.google_calendar_write);
     }
+    if (user?.google_calendar_read !== undefined) {
+      setHasReadScope(user.google_calendar_read);
+    }
   }, [user]);
+
+  useEffect(() => { connectedRef.current = calendarConnected; }, [calendarConnected]);
 
   const fetchData = useCallback(async () => {
     try {
@@ -80,6 +88,16 @@ export default function Calendar() {
       setScheduledTasks(calendarData.scheduled);
       setUnscheduledTasks(calendarData.unscheduled);
       setGoogleEvents(calendarData.googleEvents || []);
+      const cal = calendarData.calendar;
+      if (cal) {
+        if (connectedRef.current && !cal.connected) {
+          addToast('Google Calendar access was removed — connect again to sync time blocks', 'error');
+        }
+        setCalendarConnected(cal.connected);
+        setHasWriteScope(cal.write);
+        setHasReadScope(cal.read);
+        setSyncError(cal.connected ? cal.syncError : null);
+      }
       setProjects(projectsData);
     } catch (error) {
       console.error('Failed to fetch calendar data:', error);
@@ -231,7 +249,11 @@ export default function Calendar() {
         const result = await api.calendar.connect(response.code);
         setCalendarConnected(true);
         setHasWriteScope(!!result?.hasWriteScope);
-        addToast(result?.hasWriteScope ? 'Google Calendar connected — time blocks will sync' : 'Google Calendar connected (read-only)', 'success');
+        setHasReadScope(!!result?.hasReadScope);
+        setSyncError(null);
+        if (result?.hasWriteScope) addToast('Google Calendar connected — time blocks will sync', 'success');
+        else if (result?.hasReadScope) addToast('Google Calendar connected (read-only)', 'success');
+        else addToast("Google didn't share your calendar — tick the calendar permission when you connect", 'error');
         fetchData();
       } catch {
         addToast('Failed to connect Google Calendar', 'error');
@@ -350,30 +372,47 @@ export default function Calendar() {
         />
       )}
 
-      {/* Re-consent banner: connected but no write scope */}
-      {calendarConnected && !hasWriteScope && (
-        <div
-          className="rounded-2xl glass p-4 mb-5 flex items-start gap-3"
-          style={{ boxShadow: 'inset 0 0 0 1px rgb(var(--amber) / 0.28)', background: 'rgb(var(--amber) / 0.06)' }}
-        >
-          <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" style={{ color: 'rgb(var(--amber-glow))' }} />
-          <div className="flex-1 min-w-0">
-            <div className="text-[13px] font-medium text-text-1">
-              Reconnect Google to push time blocks to your calendar
-            </div>
-            <p className="font-mono text-[11px] text-text-3 mt-1 leading-relaxed">
-              You're connected with read-only access. Reconnect with write access and we'll push your time blocks to a dedicated <span style={{ color: 'rgb(var(--violet-glow))' }}>Cleartable</span> calendar — your primary calendar stays untouched.
-            </p>
-          </div>
-          <button
-            onClick={() => connectGoogleCalendar()}
-            disabled={calendarLoading}
-            className="gtd-btn gtd-btn-primary text-[12px]"
+      {/* Calendar access banner: connected without calendar access, read-only,
+          or the last time block failed to reach Google */}
+      {calendarConnected && (!hasWriteScope || syncError) && (() => {
+        const banner = !hasReadScope
+          ? {
+              title: "Google didn't give Cleartable access to your calendar",
+              body: "On Google's permission screen, tick the box next to the Google Calendar permission, then continue. Without it we can't show your events or add your time blocks.",
+            }
+          : !hasWriteScope
+          ? {
+              title: 'Reconnect Google to push time blocks to your calendar',
+              body: null,
+            }
+          : {
+              title: "Your last time block didn't reach Google Calendar",
+              body: 'Google rejected the update. Reconnect to fix access, then move the task again to resend it.',
+            };
+        return (
+          <div
+            className="rounded-2xl glass p-4 mb-5 flex items-start gap-3"
+            style={{ boxShadow: 'inset 0 0 0 1px rgb(var(--amber) / 0.28)', background: 'rgb(var(--amber) / 0.06)' }}
           >
-            Reconnect
-          </button>
-        </div>
-      )}
+            <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" style={{ color: 'rgb(var(--amber-glow))' }} />
+            <div className="flex-1 min-w-0">
+              <div className="text-[13px] font-medium text-text-1">{banner.title}</div>
+              <p className="font-mono text-[11px] text-text-3 mt-1 leading-relaxed">
+                {banner.body ?? (
+                  <>You're connected with read-only access. Reconnect with write access and we'll push your time blocks to a dedicated <span style={{ color: 'rgb(var(--violet-glow))' }}>Cleartable</span> calendar — your primary calendar stays untouched.</>
+                )}
+              </p>
+            </div>
+            <button
+              onClick={() => connectGoogleCalendar()}
+              disabled={calendarLoading}
+              className="gtd-btn gtd-btn-primary text-[12px]"
+            >
+              Reconnect
+            </button>
+          </div>
+        );
+      })()}
 
       {/* Period nav */}
       <div className="flex items-center gap-3 mb-5">

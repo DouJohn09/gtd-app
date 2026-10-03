@@ -6,7 +6,7 @@ import { OAuth2Client } from 'google-auth-library';
 import jwt from 'jsonwebtoken';
 import { pool } from '../db/pool.js';
 import { requireAuth } from '../middleware/auth.js';
-import { exchangeCodeForTokens, revokeCalendarAccess, isCalendarConnected } from '../services/googleCalendar.js';
+import { exchangeCodeForTokens, revokeCalendarAccess, isCalendarConnected, calendarScopeFlags } from '../services/googleCalendar.js';
 import { isProActive } from '../services/billing.js';
 import { cancelSubscription } from '../services/paddle.js';
 import { isValidTimezone } from '../lib/dateTime.js';
@@ -162,7 +162,9 @@ router.get('/me', async (req, res) => {
     if (!user) return res.status(401).json({ error: 'User not found' });
 
     user.google_calendar_connected = !!user.google_calendar_connected;
-    user.google_calendar_write = (user.google_calendar_scopes || '').includes('https://www.googleapis.com/auth/calendar');
+    const calendarFlags = calendarScopeFlags(user.google_calendar_scopes);
+    user.google_calendar_write = calendarFlags.write;
+    user.google_calendar_read = calendarFlags.read;
     delete user.google_calendar_scopes;
     // Derived entitlement the client gates on. Keep current_period_end so the UI
     // can show "Pro until <date>" for canceled/past-due subscriptions.
@@ -206,7 +208,8 @@ router.post('/google-calendar', requireAuth, async (req, res) => {
         [tokens.access_token, String(tokens.expiry_date), tokens.scope, req.user.id]
       );
     }
-    res.json({ connected: true, hasWriteScope: (tokens.scope || '').includes('https://www.googleapis.com/auth/calendar') });
+    const flags = calendarScopeFlags(tokens.scope);
+    res.json({ connected: true, hasWriteScope: flags.write, hasReadScope: flags.read });
   } catch (error) {
     console.error('Google Calendar connect error:', error);
     res.status(400).json({ error: 'Failed to connect Google Calendar' });

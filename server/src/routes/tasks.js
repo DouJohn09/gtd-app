@@ -3,7 +3,7 @@ import { TaskModel, ProjectModel } from '../db/models.js';
 import { pool } from '../db/pool.js';
 import { analyzeTask } from '../services/ai.js';
 import { enforceAiLimit, requireAiEnabled, chargeAiUsage } from '../middleware/aiLimit.js';
-import { getCalendarEvents, syncTaskToCalendar, deleteTaskFromCalendar } from '../services/googleCalendar.js';
+import { getCalendarEvents, syncTaskToCalendar, deleteTaskFromCalendar, getCalendarStatus, getLastSyncError } from '../services/googleCalendar.js';
 import { serverError } from '../lib/httpErrors.js';
 
 const router = Router();
@@ -63,7 +63,11 @@ router.get('/calendar', async (req, res) => {
       console.error('Google Calendar fetch error:', err.message);
     }
 
-    res.json({ scheduled, unscheduled, googleEvents });
+    // Live connection state, read after the events fetch (which drops tokens
+    // Google rejects), so a revoke on Google's side shows up on this load.
+    const calendar = { ...(await getCalendarStatus(req.user.id)), syncError: getLastSyncError(req.user.id) };
+
+    res.json({ scheduled, unscheduled, googleEvents, calendar });
   } catch (error) {
     serverError(req, res, error);
   }

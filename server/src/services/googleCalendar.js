@@ -40,6 +40,45 @@ async function clearUserTokens(userId) {
 }
 
 export const CALENDAR_WRITE_SCOPE = 'https://www.googleapis.com/auth/calendar';
+const CALENDAR_READ_SCOPES = [
+  CALENDAR_WRITE_SCOPE,
+  `${CALENDAR_WRITE_SCOPE}.readonly`,
+  `${CALENDAR_WRITE_SCOPE}.events`,
+  `${CALENDAR_WRITE_SCOPE}.events.readonly`,
+];
+
+// Google's consent screen lists each scope with its own checkbox, and the
+// calendar one starts unticked — "connected" can mean "connected with no
+// calendar access at all". Compare whole scope names: a substring check
+// counted calendar.readonly as write access.
+export function calendarScopeFlags(scopes) {
+  const granted = new Set((scopes || '').split(/\s+/).filter(Boolean));
+  const write = granted.has(CALENDAR_WRITE_SCOPE);
+  return { write, read: write || CALENDAR_READ_SCOPES.some(sc => granted.has(sc)) };
+}
+
+// Last failed push per user, shown on the Calendar page so a time block that
+// never reached Google isn't a silent no-op. In-memory on purpose: a restart
+// forgets it, and the next successful push clears it.
+const lastSyncError = new Map();
+function recordSyncError(userId, reason) {
+  lastSyncError.set(userId, { reason, at: new Date().toISOString() });
+}
+export function getLastSyncError(userId) {
+  return lastSyncError.get(userId) || null;
+}
+
+export async function getCalendarStatus(userId) {
+  const { rows } = await pool.query(
+    `SELECT (google_calendar_refresh_token IS NOT NULL OR google_calendar_access_token IS NOT NULL) AS connected,
+            google_calendar_scopes
+       FROM users WHERE id = $1`,
+    [userId]
+  );
+  const row = rows[0];
+  if (!row?.connected) return { connected: false, read: false, write: false };
+  return { connected: true, ...calendarScopeFlags(row.google_calendar_scopes) };
+}
 
 export async function exchangeCodeForTokens(code) {
   const client = createOAuth2Client();
@@ -57,7 +96,7 @@ export async function userHasWriteScope(userId) {
     'SELECT google_calendar_scopes FROM users WHERE id = $1',
     [userId]
   );
-  return (rows[0]?.google_calendar_scopes || '').includes(CALENDAR_WRITE_SCOPE);
+  return calendarScopeFlags(rows[0]?.google_calendar_scopes).write;
 }
 
 async function getValidAccessToken(userId) {
@@ -161,6 +200,7 @@ function expandMultiDayEvent(event, rangeStart, rangeEnd, timeZone) {
 }
 
 export async function getCalendarEvents(userId, startDate, endDate, timeZone) {
+  if (!(await getCalendarStatus(userId)).read) return [];
   const accessToken = await getValidAccessToken(userId);
   if (!accessToken) return [];
 
@@ -372,9 +412,14 @@ export async function pushTaskToCalendar(userId, task, clientTimezone) {
         if (created.ok) {
           const data = await created.json();
           await setTaskEventId(task.id, data.id);
+          lastSyncError.delete(userId);
+        } else {
+          await handlePushFailure(userId, created, 'recreate');
         }
       } else if (!r.ok) {
-        console.error('Failed to update Cleartable event:', r.status, await r.text());
+        await handlePushFailure(userId, r, 'update');
+      } else {
+        lastSyncError.delete(userId);
       }
     } else {
       const r = await fetch(
@@ -388,12 +433,26 @@ export async function pushTaskToCalendar(userId, task, clientTimezone) {
       if (r.ok) {
         const data = await r.json();
         await setTaskEventId(task.id, data.id);
+        lastSyncError.delete(userId);
       } else {
-        console.error('Failed to create Cleartable event:', r.status, await r.text());
+        await handlePushFailure(userId, r, 'create');
       }
     }
   } catch (err) {
     console.error('pushTaskToCalendar error:', err.message);
+    recordSyncError(userId, 'failed');
+  }
+}
+
+// 401 = the user removed Cleartable's access on Google's side. Drop the dead
+// tokens so the app shows "Connect Google" instead of claiming it's connected.
+async function handlePushFailure(userId, response, action) {
+  console.error(`Failed to ${action} Cleartable event:`, response.status, await response.text());
+  if (response.status === 401) {
+    await clearUserTokens(userId);
+    recordSyncError(userId, 'revoked');
+  } else {
+    recordSyncError(userId, 'failed');
   }
 }
 
