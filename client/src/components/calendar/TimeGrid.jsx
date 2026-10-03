@@ -1,12 +1,13 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { CalendarDays } from 'lucide-react';
 
-const HOUR_START = 0;
-const HOUR_END = 24;
+export const HOUR_START = 0;
+export const HOUR_END = 24;
 const HOUR_HEIGHT = 56;
+export const COMPACT_HOUR_HEIGHT = 40;
 const SNAP_MINUTES = 15;
 
-function timeToMinutes(time) {
+export function timeToMinutes(time) {
   if (!time) return null;
   const [h, m] = time.split(':').map(Number);
   return h * 60 + (m || 0);
@@ -18,7 +19,7 @@ function minutesToTime(mins) {
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 }
 
-function formatTimeLabel(mins) {
+export function formatTimeLabel(mins) {
   const h = Math.floor(mins / 60);
   const m = mins % 60;
   const ampm = h < 12 ? 'am' : 'pm';
@@ -114,6 +115,9 @@ export default function TimeGrid({
   onCompleteTask,
   onUpdateTask,
   compact = false,
+  // Bare: no own scroll container and no hour labels — the parent (WeekView)
+  // owns one shared scroll and one label gutter for all seven days.
+  bare = false,
 }) {
   const scrollRef = useRef(null);
   const containerRef = useRef(null);
@@ -123,7 +127,8 @@ export default function TimeGrid({
   const resizeDurationRef = useRef(null);                     // latest value for the mouseup commit
   const [movingId, setMovingId] = useState(null);
 
-  const hourHeight = compact ? 40 : HOUR_HEIGHT;
+  const hourHeight = compact ? COMPACT_HOUR_HEIGHT : HOUR_HEIGHT;
+  const gutter = bare ? 0 : 40;
   const totalHours = HOUR_END - HOUR_START;
   const scrollHeight = compact ? 420 : 560;
 
@@ -206,12 +211,7 @@ export default function TimeGrid({
     };
   }, [resizingId, timeBlocks, hourHeight]);
 
-  return (
-    <div
-      ref={scrollRef}
-      className="relative overflow-y-auto"
-      style={{ maxHeight: `${scrollHeight}px` }}
-    >
+  const grid = (
       <div
         ref={containerRef}
         onDragOver={handleDragOver}
@@ -226,12 +226,14 @@ export default function TimeGrid({
           const top = i * hourHeight;
           return (
             <div key={i} className="absolute left-0 right-0 flex items-start" style={{ top: `${top}px` }}>
-              <div
-                className="font-mono text-[9.5px] text-text-3 w-10 -mt-1.5 text-right pr-2 select-none"
-                style={{ flexShrink: 0 }}
-              >
-                {formatTimeLabel(hour * 60)}
-              </div>
+              {!bare && (
+                <div
+                  className="font-mono text-[9.5px] text-text-3 w-10 -mt-1.5 text-right pr-2 select-none"
+                  style={{ flexShrink: 0 }}
+                >
+                  {formatTimeLabel(hour * 60)}
+                </div>
+              )}
               <div className="flex-1 h-px" style={{ background: 'rgba(255,255,255,0.04)' }} />
             </div>
           );
@@ -243,8 +245,8 @@ export default function TimeGrid({
           return (
             <div
               key={`half-${i}`}
-              className="absolute left-10 right-0 h-px pointer-events-none"
-              style={{ top: `${top}px`, background: 'rgba(255,255,255,0.02)' }}
+              className="absolute right-0 h-px pointer-events-none"
+              style={{ left: gutter, top: `${top}px`, background: 'rgba(255,255,255,0.02)' }}
             />
           );
         })}
@@ -252,8 +254,9 @@ export default function TimeGrid({
         {/* Drop indicator */}
         {dragOverY !== null && (
           <div
-            className="absolute left-10 right-1 pointer-events-none rounded-md"
+            className="absolute right-1 pointer-events-none rounded-md"
             style={{
+              left: gutter,
               top: `${Math.max(0, ((snapMinutes((dragOverY / hourHeight) * 60)) / 60) * hourHeight)}px`,
               height: `${hourHeight}px`,
               background: 'rgba(167,139,250,0.10)',
@@ -263,7 +266,7 @@ export default function TimeGrid({
         )}
 
         {/* Time blocks */}
-        <div className="absolute left-10 right-1 top-0 bottom-0 pointer-events-none">
+        <div className="absolute right-1 top-0 bottom-0 pointer-events-none" style={{ left: gutter }}>
           {layoutBlocks.map(task => {
             const startMins = task._start;
             if (startMins === null) return null;
@@ -290,6 +293,16 @@ export default function TimeGrid({
           })}
         </div>
       </div>
+  );
+
+  if (bare) return grid;
+  return (
+    <div
+      ref={scrollRef}
+      className="relative overflow-y-auto"
+      style={{ maxHeight: `${scrollHeight}px` }}
+    >
+      {grid}
     </div>
   );
 }
