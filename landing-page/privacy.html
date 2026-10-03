@@ -33,7 +33,7 @@
   <main class="legal">
     <div class="eyebrow">privacy</div>
     <h1>Privacy Policy</h1>
-    <div class="updated">Last updated: 2 September 2026</div>
+    <div class="updated">Last updated: 3 October 2026</div>
     <p class="intro">
       This policy explains what personal data Cleartable collects, why, who we share it with, and the rights you
       have over it. Cleartable is operated by an individual entrepreneur established in the Czech Republic, and this
@@ -60,8 +60,18 @@
     </ul>
     <h3>Google Calendar (optional)</h3>
     <ul>
-      <li>Only if you explicitly connect it: OAuth access/refresh tokens, calendar events we read to display alongside your tasks, and events we create in a dedicated "Cleartable" calendar. Tokens are kept until you disconnect or delete your account; disconnecting revokes and deletes them.</li>
+      <li>Only if you explicitly connect it, we access your Google Calendar to (a) read your events so they appear next to your tasks in Cleartable's calendar and so the planners can schedule work around your meetings, and (b) create, update and delete events for the tasks you time-block, only inside a dedicated "Cleartable" calendar. We do not change or delete events in your other calendars.</li>
+      <li>What we store: the OAuth access/refresh tokens, the ID of the "Cleartable" calendar, and, for each time-blocked task, the ID of the event we created for it. Your other events are fetched live when you open the calendar or run a planner and are not stored in our database.</li>
+      <li>When you run Plan my day or Plan my week, the titles and times of that day's or week's events are sent to our AI provider (see section 5) so the plan can work around them. This happens only when you start the planner.</li>
+      <li>Tokens are kept until you disconnect or delete your account; disconnecting revokes and deletes them. You can also remove access at any time at <a href="https://myaccount.google.com/connections">myaccount.google.com/connections</a>.</li>
     </ul>
+    <p>
+      Cleartable's use and transfer to any other app of information received from Google APIs will adhere to the
+      <a href="https://developers.google.com/terms/api-services-user-data-policy">Google API Services User Data Policy</a>,
+      including the Limited Use requirements. Google user data is used only to provide the calendar features you see in
+      the app. It is never sold, never used for advertising, never read by humans except with your permission or where
+      required for security or by law, and never used to train AI models, ours or anyone else's.
+    </p>
     <h3>Payment data</h3>
     <ul>
       <li>Payments are processed by <strong>Paddle</strong>, our Merchant of Record. <strong>We never receive or store your card details.</strong> We receive a customer/subscription identifier, your plan, and its status so we can unlock paid features.</li>
@@ -95,9 +105,13 @@
       is sent. AI suggestions are processed in real time and are not used by us to build advertising profiles.
     </p>
     <ul>
-      <li><strong>Groq</strong> — primary provider for fast capture and objective processing. Per Groq's policy, API inputs are not used to train their models.</li>
-      <li><strong>OpenAI</strong> — used as a fallback and for advisory features. Per OpenAI's API data-usage policy, data submitted via the API is not used to train their models.</li>
+      <li><strong>OpenAI</strong>: primary provider for all AI features. Per OpenAI's API data-usage policy, data submitted via the API is not used to train their models.</li>
+      <li><strong>Groq</strong>: backup provider, used only when OpenAI is unavailable. Per Groq's policy, API inputs are not used to train their models.</li>
     </ul>
+    <p>
+      If you have connected Google Calendar, the planners include the titles and times of the relevant day's or week's
+      events in that request. No other Google data is sent to AI providers.
+    </p>
 
     <h2>6. Who we share data with (sub-processors)</h2>
     <p>We do not sell your data. We share it only with the service providers needed to run Cleartable:</p>
@@ -106,8 +120,8 @@
       <tr><td>Railway</td><td>Application hosting &amp; PostgreSQL database (where your tasks are stored)</td><td>EU / US</td></tr>
       <tr><td>Cloudflare</td><td>DNS, CDN/proxy for the website, and privacy-friendly (cookieless) web analytics</td><td>EU / US</td></tr>
       <tr><td>Google</td><td>Sign-in (OAuth) and optional Calendar sync</td><td>EU / US</td></tr>
-      <tr><td>Groq</td><td>AI processing (capture &amp; objective ops)</td><td>US</td></tr>
-      <tr><td>OpenAI</td><td>AI processing (fallback &amp; advisory ops)</td><td>US</td></tr>
+      <tr><td>OpenAI</td><td>AI processing (primary)</td><td>US</td></tr>
+      <tr><td>Groq</td><td>AI processing (backup when OpenAI is unavailable)</td><td>US</td></tr>
       <tr><td>Paddle</td><td>Payments &amp; subscription management (Merchant of Record)</td><td>EU / US</td></tr>
       <tr><td>Resend</td><td>Transactional email (account and service notices) — receives your email address and the message</td><td>EU (Ireland) / US</td></tr>
     </table>
