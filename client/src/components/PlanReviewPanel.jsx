@@ -5,6 +5,7 @@ import { api } from '../lib/api';
 import { contextLabel } from '../lib/context';
 import { useToast } from './Toast';
 import { aiToast } from '../lib/aiError';
+import { formatHHMM, formatClock } from '../lib/dateUtils';
 
 /**
  * Review step for the AI day plan. Blocks are keep/skip (tap to toggle);
@@ -69,7 +70,7 @@ export default function PlanReviewPanel({ result, onApplied, onCancel, onOpenTas
   const endTime = (b) => {
     const [h, m] = b.start.split(':').map(Number);
     const end = h * 60 + m + b.duration_mins;
-    return `${String(Math.floor(end / 60)).padStart(2, '0')}:${String(end % 60).padStart(2, '0')}`;
+    return formatClock(Math.floor(end / 60) % 24, end % 60);
   };
 
   const apply = async () => {
@@ -148,7 +149,7 @@ export default function PlanReviewPanel({ result, onApplied, onCancel, onOpenTas
                 {isKept && <Check className="w-3 h-3 text-white" strokeWidth={3} />}
               </span>
               <div className="font-mono text-[12px] text-text-1 flex-shrink-0 w-[7.5rem]">
-                {b.start}–{endTime(b)}
+                {formatHHMM(b.start)}–{endTime(b)}
               </div>
               <div className="flex-1 min-w-0">
                 <div className="text-[13.5px] leading-snug [overflow-wrap:anywhere]">{task.title}</div>

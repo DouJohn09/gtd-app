@@ -3,6 +3,7 @@ import { ArrowRight, Sparkles } from 'lucide-react';
 import { api } from '../lib/api';
 import { useToast } from './Toast';
 import { useAiMode } from '../hooks/useAiMode';
+import { formatHHMM } from '../lib/dateUtils';
 
 const LIST_LABELS = {
   inbox: 'Inbox',
@@ -26,10 +27,7 @@ function formatAiToast(ai) {
 function formatBookedToast(bookedSlot) {
   const d = new Date(bookedSlot.date + 'T00:00:00');
   const dayLabel = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-  const [h, m] = bookedSlot.time.split(':').map(Number);
-  const ampm = h < 12 ? 'am' : 'pm';
-  const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
-  const timeLabel = m === 0 ? `${h12}${ampm}` : `${h12}:${String(m).padStart(2, '0')}${ampm}`;
+  const timeLabel = formatHHMM(bookedSlot.time);
   return `Booked ${dayLabel} at ${timeLabel} (${bookedSlot.duration}m)`;
 }
 

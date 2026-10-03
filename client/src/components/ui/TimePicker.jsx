@@ -1,17 +1,11 @@
 import { useState, useRef, useEffect } from 'react';
 import { Clock, X } from 'lucide-react';
+import { formatHHMM, formatHourOption } from '../../lib/dateUtils';
 
 const HOURS = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0'));
 const MINUTES = ['00', '05', '10', '15', '20', '25', '30', '35', '40', '45', '50', '55'];
 
-function formatDisplay(val) {
-  if (!val) return '';
-  const [h, m] = val.split(':');
-  const hour = parseInt(h);
-  const ampm = hour >= 12 ? 'PM' : 'AM';
-  const h12 = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
-  return `${h12}:${m} ${ampm}`;
-}
+const formatDisplay = formatHHMM;
 
 export default function TimePicker({ value, onChange, placeholder = 'No time', disabled, className = '' }) {
   const [open, setOpen] = useState(false);
@@ -110,7 +104,7 @@ export default function TimePicker({ value, onChange, placeholder = 'No time', d
                       className="w-full h-8 font-mono text-[12px] transition-colors hover:bg-white/[0.06] grid place-items-center"
                       style={active ? { background: 'rgb(var(--violet) / 0.25)', color: 'rgb(var(--violet-glow))' } : { color: 'rgb(var(--text-2))' }}
                     >
-                      {hour}
+                      {formatHourOption(Number(hour))}
                     </button>
                   );
                 })}

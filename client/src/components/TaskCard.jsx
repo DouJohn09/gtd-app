@@ -2,7 +2,7 @@ import { Check, Clock, Zap, Tag, FolderOpen, User, ExternalLink, Repeat, Calenda
 import { siteLabel, linkify } from '../lib/linkify.jsx';
 import { contextLabel } from '../lib/context';
 import { listLabel } from '../lib/listLabel';
-import { isOverdue } from '../lib/dateUtils';
+import { isOverdue, formatHHMM } from '../lib/dateUtils';
 
 const ENERGY_TONES = {
   low: 'mint',
@@ -30,13 +30,7 @@ function parseNotes(notes) {
   return { text, urls };
 }
 
-function formatScheduledTime(time) {
-  if (!time) return '';
-  const [h, m] = time.split(':').map(Number);
-  const ampm = h < 12 ? 'am' : 'pm';
-  const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
-  return m === 0 ? `${h12}${ampm}` : `${h12}:${String(m).padStart(2, '0')}${ampm}`;
-}
+const formatScheduledTime = formatHHMM;
 
 export default function TaskCard({ task, onComplete, onEdit, showList = false, queued = false }) {
   const isCompleted = task.list === 'completed';

@@ -1,13 +1,10 @@
 import { CalendarDays, MapPin, ExternalLink } from 'lucide-react';
+import { formatClock } from '../lib/dateUtils';
 
 function formatTime(isoString) {
   if (!isoString) return null;
   const d = new Date(isoString);
-  const hours = d.getHours();
-  const minutes = String(d.getMinutes()).padStart(2, '0');
-  const ampm = hours >= 12 ? 'p' : 'a';
-  const h = hours % 12 || 12;
-  return `${h}:${minutes}${ampm}`;
+  return formatClock(d.getHours(), d.getMinutes());
 }
 
 export default function CalendarEventCard({ event, expanded = false }) {

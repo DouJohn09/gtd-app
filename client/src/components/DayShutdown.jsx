@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Moon, X, ArrowRight, CalendarClock, Wind } from 'lucide-react';
 import { api } from '../lib/api';
 import { useToast } from './Toast';
+import { formatHHMM } from '../lib/dateUtils';
 
 /**
  * The evening shutdown — the plan's honest ending. Shown when a plan was
@@ -39,7 +40,7 @@ export default function DayShutdown({ brief, onChanged, onDismissed, hidden }) {
         mode === 'release'
           ? 'Back on the list — today just didn’t have room.'
           : r.scheduled_time
-            ? `Moved to tomorrow at ${r.scheduled_time}.`
+            ? `Moved to tomorrow at ${formatHHMM(r.scheduled_time)}.`
             : 'Moved to tomorrow.',
         'success'
       );

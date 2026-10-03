@@ -1,3 +1,35 @@
+// 12- vs 24-hour clock follows the browser's locale: en-US shows 2:30pm,
+// cs / de / en-GB show 14:30. Every time label in the app goes through here
+// so the picker, cards and calendar never disagree.
+export const USES_12H = (() => {
+  try {
+    const o = new Intl.DateTimeFormat(undefined, { hour: 'numeric' }).resolvedOptions();
+    return o.hour12 ?? (o.hourCycle === 'h11' || o.hourCycle === 'h12');
+  } catch {
+    return true;
+  }
+})();
+
+export function formatClock(hours, minutes = 0) {
+  const mm = String(minutes).padStart(2, '0');
+  if (!USES_12H) return `${hours}:${mm}`;
+  const h12 = hours % 12 || 12;
+  const suffix = hours < 12 ? 'am' : 'pm';
+  return minutes === 0 ? `${h12}${suffix}` : `${h12}:${mm}${suffix}`;
+}
+
+// "HH:MM" (how tasks store scheduled_time) → locale label.
+export function formatHHMM(value) {
+  if (!value) return '';
+  const [h, m] = value.split(':').map(Number);
+  return formatClock(h, m || 0);
+}
+
+// Hour-column label for pickers: "2 pm" or "14".
+export function formatHourOption(hours) {
+  return USES_12H ? `${hours % 12 || 12} ${hours < 12 ? 'am' : 'pm'}` : String(hours).padStart(2, '0');
+}
+
 export function formatDateKey(date) {
   const d = typeof date === 'string' ? new Date(date + 'T00:00:00') : date;
   const year = d.getFullYear();

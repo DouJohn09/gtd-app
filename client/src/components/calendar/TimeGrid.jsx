@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { CalendarDays } from 'lucide-react';
+import { formatClock } from '../../lib/dateUtils';
 
 export const HOUR_START = 0;
 export const HOUR_END = 24;
@@ -20,12 +21,7 @@ function minutesToTime(mins) {
 }
 
 export function formatTimeLabel(mins) {
-  const h = Math.floor(mins / 60);
-  const m = mins % 60;
-  const ampm = h < 12 ? 'am' : 'pm';
-  const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
-  if (m === 0) return `${h12}${ampm}`;
-  return `${h12}:${String(m).padStart(2, '0')}${ampm}`;
+  return formatClock(Math.floor(mins / 60), mins % 60);
 }
 
 function snapMinutes(mins) {
