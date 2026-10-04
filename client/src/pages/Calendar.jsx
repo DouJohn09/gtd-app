@@ -241,7 +241,9 @@ export default function Calendar() {
 
   const connectGoogleCalendar = useGoogleLogin({
     flow: 'auth-code',
-    scope: 'https://www.googleapis.com/auth/calendar',
+    // Read events + manage only the calendar we create. Narrower than the full
+    // `calendar` scope older connections hold (those keep working).
+    scope: 'https://www.googleapis.com/auth/calendar.events.readonly https://www.googleapis.com/auth/calendar.app.created',
     prompt: 'consent',
     onSuccess: async (response) => {
       setCalendarLoading(true);
@@ -251,14 +253,14 @@ export default function Calendar() {
         setHasWriteScope(!!result?.hasWriteScope);
         setHasReadScope(!!result?.hasReadScope);
         setSyncError(null);
-        if (result?.hasWriteScope) {
+        if (result?.hasWriteScope && result?.hasReadScope) {
           const n = result.syncing || 0;
           addToast(n
             ? `Google Calendar connected — adding your ${n} upcoming time block${n === 1 ? '' : 's'}`
             : 'Google Calendar connected — time blocks will sync', 'success');
         }
-        else if (result?.hasReadScope) addToast('Google Calendar connected (read-only)', 'success');
-        else addToast("Google didn't share your calendar — tick the calendar permission when you connect", 'error');
+        else if (result?.hasWriteScope || result?.hasReadScope) addToast('Google Calendar connected, but only one of the two calendar permissions was ticked', 'error');
+        else addToast("Google didn't share your calendar — tick the calendar permissions when you connect", 'error');
         fetchData();
       } catch {
         addToast('Failed to connect Google Calendar', 'error');
@@ -379,11 +381,16 @@ export default function Calendar() {
 
       {/* Calendar access banner: connected without calendar access, read-only,
           or the last time block failed to reach Google */}
-      {calendarConnected && (!hasWriteScope || syncError) && (() => {
-        const banner = !hasReadScope
+      {calendarConnected && (!hasWriteScope || !hasReadScope || syncError) && (() => {
+        const banner = !hasReadScope && !hasWriteScope
           ? {
               title: "Google didn't give Cleartable access to your calendar",
-              body: "On Google's permission screen, tick the box next to the Google Calendar permission, then continue. Without it we can't show your events or add your time blocks.",
+              body: "On Google's permission screen, tick both Google Calendar permissions, then continue. Without them we can't show your events or add your time blocks.",
+            }
+          : !hasReadScope
+          ? {
+              title: "Reconnect Google to see your events here",
+              body: "Cleartable can add your time blocks but can't see your events. Reconnect and tick the permission to see your calendar events, so they show up here and the planners can work around your meetings.",
             }
           : !hasWriteScope
           ? {
@@ -404,7 +411,7 @@ export default function Calendar() {
               <div className="text-[13px] font-medium text-text-1">{banner.title}</div>
               <p className="font-mono text-[11px] text-text-3 mt-1 leading-relaxed">
                 {banner.body ?? (
-                  <>You're connected with read-only access. Reconnect with write access and we'll push your time blocks to a dedicated <span style={{ color: 'rgb(var(--violet-glow))' }}>Cleartable</span> calendar — your primary calendar stays untouched.</>
+                  <>Cleartable can see your events but can't add your time blocks. Reconnect and tick the permission to make secondary calendars, and we'll put your time blocks in a dedicated <span style={{ color: 'rgb(var(--violet-glow))' }}>Cleartable</span> calendar. Your other calendars stay untouched.</>
                 )}
               </p>
             </div>

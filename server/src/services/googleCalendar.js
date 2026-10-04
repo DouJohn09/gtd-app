@@ -39,22 +39,25 @@ async function clearUserTokens(userId) {
   );
 }
 
-export const CALENDAR_WRITE_SCOPE = 'https://www.googleapis.com/auth/calendar';
-const CALENDAR_READ_SCOPES = [
-  CALENDAR_WRITE_SCOPE,
-  `${CALENDAR_WRITE_SCOPE}.readonly`,
-  `${CALENDAR_WRITE_SCOPE}.events`,
-  `${CALENDAR_WRITE_SCOPE}.events.readonly`,
-];
+// What we ask for: read events (to show them and plan around them) and
+// manage only calendars this app created (the "Cleartable" calendar).
+// The full `calendar` scope is what connections made before 2026-10 hold;
+// it still counts for both so those users keep syncing without re-consent.
+const SCOPE_BASE = 'https://www.googleapis.com/auth/calendar';
+const LEGACY_FULL_SCOPE = SCOPE_BASE;
+const READ_SCOPES = [LEGACY_FULL_SCOPE, `${SCOPE_BASE}.readonly`, `${SCOPE_BASE}.events`, `${SCOPE_BASE}.events.readonly`];
+const WRITE_SCOPES = [LEGACY_FULL_SCOPE, `${SCOPE_BASE}.app.created`];
 
-// Google's consent screen lists each scope with its own checkbox, and the
-// calendar one starts unticked — "connected" can mean "connected with no
-// calendar access at all". Compare whole scope names: a substring check
-// counted calendar.readonly as write access.
+// Google's consent screen lists each scope with its own checkbox, unticked
+// by default — "connected" can mean connected with one or neither calendar
+// permission. Compare whole scope names: a substring check counted
+// calendar.readonly as write access.
 export function calendarScopeFlags(scopes) {
   const granted = new Set((scopes || '').split(/\s+/).filter(Boolean));
-  const write = granted.has(CALENDAR_WRITE_SCOPE);
-  return { write, read: write || CALENDAR_READ_SCOPES.some(sc => granted.has(sc)) };
+  return {
+    read: READ_SCOPES.some(sc => granted.has(sc)),
+    write: WRITE_SCOPES.some(sc => granted.has(sc)),
+  };
 }
 
 // Last failed push per user, shown on the Calendar page so a time block that
@@ -284,6 +287,15 @@ async function claimGtdCalendarId(userId, id) {
   return rows[0]?.gtd_calendar_id || getGtdCalendarId(userId);
 }
 
+// Forget a stored calendar we can no longer reach (deleted by the user, or
+// created under the old full scope and not visible to calendar.app.created),
+// together with event ids that pointed into it, so the next push makes a
+// fresh "Cleartable" calendar instead of failing forever.
+async function resetGtdCalendar(userId, calendarId) {
+  await pool.query('UPDATE users SET gtd_calendar_id = NULL WHERE id = $1 AND gtd_calendar_id = $2', [userId, calendarId]);
+  await pool.query('UPDATE tasks SET google_event_id = NULL WHERE user_id = $1 AND google_event_id IS NOT NULL', [userId]);
+}
+
 // One-time rename of legacy "GTD Flow" calendars to "Cleartable" after the rebrand.
 // Memoized per server process so we don't re-check on every push.
 const migratedCalendarCache = new Set();
@@ -386,62 +398,75 @@ export async function pushTaskToCalendar(userId, task, clientTimezone) {
   if (!(await userHasWriteScope(userId))) return;
 
   try {
-    const calendarId = await ensureGtdCalendar(userId, accessToken);
     const payload = buildEventPayload(task, clientTimezone);
     if (!payload) return;
+    let calendarId = await ensureGtdCalendar(userId, accessToken);
+    const eventsUrl = (calId) => `${CALENDAR_API_BASE}/calendars/${encodeURIComponent(calId)}/events`;
+    const send = (url, method) => fetch(url, {
+      method,
+      headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
 
+    let r;
+    let action = 'create';
     if (task.google_event_id) {
-      const r = await fetch(
-        `${CALENDAR_API_BASE}/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(task.google_event_id)}`,
-        {
-          method: 'PATCH',
-          headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        }
-      );
-      if (r.status === 404) {
-        // Event was deleted on Google side — recreate
-        const created = await fetch(
-          `${CALENDAR_API_BASE}/calendars/${encodeURIComponent(calendarId)}/events`,
-          {
-            method: 'POST',
-            headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload),
-          }
-        );
-        if (created.ok) {
-          const data = await created.json();
-          await setTaskEventId(task.id, data.id);
-          lastSyncError.delete(userId);
-        } else {
-          await handlePushFailure(userId, created, 'recreate');
-        }
-      } else if (!r.ok) {
-        await handlePushFailure(userId, r, 'update');
-      } else {
-        lastSyncError.delete(userId);
-      }
+      action = 'update';
+      r = await send(`${eventsUrl(calendarId)}/${encodeURIComponent(task.google_event_id)}`, 'PATCH');
+      // 404: the event was deleted on Google's side (or its calendar is gone,
+      // which the create below finds out) — recreate it.
+      if (r.status === 404) { action = 'recreate'; r = await send(eventsUrl(calendarId), 'POST'); }
     } else {
-      const r = await fetch(
-        `${CALENDAR_API_BASE}/calendars/${encodeURIComponent(calendarId)}/events`,
-        {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        }
-      );
-      if (r.ok) {
-        const data = await r.json();
-        await setTaskEventId(task.id, data.id);
-        lastSyncError.delete(userId);
-      } else {
-        await handlePushFailure(userId, r, 'create');
-      }
+      r = await send(eventsUrl(calendarId), 'POST');
+    }
+
+    // 403/404 on the calendar itself: we can't reach the stored "Cleartable"
+    // calendar any more. Start a new one once, then requeue upcoming blocks
+    // (their event ids pointed into the old calendar).
+    if (r.status === 404 || (r.status === 403 && !(await isRateLimit(r)))) {
+      console.error(`Cleartable calendar unreachable (${r.status}) — creating a new one for user ${userId}`);
+      await resetGtdCalendar(userId, calendarId);
+      calendarId = await ensureGtdCalendar(userId, accessToken);
+      action = 'create (new calendar)';
+      r = await send(eventsUrl(calendarId), 'POST');
+      if (r.ok) requeueUpcoming(userId, task.id, clientTimezone);
+    }
+
+    if (r.ok) {
+      if (action !== 'update') await setTaskEventId(task.id, (await r.json()).id);
+      lastSyncError.delete(userId);
+    } else {
+      await handlePushFailure(userId, r, action);
     }
   } catch (err) {
     console.error('pushTaskToCalendar error:', err.message);
     recordSyncError(userId, 'failed');
   }
+}
+
+// Google also answers 403 for quota/rate limits; those must not be mistaken
+// for "calendar unreachable" (which would spawn a new calendar).
+async function isRateLimit(response) {
+  try {
+    const body = await response.clone().json();
+    const reasons = (body?.error?.errors || []).map(e => e.reason);
+    return reasons.some(x => /rate|quota|usageLimits/i.test(x || ''));
+  } catch {
+    return false;
+  }
+}
+
+function requeueUpcoming(userId, exceptTaskId, clientTimezone) {
+  const today = formatDateKey(new Date(), clientTimezone);
+  pool.query(
+    `SELECT id FROM tasks WHERE user_id = $1 AND id <> $2 AND list <> 'completed'
+       AND scheduled_time IS NOT NULL AND due_date >= $3 LIMIT ${BACKFILL_LIMIT}`,
+    [userId, exceptTaskId, today]
+  ).then(({ rows }) => {
+    for (const { id } of rows) {
+      syncTaskToCalendar(userId, { id }, clientTimezone).catch(err => console.error('requeueUpcoming:', err.message));
+    }
+  }).catch(err => console.error('requeueUpcoming:', err.message));
 }
 
 // 401 = the user removed Cleartable's access on Google's side. Drop the dead
