@@ -24,6 +24,8 @@ import { isCheckoutEnabled, founderSpotsLeft, FOUNDER_CAP } from './services/pad
 import preferencesRouter from './routes/preferences.js';
 import clientErrorsRouter from './routes/clientErrors.js';
 import internalRouter from './routes/internal.js';
+import adminRouter from './routes/admin.js';
+import { startHeartbeat } from './services/heartbeat.js';
 import { startModelWatchdog } from './services/aiRouter.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -87,6 +89,7 @@ app.use('/api/billing', requireAuth, billingRouter);
 app.use('/api/preferences', requireAuth, preferencesRouter);
 app.use('/api/client-errors', requireAuth, clientErrorsRouter);
 app.use('/api/internal', internalRouter);
+app.use('/api/admin', requireAuth, adminRouter);
 
 // Health touches the database so a wedged pool or a dead Postgres shows up
 // here (Railway restarts on non-2xx), not only in user-facing 500s.
@@ -240,6 +243,7 @@ async function start() {
     console.log(`Cleartable server running on http://localhost:${PORT}`);
   });
   startModelWatchdog();
+  startHeartbeat();
 }
 
 start().catch(async (err) => {

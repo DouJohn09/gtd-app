@@ -142,6 +142,9 @@ export const api = {
   insights: {
     get: () => fetchApi('/insights'),
   },
+  admin: {
+    pulse: () => fetchApi('/admin/pulse'),
+  },
   habits: {
     getAll: () => fetchApi('/habits'),
     getStats: () => fetchApi('/habits/stats'),

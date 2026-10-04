@@ -1,12 +1,11 @@
 import express from 'express';
 import crypto from 'node:crypto';
-import { buildPulse } from '../services/pulse.js';
 import { recordOpsEvent } from '../lib/opsEvents.js';
-import { serverError } from '../lib/httpErrors.js';
 
-// Machine-to-machine endpoints for the founder's monitoring, behind one shared
-// secret (PULSE_TOKEN, Authorization: Bearer …). Unset token → the routes
-// don't exist (404), so a fresh environment exposes nothing.
+// Machine-to-machine endpoints, behind one shared secret (PULSE_TOKEN,
+// Authorization: Bearer …). Unset token → the routes don't exist (404), so a
+// fresh environment exposes nothing. The founder's Pulse page itself is
+// served by routes/admin.js behind the normal sign-in.
 const router = express.Router();
 
 function tokenOk(req) {
@@ -24,15 +23,6 @@ router.use((req, res, next) => {
   if (!ok) return res.status(401).json({ error: 'unauthorized' });
   res.set('Cache-Control', 'no-store');
   next();
-});
-
-// GET /api/internal/pulse — aggregate health/traffic/funnel numbers.
-router.get('/pulse', async (req, res) => {
-  try {
-    res.json(await buildPulse());
-  } catch (error) {
-    serverError(req, res, error);
-  }
 });
 
 // POST /api/internal/inquiry { from, subject } — called by the Cloudflare

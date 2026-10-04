@@ -3,7 +3,7 @@ import { Outlet, NavLink, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, Inbox, FolderKanban, ListTodo, Clock, CloudSun,
   Sparkles, Target, LogOut, CheckCircle2, RotateCcw, CalendarDays,
-  Command, Settings, MoreHorizontal, X, Plus, List, BarChart3,
+  Command, Settings, MoreHorizontal, X, Plus, List, BarChart3, Activity,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useAiMode } from '../hooks/useAiMode';
@@ -100,9 +100,13 @@ export default function Layout() {
   const { aiOff } = useAiMode();
   // With AI off, the AI Assistant page has nothing to offer — drop it from
   // navigation entirely rather than showing a dead entry.
-  const groups = aiOff
+  // Founder-only Pulse sits under "system" for admins; nobody else sees it.
+  const groups = (aiOff
     ? navGroups.map(g => ({ ...g, items: g.items.filter(i => i.to !== '/ai') }))
-    : navGroups;
+    : navGroups
+  ).map(g => (g.label === 'system' && user?.is_admin
+    ? { ...g, items: [...g.items, { to: '/pulse', icon: Activity, label: 'Pulse' }] }
+    : g));
   const [captureOpen, setCaptureOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const [customLists, setCustomLists] = useState([]);

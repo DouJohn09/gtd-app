@@ -5,8 +5,9 @@ import { founderSpotsLeft, FOUNDER_CAP } from './paddle.js';
 // Everything the founder's monitoring page shows, as one JSON of aggregate
 // numbers: health, real visitors, sign-ups, the activation funnel against the
 // kill/continue gate, money, AI, errors and inquiries. No task content, no
-// full emails (masked), no tokens. Served by GET /api/internal/pulse behind
-// PULSE_TOKEN; an hourly job copies it into the monitoring artifact.
+// full emails (masked), no tokens. Served live to the founder's Pulse page
+// (GET /api/admin/pulse, signed-in admin only); the 5-minute self-checks come
+// from services/heartbeat.js.
 //
 // External sources are optional and cached 10 min: Cloudflare Web Analytics
 // (CF_API_TOKEN + CF_ACCOUNT_ID + CF_WEB_ANALYTICS_SITE_TAG) for real
@@ -45,6 +46,36 @@ async function health() {
     startedAt: new Date(Date.now() - process.uptime() * 1000).toISOString(),
     commit: (process.env.RAILWAY_GIT_COMMIT_SHA || '').slice(0, 7) || null,
     aiModelsSkipped: Object.entries(ai.open).map(([model, v]) => ({ model, until: v.until, reason: v.reason })),
+  };
+}
+
+// ─── Heartbeat (our own 5-minute self-checks) ─────────────────────────────
+async function heartbeat() {
+  const [{ rows: hourly }, { rows: [share] }, { rows: [last] }, { rows: [lastFail] }] = await Promise.all([
+    pool.query(
+      `SELECT date_trunc('hour', checked_at) AS hour, COUNT(*)::int AS total,
+              COUNT(*) FILTER (WHERE NOT ok)::int AS failed
+         FROM heartbeat_checks WHERE checked_at > NOW() - INTERVAL '24 hours'
+        GROUP BY 1 ORDER BY 1`
+    ),
+    pool.query(
+      `SELECT AVG(ok::int) FILTER (WHERE checked_at > NOW() - INTERVAL '24 hours') AS d1,
+              AVG(ok::int) FILTER (WHERE checked_at > NOW() - INTERVAL '7 days') AS d7,
+              AVG(ok::int) AS d30,
+              ROUND(AVG(public_ms) FILTER (WHERE ok AND checked_at > NOW() - INTERVAL '24 hours'))::int AS public_ms
+         FROM heartbeat_checks`
+    ),
+    pool.query('SELECT checked_at AS at, ok, db_ms, public_ms, problem FROM heartbeat_checks ORDER BY checked_at DESC LIMIT 1'),
+    pool.query('SELECT checked_at AS at, problem FROM heartbeat_checks WHERE NOT ok ORDER BY checked_at DESC LIMIT 1'),
+  ]);
+  const ratio = (x) => (x == null ? null : Math.round(Number(x) * 10000) / 100);
+  return {
+    intervalMin: 5,
+    last: last || null,
+    uptime24h: ratio(share?.d1), uptime7d: ratio(share?.d7), uptime30d: ratio(share?.d30),
+    publicMs24h: share?.public_ms ?? null,
+    lastFailure: lastFail || null,
+    hourly: hourly.map(h => ({ hour: h.hour, total: h.total, failed: h.failed })),
   };
 }
 
@@ -276,8 +307,9 @@ async function opsEvents() {
 }
 
 export async function buildPulse() {
-  const [h, up, v, p, a, o] = await Promise.all([
+  const [h, hb, up, v, p, a, o] = await Promise.all([
     health(),
+    heartbeat().catch(err => ({ error: err.message })),
     uptime(),
     visitors(),
     people(),
@@ -287,6 +319,7 @@ export async function buildPulse() {
   return {
     generatedAt: new Date().toISOString(),
     health: h,
+    heartbeat: hb,
     uptime: up,
     visitors: v,
     ...p,
