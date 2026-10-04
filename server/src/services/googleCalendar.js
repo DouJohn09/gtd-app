@@ -350,6 +350,7 @@ async function ensureGtdCalendar(userId, accessToken) {
     throw new Error(`Failed to create Cleartable calendar: ${response.status} ${err}`);
   }
   const data = await response.json();
+  console.log(`[gcal] created Cleartable calendar user=${userId} cal=${data.id}`);
   const stored = await claimGtdCalendarId(userId, data.id);
   if (stored !== data.id) {
     // Another process created one first — drop ours rather than leave a
@@ -395,7 +396,10 @@ export async function pushTaskToCalendar(userId, task, clientTimezone) {
   if (!task || !task.scheduled_time || !task.due_date) return;
   const accessToken = await getValidAccessToken(userId);
   if (!accessToken) return;
-  if (!(await userHasWriteScope(userId))) return;
+  if (!(await userHasWriteScope(userId))) {
+    console.log(`[gcal] skip push user=${userId} task=${task.id}: no write scope`);
+    return;
+  }
 
   try {
     const payload = buildEventPayload(task, clientTimezone);
@@ -435,6 +439,9 @@ export async function pushTaskToCalendar(userId, task, clientTimezone) {
     if (r.ok) {
       if (action !== 'update') await setTaskEventId(task.id, (await r.json()).id);
       lastSyncError.delete(userId);
+      // Calendar id only (no titles): lets us match against Google Calendar →
+      // Settings → <calendar> → Calendar ID when a user can't find a block.
+      console.log(`[gcal] ${action} ok user=${userId} task=${task.id} date=${task.due_date} ${task.scheduled_time} cal=${calendarId}`);
     } else {
       await handlePushFailure(userId, r, action);
     }
@@ -543,6 +550,7 @@ export async function syncUpcomingTasks(userId, today, clientTimezone) {
     syncTaskToCalendar(userId, { id }, clientTimezone)
       .catch(err => console.error('syncUpcomingTasks:', err.message));
   }
+  console.log(`[gcal] backfill user=${userId} from=${today} queued=${rows.length}`);
   return rows.length;
 }
 
