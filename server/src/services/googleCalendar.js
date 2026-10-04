@@ -384,6 +384,9 @@ function buildEventPayload(task, clientTimezone) {
 
   const tz = clientTimezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
   return {
+    // Deleting an event in Google only marks it 'cancelled'; a PATCH to it
+    // still answers 200 but leaves it hidden. Always (re)confirm it.
+    status: 'confirmed',
     summary: task.title,
     description: task.notes || undefined,
     start: { dateTime: `${startDate}T${startTime}:00`, timeZone: tz },
@@ -420,9 +423,13 @@ export async function pushTaskToCalendar(userId, task, clientTimezone) {
     if (task.google_event_id) {
       action = 'update';
       r = await send(`${eventsUrl(calendarId)}/${encodeURIComponent(task.google_event_id)}`, 'PATCH');
-      // 404: the event was deleted on Google's side (or its calendar is gone,
-      // which the create below finds out) — recreate it.
-      if (r.status === 404) { action = 'recreate'; r = await send(eventsUrl(calendarId), 'POST'); }
+      // 404: the event was purged on Google's side (or its calendar is gone,
+      // which the create below finds out). Still 'cancelled' after the
+      // confirm above: Google wouldn't restore it. Either way, recreate it.
+      if (r.status === 404 || (r.ok && (await r.clone().json().catch(() => ({}))).status === 'cancelled')) {
+        action = 'recreate';
+        r = await send(eventsUrl(calendarId), 'POST');
+      }
     } else {
       r = await send(eventsUrl(calendarId), 'POST');
     }
