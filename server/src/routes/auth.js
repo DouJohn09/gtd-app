@@ -209,6 +209,8 @@ router.post('/google-calendar', requireAuth, async (req, res) => {
       );
     }
     const flags = calendarScopeFlags(tokens.scope);
+    const granted = (tokens.scope || '').split(/\s+/).filter(s => s.includes('calendar')).map(s => s.split('/').pop());
+    console.log(`[gcal] connect user=${req.user.id} scopes=${granted.join(',') || 'none'} refresh=${tokens.refresh_token ? 'new' : 'none'} expiry=${tokens.expiry_date}`);
     const syncing = flags.write ? await syncUpcomingTasks(req.user.id, req.today, req.clientTimezone) : 0;
     res.json({ connected: true, hasWriteScope: flags.write, hasReadScope: flags.read, syncing });
   } catch (error) {

@@ -114,7 +114,10 @@ async function getValidAccessToken(userId) {
     return tokens.access_token;
   }
 
-  if (!tokens.refresh_token) return null;
+  if (!tokens.refresh_token) {
+    console.log(`[gcal] user=${userId}: access token expired and no refresh token stored`);
+    return null;
+  }
 
   try {
     const client = createOAuth2Client();
@@ -231,7 +234,7 @@ export async function getCalendarEvents(userId, startDate, endDate, timeZone) {
 
   if (!response.ok) {
     const error = await response.text();
-    console.error('Google Calendar API error:', response.status, error);
+    console.error(`Google Calendar API error (events list, user=${userId}):`, response.status, error);
     if (response.status === 401) {
       await clearUserTokens(userId);
     }
