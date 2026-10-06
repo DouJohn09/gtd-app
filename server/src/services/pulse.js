@@ -158,7 +158,7 @@ async function visitors() {
 // ─── People: sign-ups, activity, funnel, gate, money ───────────────────────
 async function people() {
   const { rows: users } = await pool.query(
-    `SELECT id, email, created_at, last_login, onboarded_at, plan, subscription_status, current_period_end, paddle_price_id
+    `SELECT id, email, created_at, last_login, onboarded_at, plan, subscription_status, current_period_end, paddle_price_id, signup_referrer, signup_utm
        FROM users ORDER BY created_at`
   );
   const skip = excluded();
@@ -223,6 +223,8 @@ async function people() {
         tasks: tasksOf.get(u.id) || 0,
         lastSeen: lastSeen(u) ? new Date(lastSeen(u)).toISOString() : null,
         paying: paying(u),
+        source: u.signup_referrer || (u.signup_utm ? JSON.parse(u.signup_utm).utm_source : null) || null,
+        utm: u.signup_utm ? JSON.parse(u.signup_utm) : null,
       })),
     },
     activeLast7: strangers.filter(u => now - lastSeen(u) < 7 * DAY).length,

@@ -48,13 +48,31 @@ export function AuthProvider({ children }) {
   const login = async (googleCredential) => {
     let tz = '';
     try { tz = Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch { /* ignore */ }
+
+    let referrer = '';
+    try {
+      referrer = sessionStorage.getItem('_ct_ref') || document.referrer || '';
+      if (referrer.includes('accounts.google.com')) referrer = sessionStorage.getItem('_ct_ref') || '';
+    } catch { /* ignore */ }
+    const utm = {};
+    try {
+      for (const key of ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content', 'ref']) {
+        const v = sessionStorage.getItem('_ct_' + key) || new URLSearchParams(window.location.search).get(key);
+        if (v) utm[key] = v;
+      }
+    } catch { /* ignore */ }
+
     const res = await fetch('/api/auth/google', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         ...(tz ? { 'X-Client-Timezone': tz } : {}),
       },
-      body: JSON.stringify({ credential: googleCredential }),
+      body: JSON.stringify({
+        credential: googleCredential,
+        ...(referrer ? { referrer } : {}),
+        ...(Object.keys(utm).length ? { utm } : {}),
+      }),
     });
     if (!res.ok) throw new Error('Login failed');
     const data = await res.json();

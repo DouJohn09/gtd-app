@@ -83,10 +83,11 @@ export async function sendWelcome(to, name) {
 
 // One line to the founder per new account, so arrivals are noticed the hour
 // they happen. Off unless FOUNDER_NOTIFY_EMAIL is set.
-export async function notifyFounderSignup({ email, name, id }) {
+export async function notifyFounderSignup({ email, name, id, source }) {
   const to = process.env.FOUNDER_NOTIFY_EMAIL;
   if (!to) return { skipped: true };
   const subject = `New Cleartable sign-up: ${email}`;
-  const text = `${name || '(no name)'} <${email}> · user #${id} · ${new Date().toISOString()}`;
+  const src = source ? ` · via ${source}` : '';
+  const text = `${name || '(no name)'} <${email}> · user #${id}${src} · ${new Date().toISOString()}`;
   return send({ to, subject, text, html: `<p style="font-family:monospace">${escapeHtml(text)}</p>` });
 }

@@ -40,7 +40,7 @@ const loginLimiter = rateLimit({
 
 router.post('/google', loginLimiter, async (req, res) => {
   try {
-    const { credential } = req.body;
+    const { credential, referrer, utm } = req.body;
 
     const ticket = await googleClient.verifyIdToken({
       idToken: credential,
@@ -94,9 +94,11 @@ router.post('/google', loginLimiter, async (req, res) => {
         ));
       }
     } else {
+      const safeReferrer = typeof referrer === 'string' ? referrer.slice(0, 2048) : null;
+      const safeUtm = utm && typeof utm === 'object' && Object.keys(utm).length ? JSON.stringify(utm) : null;
       const { rows: insertRows } = await pool.query(
-        'INSERT INTO users (google_id, email, name, picture, timezone) VALUES ($1, $2, $3, $4, $5) RETURNING id',
-        [googleId, email, name, picture, tz]
+        'INSERT INTO users (google_id, email, name, picture, timezone, signup_referrer, signup_utm) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id',
+        [googleId, email, name, picture, tz, safeReferrer, safeUtm]
       );
       const id = insertRows[0].id;
       user = { id, google_id: googleId, email, name, picture };
@@ -109,7 +111,7 @@ router.post('/google', loginLimiter, async (req, res) => {
 
       // Fire-and-forget: mail must never delay or fail a sign-in.
       sendWelcome(email, name).catch(err => console.error('[email] welcome failed:', err.message));
-      notifyFounderSignup({ email, name, id }).catch(err => console.error('[email] founder notice failed:', err.message));
+      notifyFounderSignup({ email, name, id, source: safeReferrer || (utm?.utm_source) || null }).catch(err => console.error('[email] founder notice failed:', err.message));
     }
 
     const token = jwt.sign(
