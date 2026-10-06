@@ -1,8 +1,9 @@
-import { useState } from 'react';
-import { ArrowRight, Sparkles } from 'lucide-react';
+import { useState, useCallback } from 'react';
+import { ArrowRight, Sparkles, Mic } from 'lucide-react';
 import { api } from '../lib/api';
 import { useToast } from './Toast';
 import { useAiMode } from '../hooks/useAiMode';
+import { useSpeechRecognition, speechSupported } from '../hooks/useSpeechRecognition';
 import { formatHHMM } from '../lib/dateUtils';
 
 const LIST_LABELS = {
@@ -37,6 +38,11 @@ export default function QuickCapture({ onCapture, placeholder = "Quick capture â
   const { mode, aiOff } = useAiMode();
   const useAi = smartMode && !aiOff;
   const { addToast } = useToast();
+
+  const onSpeechResult = useCallback((transcript) => {
+    setTitle((prev) => (prev ? prev + ' ' + transcript : transcript));
+  }, []);
+  const { listening, toggle: toggleMic } = useSpeechRecognition({ onResult: onSpeechResult });
 
   // Fire-and-forget capture: clear the input the moment the user submits so
   // they can keep typing the next idea while the AI classifies in the
@@ -107,6 +113,21 @@ export default function QuickCapture({ onCapture, placeholder = "Quick capture â
           </button>
         )}
       </div>
+      {speechSupported && (
+        <button
+          type="button"
+          onClick={toggleMic}
+          className="grid place-items-center w-9 h-9 rounded-lg transition-all shrink-0"
+          style={
+            listening
+              ? { color: '#ef4444', background: 'rgba(239,68,68,0.12)', boxShadow: 'inset 0 0 0 1px rgba(239,68,68,0.3)' }
+              : { color: 'rgb(var(--text-3))' }
+          }
+          title={listening ? 'Stop dictation' : 'Dictate task'}
+        >
+          <Mic className="w-4 h-4" />
+        </button>
+      )}
       <button
         type="submit"
         disabled={!title.trim()}
