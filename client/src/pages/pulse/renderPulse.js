@@ -172,8 +172,17 @@ export function renderPulse(root, { data: d, error, fetchedAt }) {
     ? `<div class="panel"><h2>Where visitors come from</h2><div class="hint">${!vis
         ? 'Needs <code>CF_API_TOKEN</code>, <code>CF_ACCOUNT_ID</code> and <code>CF_WEB_ANALYTICS_SITE_TAG</code> on Railway.'
         : `Cloudflare answered: ${esc(vis.error)}`}</div></div>`
-    : `<div class="panel"><h2>Where visitors come from ${pill('7 days')}</h2>
-        ${rows((vis.referrers || []).map(r => [esc(r.host), fmt(r.visits)]), 'No visits this week.')}
+    : `<div class="panel span-2"><h2>Stranger visitors ${pill('7 days, excl. owner')}</h2>
+        ${(vis.detail || []).length ? `<div class="table-wrap"><table>
+          <thead><tr><th>Date</th><th>Country</th><th>Source</th><th>Page</th><th>Device</th><th>Visits</th></tr></thead>
+          <tbody>${vis.detail.map(d => {
+            const src = d.referrer ? esc(d.referrer) : '<span style="color:var(--faint)">direct</span>';
+            const pg = esc(d.path);
+            return `<tr><td>${shortDate(d.date)}</td><td>${esc(d.country)}</td><td class="m" style="font-size:11.5px">${src}</td><td class="m" style="font-size:11.5px">${pg}</td><td>${esc(d.device)}</td><td class="m num">${fmt(d.visits)}</td></tr>`;
+          }).join('')}</tbody>
+        </table></div>` : '<div class="empty">No stranger visits this week.</div>'}
+        <span class="label" style="margin-top:8px">Aggregated · 7 days</span>
+        ${rows((vis.referrers || []).map(r => [esc(r.host), fmt(r.visits)]), '—')}
         <span class="label">Top pages</span>
         ${rows((vis.pages || []).slice(0, 5).map(r => [esc(r.path), fmt(r.views)]), '—')}
         <span class="label">Countries</span>

@@ -122,19 +122,22 @@ async function visitors() {
     const from = isoDay(Date.now() - 29 * DAY);
     const filter = { AND: [{ siteTag: site }, { date_geq: from }, { date_leq: to }] };
     const since7 = { AND: [{ siteTag: site }, { date_geq: isoDay(Date.now() - 6 * DAY) }, { date_leq: to }] };
-    const query = `query ($account: String!, $filter: AccountRumPageloadEventsAdaptiveGroupsFilter_InputObject, $since7: AccountRumPageloadEventsAdaptiveGroupsFilter_InputObject) {
+    const excludeOwner = process.env.STATS_EXCLUDE_COUNTRY || 'CZ';
+    const detail7 = { AND: [{ siteTag: site }, { date_geq: isoDay(Date.now() - 6 * DAY) }, { date_leq: to }, { countryName_neq: excludeOwner }, { userAgentBrowser_neq: 'ChromeHeadless' }, { userAgentBrowser_neq: 'Unknown' }] };
+    const query = `query ($account: String!, $filter: AccountRumPageloadEventsAdaptiveGroupsFilter_InputObject, $since7: AccountRumPageloadEventsAdaptiveGroupsFilter_InputObject, $detail7: AccountRumPageloadEventsAdaptiveGroupsFilter_InputObject) {
       viewer { accounts(filter: { accountTag: $account }) {
         daily: rumPageloadEventsAdaptiveGroups(limit: 40, filter: $filter, orderBy: [date_ASC]) { count sum { visits } dimensions { date } }
         referrers: rumPageloadEventsAdaptiveGroups(limit: 8, filter: $since7, orderBy: [sum_visits_DESC]) { sum { visits } dimensions { refererHost } }
         pages: rumPageloadEventsAdaptiveGroups(limit: 8, filter: $since7, orderBy: [count_DESC]) { count dimensions { requestPath } }
         countries: rumPageloadEventsAdaptiveGroups(limit: 8, filter: $since7, orderBy: [sum_visits_DESC]) { sum { visits } dimensions { countryName } }
+        detail: rumPageloadEventsAdaptiveGroups(limit: 80, filter: $detail7, orderBy: [date_DESC]) { count sum { visits } dimensions { date countryName refererHost requestPath deviceType } }
       } }
     }`;
     try {
       const r = await fetch('https://api.cloudflare.com/client/v4/graphql', {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query, variables: { account, filter, since7 } }),
+        body: JSON.stringify({ query, variables: { account, filter, since7, detail7 } }),
         signal: AbortSignal.timeout(10_000),
       });
       const j = await r.json();
@@ -148,6 +151,11 @@ async function visitors() {
         referrers: (a.referrers || []).map(g => ({ host: g.dimensions.refererHost || '(direct)', visits: g.sum.visits })),
         pages: (a.pages || []).map(g => ({ path: g.dimensions.requestPath, views: g.count })),
         countries: (a.countries || []).map(g => ({ country: g.dimensions.countryName || '?', visits: g.sum.visits })),
+        detail: (a.detail || []).map(g => ({
+          date: g.dimensions.date, country: g.dimensions.countryName || '?',
+          referrer: g.dimensions.refererHost || null, path: g.dimensions.requestPath,
+          device: g.dimensions.deviceType || '?', visits: g.sum.visits, pageviews: g.count,
+        })),
       };
     } catch (err) {
       return { error: err.message };
