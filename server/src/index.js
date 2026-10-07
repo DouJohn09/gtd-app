@@ -3,7 +3,7 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import { fileURLToPath } from 'url';
-import { dirname, join } from 'path';
+import { dirname, join, extname } from 'path';
 import { pingDb, pool } from './db/pool.js';
 import { captureError, flushErrors } from './lib/observability.js';
 import { requireAuth } from './middleware/auth.js';
@@ -162,6 +162,14 @@ if (process.env.NODE_ENV === 'production') {
   app.get('/app/*', (req, res) => {
     res.set('Cache-Control', 'no-cache');
     res.sendFile(join(clientDistPath, 'index.html'));
+  });
+
+  // Clean URLs: /blog/cleartable-vs-todoist serves cleartable-vs-todoist.html
+  app.use((req, res, next) => {
+    if (req.method === 'GET' && !extname(req.path) && req.path !== '/') {
+      const file = join(landingPath, req.path + '.html');
+      res.sendFile(file, (err) => { if (err) next(); });
+    } else next();
   });
 
   // Landing page at root. The static middleware serves /style.css, /icons/*,
