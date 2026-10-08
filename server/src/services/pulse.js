@@ -122,8 +122,7 @@ async function visitors() {
     const from = isoDay(Date.now() - 29 * DAY);
     const filter = { AND: [{ siteTag: site }, { date_geq: from }, { date_leq: to }] };
     const since7 = { AND: [{ siteTag: site }, { date_geq: isoDay(Date.now() - 6 * DAY) }, { date_leq: to }] };
-    const excludeOwner = process.env.STATS_EXCLUDE_COUNTRY || 'CZ';
-    const detail7 = { AND: [{ siteTag: site }, { date_geq: isoDay(Date.now() - 6 * DAY) }, { date_leq: to }, { countryName_neq: excludeOwner }, { userAgentBrowser_neq: 'ChromeHeadless' }, { userAgentBrowser_neq: 'Unknown' }] };
+    const detail7 = { AND: [{ siteTag: site }, { date_geq: isoDay(Date.now() - 6 * DAY) }, { date_leq: to }, { requestPath_notLike: '/app%' }, { userAgentBrowser_neq: 'ChromeHeadless' }, { userAgentBrowser_neq: 'Unknown' }] };
     const query = `query ($account: String!, $filter: AccountRumPageloadEventsAdaptiveGroupsFilter_InputObject, $since7: AccountRumPageloadEventsAdaptiveGroupsFilter_InputObject, $detail7: AccountRumPageloadEventsAdaptiveGroupsFilter_InputObject) {
       viewer { accounts(filter: { accountTag: $account }) {
         daily: rumPageloadEventsAdaptiveGroups(limit: 40, filter: $filter, orderBy: [date_ASC]) { count sum { visits } dimensions { date } }

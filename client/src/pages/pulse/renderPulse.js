@@ -172,7 +172,7 @@ export function renderPulse(root, { data: d, error, fetchedAt }) {
     ? `<div class="panel"><h2>Where visitors come from</h2><div class="hint">${!vis
         ? 'Needs <code>CF_API_TOKEN</code>, <code>CF_ACCOUNT_ID</code> and <code>CF_WEB_ANALYTICS_SITE_TAG</code> on Railway.'
         : `Cloudflare answered: ${esc(vis.error)}`}</div></div>`
-    : `<div class="panel span-2"><h2>Stranger visitors ${pill('7 days, excl. owner')}</h2>
+    : `<div class="panel span-2"><h2>Stranger visitors ${pill('7 days, landing pages only')}</h2>
         ${(vis.detail || []).length ? `<div class="table-wrap"><table>
           <thead><tr><th>Date</th><th>Country</th><th>Source</th><th>Page</th><th>Device</th><th>Visits</th></tr></thead>
           <tbody>${vis.detail.map(d => {
