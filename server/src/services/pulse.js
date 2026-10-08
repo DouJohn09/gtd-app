@@ -122,7 +122,7 @@ async function visitors() {
     const from = isoDay(Date.now() - 29 * DAY);
     const filter = { AND: [{ siteTag: site }, { date_geq: from }, { date_leq: to }] };
     const since7 = { AND: [{ siteTag: site }, { date_geq: isoDay(Date.now() - 6 * DAY) }, { date_leq: to }] };
-    const detail7 = { AND: [{ siteTag: site }, { date_geq: isoDay(Date.now() - 6 * DAY) }, { date_leq: to }, { requestPath_notLike: '/app%' }, { userAgentBrowser_neq: 'ChromeHeadless' }, { userAgentBrowser_neq: 'Unknown' }] };
+    const detail7 = { AND: [{ siteTag: site }, { date_geq: isoDay(Date.now() - 6 * DAY) }, { date_leq: to }, { userAgentBrowser_neq: 'ChromeHeadless' }, { userAgentBrowser_neq: 'Unknown' }] };
     const query = `query ($account: String!, $filter: AccountRumPageloadEventsAdaptiveGroupsFilter_InputObject, $since7: AccountRumPageloadEventsAdaptiveGroupsFilter_InputObject, $detail7: AccountRumPageloadEventsAdaptiveGroupsFilter_InputObject) {
       viewer { accounts(filter: { accountTag: $account }) {
         daily: rumPageloadEventsAdaptiveGroups(limit: 40, filter: $filter, orderBy: [date_ASC]) { count sum { visits } dimensions { date } }
@@ -150,11 +150,13 @@ async function visitors() {
         referrers: (a.referrers || []).map(g => ({ host: g.dimensions.refererHost || '(direct)', visits: g.sum.visits })),
         pages: (a.pages || []).map(g => ({ path: g.dimensions.requestPath, views: g.count })),
         countries: (a.countries || []).map(g => ({ country: g.dimensions.countryName || '?', visits: g.sum.visits })),
-        detail: (a.detail || []).map(g => ({
-          date: g.dimensions.date, country: g.dimensions.countryName || '?',
-          referrer: g.dimensions.refererHost || null, path: g.dimensions.requestPath,
-          device: g.dimensions.deviceType || '?', visits: g.sum.visits, pageviews: g.count,
-        })),
+        detail: (a.detail || [])
+          .filter(g => !g.dimensions.requestPath?.startsWith('/app'))
+          .map(g => ({
+            date: g.dimensions.date, country: g.dimensions.countryName || '?',
+            referrer: g.dimensions.refererHost || null, path: g.dimensions.requestPath,
+            device: g.dimensions.deviceType || '?', visits: g.sum.visits, pageviews: g.count,
+          })),
       };
     } catch (err) {
       return { error: err.message };
