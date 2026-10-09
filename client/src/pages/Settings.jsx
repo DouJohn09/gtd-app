@@ -401,7 +401,13 @@ export default function Settings() {
                         addToast(err.message || 'Could not save', 'error');
                       }
                     }}
-                    className="gtd-input text-[13px] w-auto"
+                    className="px-3 py-2 rounded-xl text-[13px] outline-none transition-all cursor-pointer"
+                    style={{
+                      background: 'rgba(255,255,255,0.05)',
+                      border: '1px solid rgba(255,255,255,0.10)',
+                      color: 'rgb(var(--text-1))',
+                      colorScheme: 'dark',
+                    }}
                   >
                     {Array.from({ length: 18 }, (_, i) => i + 5).map(h => (
                       <option key={h} value={h}>{`${h}:00`}</option>
