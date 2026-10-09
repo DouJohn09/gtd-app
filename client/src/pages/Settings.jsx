@@ -377,31 +377,50 @@ export default function Settings() {
           Email notifications
         </h2>
         <p className="text-text-3 text-sm mb-5 leading-relaxed">
-          Get a morning email with your tasks due today and any overdue items.
-          Delivered around 8 AM in your timezone.
+          A daily digest email with your tasks and calendar. Delivered at
+          your chosen time based on your timezone.
         </p>
 
         {notifPrefs && (
-          <label className="flex items-center gap-3 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={notifPrefs.daily_email}
-              onChange={async (e) => {
-                const next = e.target.checked;
-                setNotifPrefs(prev => ({ ...prev, daily_email: next }));
-                try {
-                  const updated = await api.preferences.setNotifications({ daily_email: next });
-                  setNotifPrefs(updated);
-                  addToast(next ? 'Daily task email enabled' : 'Daily task email disabled', 'success');
-                } catch (err) {
-                  setNotifPrefs(prev => ({ ...prev, daily_email: !next }));
-                  addToast(err.message || 'Could not save', 'error');
-                }
-              }}
-              className="w-4 h-4 accent-violet-400"
-            />
-            <span className="text-[13px] text-text-1">Daily due-tasks email</span>
-          </label>
+          <div className="space-y-4">
+            <NotifToggle label="Daily email digest" field="daily_email" prefs={notifPrefs} setPrefs={setNotifPrefs} addToast={addToast} />
+
+            {notifPrefs.daily_email && (
+              <>
+                <div className="flex items-center gap-3">
+                  <span className="text-[13px] text-text-2 w-28 shrink-0">Delivery time</span>
+                  <select
+                    value={notifPrefs.delivery_hour}
+                    onChange={async (e) => {
+                      const h = parseInt(e.target.value, 10);
+                      setNotifPrefs(prev => ({ ...prev, delivery_hour: h }));
+                      try {
+                        const updated = await api.preferences.setNotifications({ delivery_hour: h });
+                        setNotifPrefs(updated);
+                      } catch (err) {
+                        addToast(err.message || 'Could not save', 'error');
+                      }
+                    }}
+                    className="gtd-input text-[13px] w-auto"
+                  >
+                    {Array.from({ length: 18 }, (_, i) => i + 5).map(h => (
+                      <option key={h} value={h}>{`${h}:00`}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="pl-1">
+                  <p className="text-[12px] text-text-3 mb-2">Include in email:</p>
+                  <div className="space-y-2">
+                    <NotifToggle label="Tasks due today" field="include_due_today" prefs={notifPrefs} setPrefs={setNotifPrefs} addToast={addToast} />
+                    <NotifToggle label="Overdue tasks" field="include_overdue" prefs={notifPrefs} setPrefs={setNotifPrefs} addToast={addToast} />
+                    <NotifToggle label="Upcoming tasks (next 3 days)" field="include_upcoming" prefs={notifPrefs} setPrefs={setNotifPrefs} addToast={addToast} />
+                    <NotifToggle label="Today's calendar events" field="include_calendar" prefs={notifPrefs} setPrefs={setNotifPrefs} addToast={addToast} />
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
         )}
       </section>
 
@@ -510,5 +529,29 @@ export default function Settings() {
         />
       )}
     </div>
+  );
+}
+
+function NotifToggle({ label, field, prefs, setPrefs, addToast }) {
+  return (
+    <label className="flex items-center gap-3 cursor-pointer">
+      <input
+        type="checkbox"
+        checked={!!prefs[field]}
+        onChange={async (e) => {
+          const next = e.target.checked;
+          setPrefs(prev => ({ ...prev, [field]: next }));
+          try {
+            const updated = await api.preferences.setNotifications({ [field]: next });
+            setPrefs(updated);
+          } catch (err) {
+            setPrefs(prev => ({ ...prev, [field]: !next }));
+            addToast(err.message || 'Could not save', 'error');
+          }
+        }}
+        className="w-4 h-4 accent-violet-400"
+      />
+      <span className="text-[13px] text-text-1">{label}</span>
+    </label>
   );
 }

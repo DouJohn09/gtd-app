@@ -75,13 +75,22 @@ router.post('/ai-nudge-seen', async (req, res) => {
 });
 
 // Notification preferences — partial merge into the JSONB column.
+function normalizeNotifPrefs(raw) {
+  const d = raw || {};
+  return {
+    daily_email: d.daily_email !== false,
+    delivery_hour: Number.isFinite(d.delivery_hour) ? d.delivery_hour : 8,
+    include_due_today: d.include_due_today !== false,
+    include_overdue: d.include_overdue !== false,
+    include_upcoming: d.include_upcoming === true,
+    include_calendar: d.include_calendar === true,
+  };
+}
+
 router.get('/notifications', async (req, res) => {
   try {
     const { rows } = await pool.query('SELECT notification_prefs FROM users WHERE id = $1', [req.user.id]);
-    const prefs = rows[0]?.notification_prefs || {};
-    res.json({
-      daily_email: prefs.daily_email !== false,
-    });
+    res.json(normalizeNotifPrefs(rows[0]?.notification_prefs));
   } catch (error) {
     serverError(req, res, error);
   }
@@ -89,10 +98,14 @@ router.get('/notifications', async (req, res) => {
 
 router.put('/notifications', async (req, res) => {
   try {
-    const allowed = ['daily_email'];
+    const boolKeys = ['daily_email', 'include_due_today', 'include_overdue', 'include_upcoming', 'include_calendar'];
     const patch = {};
-    for (const key of allowed) {
+    for (const key of boolKeys) {
       if (key in req.body) patch[key] = Boolean(req.body[key]);
+    }
+    if ('delivery_hour' in req.body) {
+      const h = parseInt(req.body.delivery_hour, 10);
+      if (h >= 5 && h <= 22) patch.delivery_hour = h;
     }
     if (Object.keys(patch).length === 0) return res.status(400).json({ error: 'No valid keys' });
     await pool.query(
@@ -100,10 +113,7 @@ router.put('/notifications', async (req, res) => {
       [JSON.stringify(patch), req.user.id]
     );
     const { rows } = await pool.query('SELECT notification_prefs FROM users WHERE id = $1', [req.user.id]);
-    const prefs = rows[0]?.notification_prefs || {};
-    res.json({
-      daily_email: prefs.daily_email !== false,
-    });
+    res.json(normalizeNotifPrefs(rows[0]?.notification_prefs));
   } catch (error) {
     serverError(req, res, error);
   }
