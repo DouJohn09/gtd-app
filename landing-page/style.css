@@ -960,6 +960,7 @@ footer .footer-badges {
   width: 100%;
   display: flex;
   justify-content: center;
+  gap: 16px;
   margin-top: 18px;
 }
 footer .footer-badges img {
