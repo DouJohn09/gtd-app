@@ -25,6 +25,7 @@ import preferencesRouter from './routes/preferences.js';
 import clientErrorsRouter from './routes/clientErrors.js';
 import internalRouter from './routes/internal.js';
 import adminRouter from './routes/admin.js';
+import notificationsRouter from './routes/notifications.js';
 import { startHeartbeat } from './services/heartbeat.js';
 import { startModelWatchdog } from './services/aiRouter.js';
 
@@ -74,6 +75,7 @@ app.use((req, _res, next) => {
 
 // Public routes (no auth)
 app.use('/api/auth', authRouter);
+app.use('/api/notifications', notificationsRouter);
 
 // Protected routes
 app.use('/api/tasks', requireAuth, tasksRouter);

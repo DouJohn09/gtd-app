@@ -1,6 +1,7 @@
 import { pool } from '../db/pool.js';
 import { sendEmail } from './email.js';
 import { captureError } from '../lib/observability.js';
+import { runNotificationCycle } from './notifications.js';
 
 // The server checks itself every 5 minutes: the database, and the public URL
 // end to end (Cloudflare → Railway → this app), and stores the result for the
@@ -90,6 +91,8 @@ export async function runHeartbeat() {
     failingSince = null;
     alerted = false;
   }
+  runNotificationCycle().catch(err => console.error('[heartbeat] notification cycle failed:', err.message));
+
   return result;
 }
 

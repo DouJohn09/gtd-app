@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Settings as SettingsIcon, FileJson, FileSpreadsheet, Upload, X, Tag, Plus, Sparkles } from 'lucide-react';
+import { Settings as SettingsIcon, FileJson, FileSpreadsheet, Upload, X, Tag, Plus, Sparkles, Bell } from 'lucide-react';
 import { api } from '../lib/api';
 import { useToast } from '../components/Toast';
 import { useAuth } from '../contexts/AuthContext';
@@ -27,6 +27,10 @@ export default function Settings() {
     api.ai.usage().then(setAiUsage).catch(() => {});
   }, []);
   const { mode, setMode } = useAiMode();
+  const [notifPrefs, setNotifPrefs] = useState(null);
+  useEffect(() => {
+    api.preferences.getNotifications().then(setNotifPrefs).catch(() => {});
+  }, []);
 
   useEffect(() => {
     api.contexts.getAll().then(setContexts).catch(err => {
@@ -364,6 +368,41 @@ export default function Settings() {
             </label>
           ))}
         </div>
+      </section>
+
+      <section className="glass rounded-2xl p-6 mt-6">
+        <MonoLabel className="mb-2">notifications</MonoLabel>
+        <h2 className="font-display text-xl mb-1 flex items-center gap-2">
+          <Bell className="w-4 h-4 text-text-2" />
+          Email notifications
+        </h2>
+        <p className="text-text-3 text-sm mb-5 leading-relaxed">
+          Get a morning email with your tasks due today and any overdue items.
+          Delivered around 8 AM in your timezone.
+        </p>
+
+        {notifPrefs && (
+          <label className="flex items-center gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={notifPrefs.daily_email}
+              onChange={async (e) => {
+                const next = e.target.checked;
+                setNotifPrefs(prev => ({ ...prev, daily_email: next }));
+                try {
+                  const updated = await api.preferences.setNotifications({ daily_email: next });
+                  setNotifPrefs(updated);
+                  addToast(next ? 'Daily task email enabled' : 'Daily task email disabled', 'success');
+                } catch (err) {
+                  setNotifPrefs(prev => ({ ...prev, daily_email: !next }));
+                  addToast(err.message || 'Could not save', 'error');
+                }
+              }}
+              className="w-4 h-4 accent-violet-400"
+            />
+            <span className="text-[13px] text-text-1">Daily due-tasks email</span>
+          </label>
+        )}
       </section>
 
       <section className="glass rounded-2xl p-6 mt-6">

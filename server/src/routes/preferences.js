@@ -74,4 +74,39 @@ router.post('/ai-nudge-seen', async (req, res) => {
   }
 });
 
+// Notification preferences — partial merge into the JSONB column.
+router.get('/notifications', async (req, res) => {
+  try {
+    const { rows } = await pool.query('SELECT notification_prefs FROM users WHERE id = $1', [req.user.id]);
+    const prefs = rows[0]?.notification_prefs || {};
+    res.json({
+      daily_email: prefs.daily_email !== false,
+    });
+  } catch (error) {
+    serverError(req, res, error);
+  }
+});
+
+router.put('/notifications', async (req, res) => {
+  try {
+    const allowed = ['daily_email'];
+    const patch = {};
+    for (const key of allowed) {
+      if (key in req.body) patch[key] = Boolean(req.body[key]);
+    }
+    if (Object.keys(patch).length === 0) return res.status(400).json({ error: 'No valid keys' });
+    await pool.query(
+      'UPDATE users SET notification_prefs = notification_prefs || $1::jsonb WHERE id = $2',
+      [JSON.stringify(patch), req.user.id]
+    );
+    const { rows } = await pool.query('SELECT notification_prefs FROM users WHERE id = $1', [req.user.id]);
+    const prefs = rows[0]?.notification_prefs || {};
+    res.json({
+      daily_email: prefs.daily_email !== false,
+    });
+  } catch (error) {
+    serverError(req, res, error);
+  }
+});
+
 export default router;
