@@ -1,3 +1,4 @@
+import { upcomingDaysTable } from '../lib/relativeDate.js';
 import { lookup } from 'node:dns/promises';
 import net from 'node:net';
 import {
@@ -102,6 +103,7 @@ Raw input: "${rawText}"
 
 DATE RULES (critical — get this right):
 - Today is ${dayName}, ${today}
+- Upcoming days (look dates up here instead of computing them): ${upcomingDaysTable(today)}
 - "tomorrow" = the day after ${today}
 - "Friday" or "by Friday" = the NEAREST upcoming Friday from ${today}. If today IS Friday, it means TODAY.
 - "next Monday" = the Monday of NEXT week
@@ -332,7 +334,7 @@ export async function processInbox(tasks, userContexts, { projects = [], today =
     ? `\nActive projects (use the EXACT name when an item clearly belongs to one, otherwise null):\n${projects.map(p => `- ${p.name}`).join('\n')}\n`
     : '';
   const dateLine = today
-    ? `Today is ${dayName}, ${today}. Resolve relative dates in items ("tomorrow", "Friday", "before it lapses this month") to absolute YYYY-MM-DD due dates when the item clearly implies one; otherwise leave due_date null.\n`
+    ? `Today is ${dayName}, ${today}. Upcoming days: ${upcomingDaysTable(today)}. Resolve relative dates in items ("tomorrow", "Friday", "before it lapses this month") to absolute YYYY-MM-DD due dates when the item clearly implies one; otherwise leave due_date null.\n`
     : '';
 
   return complete('process-inbox', {
@@ -391,7 +393,7 @@ export async function importNotes(rawText, userContexts, projects = [], today, d
   const projectList = projects?.length
     ? projects.map(p => `- ${p.name}`).join('\n')
     : '(none)';
-  const dateLine = today ? `Today is ${dayName}, ${today}. Resolve relative dates (e.g. "tomorrow", "Friday", "next week") to absolute YYYY-MM-DD.` : '';
+  const dateLine = today ? `Today is ${dayName}, ${today}. Upcoming days: ${upcomingDaysTable(today)}. Resolve relative dates (e.g. "tomorrow", "Friday", "next week") to absolute YYYY-MM-DD.` : '';
   return complete('import-notes', {
       messages: [
         { role: 'system', content: getSystemPrompt(userContexts) },

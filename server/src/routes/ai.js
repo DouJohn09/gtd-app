@@ -7,6 +7,7 @@ import { findFreeSlot, freeRangesFor, timeToMinutes, minutesToTime, eventMinutes
 import { check, charge, getStatus } from '../services/aiUsage.js';
 import { enforceAiLimit, requireAiEnabled, chargeAiUsage } from '../middleware/aiLimit.js';
 import { getAiMode } from '../services/userPrefs.js';
+import { resolveRelativeDate } from '../lib/relativeDate.js';
 import { assertPlanWithinLimit, assertWeekPlanWithinLimit, LimitError } from '../services/billing.js';
 import { recordAppliedBlocks, closeBlock, planReality, planningProfileText, calibrationLine } from '../services/insights.js';
 import { serverError } from '../lib/httpErrors.js';
@@ -116,6 +117,10 @@ router.post('/smart-capture', async (req, res) => {
         // No provider configured → same graceful raw-capture fallback as the
         // budget path, not an error. The capture must never fail.
         if (ai?.error) ai = null;
+        if (ai && !ai.recurrence_rule) {
+          const resolved = resolveRelativeDate(rawText, today);
+          if (resolved) ai.due_date = resolved;
+        }
         // Charge only for enrichment we actually delivered — a throttle or a
         // provider failure (raw-capture fallback) doesn't consume budget.
         if (ai) await charge(req.user.id, 1, req.today);
