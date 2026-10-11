@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { ArrowRight, Sparkles, Mic } from 'lucide-react';
 import { api } from '../lib/api';
+import { trackEvent } from '../lib/analytics';
 import { useToast } from './Toast';
 import { useAiMode } from '../hooks/useAiMode';
 import { useSpeechRecognition, speechSupported } from '../hooks/useSpeechRecognition';
@@ -74,6 +75,7 @@ export default function QuickCapture({ onCapture, placeholder = "Quick capture â
           await api.tasks.create({ title: text });
           addToast('Captured to inbox', 'success');
         }
+        trackEvent('task_captured', { ai: useAi });
         window.dispatchEvent(new Event('task-captured'));
         onCapture?.();
       } catch (error) {

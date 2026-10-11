@@ -9,9 +9,11 @@ import { UpgradeProvider } from './components/UpgradeModal';
 import UpdatePrompt from './components/UpdatePrompt';
 import ErrorBoundary from './components/ErrorBoundary';
 import { installGlobalErrorReporting } from './lib/reportError';
+import { initAnalytics } from './lib/analytics';
 import './index.css';
 
 installGlobalErrorReporting();
+initAnalytics();
 
 function Root() {
   const [googleClientId, setGoogleClientId] = useState(import.meta.env.VITE_GOOGLE_CLIENT_ID || null);

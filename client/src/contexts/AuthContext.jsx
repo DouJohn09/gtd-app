@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import { api } from '../lib/api';
+import { identifyUser, resetAnalytics } from '../lib/analytics';
 
 const AuthContext = createContext(null);
 
@@ -35,6 +36,7 @@ export function AuthProvider({ children }) {
           // /me returns a fresh token once the current one is a day old (sliding session).
           if (data.token) localStorage.setItem('token', data.token);
           setUser(data.user);
+          identifyUser(data.user);
         })
         .catch(() => {
           localStorage.removeItem('token');
@@ -78,11 +80,13 @@ export function AuthProvider({ children }) {
     const data = await res.json();
     localStorage.setItem('token', data.token);
     setUser(data.user);
+    identifyUser(data.user);
   };
 
   const logout = () => {
     localStorage.removeItem('token');
     setUser(null);
+    resetAnalytics();
   };
 
   // Re-fetch the current user (e.g. after a checkout flips the plan to Pro).

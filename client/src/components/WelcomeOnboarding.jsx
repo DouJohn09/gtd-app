@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { trackEvent } from '../lib/analytics';
 import {
   LayoutDashboard, Inbox, FolderKanban, CalendarDays, ListTodo, Clock,
   CloudSun, Target, RotateCcw, Sparkles, Command, Zap, ListChecks, Star,
@@ -108,6 +109,7 @@ export default function WelcomeOnboarding() {
   // simply shows again next load, same fail-open pattern as the AI nudges.
   const markDone = () => {
     patchUser({ onboarded_at: new Date().toISOString() });
+    trackEvent('onboarding_skipped');
     api.preferences.completeOnboarding().catch(() => {});
   };
 
@@ -131,6 +133,7 @@ export default function WelcomeOnboarding() {
       addToast('Could not finish setup — please try again.', 'error');
       return;
     }
+    trackEvent('onboarding_completed', { ai_mode: modeChoice });
     patchUser({ onboarded_at: new Date().toISOString() });
     if (seedSamples) {
       const results = await Promise.allSettled(SAMPLE_TASKS.map(t => api.tasks.create(t)));
