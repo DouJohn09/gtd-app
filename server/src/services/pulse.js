@@ -119,13 +119,20 @@ async function visitors() {
   if (!token || !account || !site) return null;
   return cached('visitors', 10 * 60_000, async () => {
     const to = isoDay(Date.now());
-    const from = isoDay(Date.now() - 29 * DAY);
-    const filter = { AND: [{ siteTag: site }, { date_geq: from }, { date_leq: to }] };
+    // Cloudflare samples adaptive groups once the range passes ~7 days: a 30-day
+    // query drops low-traffic days (including today) and rounds counts to tens.
+    // Ask for the daily series as ≤7-day windows, which come back unsampled.
+    const windows = [0, 7, 14, 21, 28].map(start => ({ AND: [
+      { siteTag: site },
+      { date_geq: isoDay(Date.now() - Math.min(start + 6, 29) * DAY) },
+      { date_leq: isoDay(Date.now() - start * DAY) },
+    ] }));
     const since7 = { AND: [{ siteTag: site }, { date_geq: isoDay(Date.now() - 6 * DAY) }, { date_leq: to }] };
     const detail7 = { AND: [{ siteTag: site }, { date_geq: isoDay(Date.now() - 6 * DAY) }, { date_leq: to }, { userAgentBrowser_neq: 'ChromeHeadless' }, { userAgentBrowser_neq: 'Unknown' }] };
-    const query = `query ($account: String!, $filter: AccountRumPageloadEventsAdaptiveGroupsFilter_InputObject, $since7: AccountRumPageloadEventsAdaptiveGroupsFilter_InputObject, $detail7: AccountRumPageloadEventsAdaptiveGroupsFilter_InputObject) {
+    const F = 'AccountRumPageloadEventsAdaptiveGroupsFilter_InputObject';
+    const query = `query ($account: String!, ${windows.map((_, i) => `$w${i}: ${F}`).join(', ')}, $since7: ${F}, $detail7: ${F}) {
       viewer { accounts(filter: { accountTag: $account }) {
-        daily: rumPageloadEventsAdaptiveGroups(limit: 40, filter: $filter, orderBy: [date_ASC]) { count sum { visits } dimensions { date } }
+        ${windows.map((_, i) => `w${i}: rumPageloadEventsAdaptiveGroups(limit: 10, filter: $w${i}, orderBy: [date_ASC]) { count sum { visits } dimensions { date } }`).join('\n        ')}
         referrers: rumPageloadEventsAdaptiveGroups(limit: 8, filter: $since7, orderBy: [sum_visits_DESC]) { sum { visits } dimensions { refererHost } }
         pages: rumPageloadEventsAdaptiveGroups(limit: 8, filter: $since7, orderBy: [count_DESC]) { count dimensions { requestPath } }
         countries: rumPageloadEventsAdaptiveGroups(limit: 8, filter: $since7, orderBy: [sum_visits_DESC]) { sum { visits } dimensions { countryName } }
@@ -136,13 +143,15 @@ async function visitors() {
       const r = await fetch('https://api.cloudflare.com/client/v4/graphql', {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query, variables: { account, filter, since7, detail7 } }),
+        body: JSON.stringify({ query, variables: { account, since7, detail7, ...Object.fromEntries(windows.map((w, i) => [`w${i}`, w])) } }),
         signal: AbortSignal.timeout(10_000),
       });
       const j = await r.json();
       if (j.errors?.length) return { error: j.errors[0].message };
       const a = j.data?.viewer?.accounts?.[0] || {};
-      const daily = (a.daily || []).map(g => ({ date: g.dimensions.date, visits: g.sum.visits, pageviews: g.count }));
+      const daily = windows.flatMap((_, i) => a[`w${i}`] || [])
+        .map(g => ({ date: g.dimensions.date, visits: g.sum.visits, pageviews: g.count }))
+        .sort((x, y) => x.date.localeCompare(y.date));
       const sum = (days) => daily.filter(d => d.date >= isoDay(Date.now() - (days - 1) * DAY)).reduce((s, d) => s + d.visits, 0);
       return {
         today: sum(1), last7: sum(7), last30: sum(30),
