@@ -11,7 +11,8 @@ import { founderSpotsLeft, FOUNDER_CAP } from './paddle.js';
 //
 // External sources are optional and cached 10 min: Cloudflare Web Analytics
 // (CF_API_TOKEN + CF_ACCOUNT_ID + CF_WEB_ANALYTICS_SITE_TAG) for real
-// visitors, UptimeRobot (UPTIMEROBOT_API_KEY) for uptime. Missing config →
+// visitors, PostHog (POSTHOG_PERSONAL_API_KEY + POSTHOG_PROJECT_ID) for
+// visitor journeys and replays, UptimeRobot (UPTIMEROBOT_API_KEY) for uptime. Missing config →
 // that block is null and the page says what to set.
 
 const DAY = 86_400_000;
@@ -173,6 +174,69 @@ async function visitors() {
   });
 }
 
+// ─── Journeys (PostHog: landing page → app → sign-in → first task) ────────
+// Read-only personal API key (POSTHOG_PERSONAL_API_KEY, "query:read") +
+// POSTHOG_PROJECT_ID. Founder accounts (STATS_EXCLUDE_EMAILS) are dropped by
+// person, so their anonymous pre-sign-in pageviews are excluded too.
+async function journeys() {
+  const key = process.env.POSTHOG_PERSONAL_API_KEY;
+  const project = process.env.POSTHOG_PROJECT_ID;
+  if (!key || !project) return null;
+  const host = (process.env.POSTHOG_APP_HOST || 'https://eu.posthog.com').replace(/\/$/, '');
+  return cached('journeys', 10 * 60_000, async () => {
+    const lit = (s) => `'${String(s).replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`;
+    const skip = excluded();
+    const notFounder = skip.length
+      ? `person_id NOT IN (SELECT id FROM persons WHERE lower(properties.email) IN (${skip.map(lit).join(', ')}))`
+      : '1 = 1';
+    const run = async (query) => {
+      const r = await fetch(`${host}/api/projects/${encodeURIComponent(project)}/query/`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: { kind: 'HogQLQuery', query } }),
+        signal: AbortSignal.timeout(15_000),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.detail || `PostHog answered ${r.status}`);
+      return j.results || [];
+    };
+    try {
+      const [[funnel = []], sessions, replays] = await Promise.all([
+        run(`SELECT
+            uniqIf(person_id, event = '$pageview' AND NOT properties.$pathname LIKE '/app%'),
+            uniqIf(person_id, event = '$pageview' AND properties.$pathname LIKE '/app%'),
+            uniqIf(person_id, event = '$identify'),
+            uniqIf(person_id, event = 'onboarding_completed'),
+            uniqIf(person_id, event = 'task_captured')
+          FROM events WHERE timestamp > now() - INTERVAL 30 DAY AND ${notFounder}`),
+        run(`SELECT $session_id, min(timestamp), dateDiff('second', min(timestamp), max(timestamp)),
+            any(person.properties.email), any(properties.$geoip_country_code), any(properties.$device_type),
+            argMin(properties.$pathname, timestamp), argMin(properties.$referring_domain, timestamp),
+            countIf(event = '$pageview'), max(event = '$identify'), max(event = 'onboarding_completed'),
+            countIf(event = 'task_captured')
+          FROM events WHERE timestamp > now() - INTERVAL 7 DAY AND $session_id IS NOT NULL AND ${notFounder}
+          GROUP BY $session_id ORDER BY min(timestamp) DESC LIMIT 30`),
+        run(`SELECT session_id FROM session_replay_events WHERE start_time > now() - INTERVAL 8 DAY GROUP BY session_id`),
+      ]);
+      const recorded = new Set(replays.map(r => r[0]));
+      const [landing, app, signedIn, onboarded, captured] = funnel.map(Number);
+      return {
+        funnel30: { landing, app, signedIn, onboarded, captured },
+        sessions: sessions.map(([id, at, secs, email, country, device, entry, ref, views, signed, onb, caps]) => ({
+          at, seconds: Number(secs) || 0,
+          who: email ? mask(email) : null,
+          country: country || '?', device: device || '?',
+          entry: entry || '/', referrer: ref && ref !== '$direct' ? ref : null,
+          pageviews: Number(views) || 0, signedIn: !!signed, onboarded: !!onb, captured: Number(caps) || 0,
+          replayUrl: recorded.has(id) ? `${host}/project/${encodeURIComponent(project)}/replay/${encodeURIComponent(id)}` : null,
+        })),
+      };
+    } catch (err) {
+      return { error: err.message };
+    }
+  });
+}
+
 // ─── People: sign-ups, activity, funnel, gate, money ───────────────────────
 async function people() {
   const { rows: users } = await pool.query(
@@ -327,11 +391,12 @@ async function opsEvents() {
 }
 
 export async function buildPulse() {
-  const [h, hb, up, v, p, a, o] = await Promise.all([
+  const [h, hb, up, v, j, p, a, o] = await Promise.all([
     health(),
     heartbeat().catch(err => ({ error: err.message })),
     uptime(),
     visitors(),
+    journeys(),
     people(),
     ai().catch(err => ({ error: err.message })),
     opsEvents().catch(err => ({ error: err.message })),
@@ -342,11 +407,13 @@ export async function buildPulse() {
     heartbeat: hb,
     uptime: up,
     visitors: v,
+    journeys: j,
     ...p,
     ai: a,
     ...o,
     configured: {
       visitors: v !== null,
+      journeys: j !== null,
       uptime: up !== null,
     },
   };

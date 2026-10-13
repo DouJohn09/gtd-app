@@ -129,3 +129,5 @@
   .pulse .target { grid-template-columns: 1fr 70px; }
   .pulse .target .bar { grid-column: 1 / -1; grid-row: 2; }
 }
+.pulse td a { color: var(--accent); text-decoration: none; }
+.pulse td a:hover { text-decoration: underline; }

@@ -33,7 +33,7 @@
   <main class="legal">
     <div class="eyebrow">privacy</div>
     <h1>Privacy Policy</h1>
-    <div class="updated">Last updated: 3 October 2026</div>
+    <div class="updated">Last updated: 13 October 2026</div>
     <p class="intro">
       This policy explains what personal data Cleartable collects, why, who we share it with, and the rights you
       have over it. Cleartable is operated by an individual entrepreneur established in the Czech Republic, and this
@@ -79,7 +79,8 @@
     <h3>Technical data</h3>
     <ul>
       <li>An authentication token (JWT) and preference settings stored in your browser's local storage. We do not use advertising or cross-site tracking cookies.</li>
-      <li><strong>Website analytics:</strong> the marketing site uses Cloudflare Web Analytics, which is cookieless and does not identify you. We do not currently run Google Analytics or any consent-based tracker. If that changes, a cookie banner will ask first and this policy will be updated.</li>
+      <li><strong>Website analytics:</strong> the marketing site uses Cloudflare Web Analytics and PostHog (EU cloud). Both run without cookies on the marketing site: PostHog keeps an anonymous visit id in your browser tab's session storage only, which disappears when you close the tab. It records page views, clicks and an anonymised session replay (form inputs are masked) so we can see where the site is confusing. We do not run Google Analytics or advertising trackers.</li>
+      <li><strong>Product analytics (signed-in app):</strong> inside the app we use PostHog (EU cloud) to understand which features are used, e.g. "captured a task" or "finished onboarding", linked to your account id and email. Session replays of the app mask all text and inputs, so your task titles, notes and other content are never recorded. PostHog stores its anonymous id in local storage and a first-party cookie on cleartable.app.</li>
     </ul>
 
     <h2>3. How we use your data</h2>
@@ -119,6 +120,7 @@
       <tr><th>Provider</th><th>Purpose</th><th>Region</th></tr>
       <tr><td>Railway</td><td>Application hosting &amp; PostgreSQL database (where your tasks are stored)</td><td>EU / US</td></tr>
       <tr><td>Cloudflare</td><td>DNS, CDN/proxy for the website, and privacy-friendly (cookieless) web analytics</td><td>EU / US</td></tr>
+      <tr><td>PostHog</td><td>Product and website analytics, anonymised session replay (task content masked)</td><td>EU (Frankfurt)</td></tr>
       <tr><td>Google</td><td>Sign-in (OAuth) and optional Calendar sync</td><td>EU / US</td></tr>
       <tr><td>OpenAI</td><td>AI processing (primary)</td><td>US</td></tr>
       <tr><td>Groq</td><td>AI processing (backup when OpenAI is unavailable)</td><td>US</td></tr>
@@ -195,5 +197,6 @@
   </footer>
   <script src="/consent.js" defer></script>
   <script src="/track.js" defer></script>
+  <script src="/analytics.js" defer></script>
 </body>
 </html>

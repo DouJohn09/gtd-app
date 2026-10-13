@@ -189,6 +189,33 @@ export function renderPulse(root, { data: d, error, fetchedAt }) {
         ${rows((vis.countries || []).slice(0, 5).map(r => [esc(r.country), fmt(r.visits)]), '—')}
       </div>`;
 
+  const jr = d.journeys;
+  const dur = (s) => (s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${String(s % 60).padStart(2, '0')}s`);
+  const jf = jr?.funnel30 || {};
+  const journeyPanel = !jr || jr.error
+    ? `<div class="panel"><h2>Visitor journeys</h2><div class="hint">${!jr
+        ? 'Needs <code>POSTHOG_PERSONAL_API_KEY</code> (read-only) and <code>POSTHOG_PROJECT_ID</code> on Railway.'
+        : `PostHog answered: ${esc(jr.error)}`}</div></div>`
+    : `<div class="panel span-2"><h2>Visitor journeys ${pill('PostHog · strangers only')}</h2>
+        <div class="funnel">
+          <span class="step"><b>${fmt(jf.landing)}</b> saw the site</span><span class="arrow">→</span>
+          <span class="step"><b>${fmt(jf.app)}</b> opened the app</span><span class="arrow">→</span>
+          <span class="step"><b>${fmt(jf.signedIn)}</b> signed in</span><span class="arrow">→</span>
+          <span class="step"><b>${fmt(jf.onboarded)}</b> onboarded</span><span class="arrow">→</span>
+          <span class="step"><b>${fmt(jf.captured)}</b> captured a task</span>
+          <span class="step" style="color:var(--faint)">people · 30 days</span>
+        </div>
+        ${(jr.sessions || []).length ? `<div class="table-wrap"><table>
+          <thead><tr><th>When</th><th>Who</th><th>Country</th><th>Device</th><th>Source</th><th>Entry</th><th>Pages</th><th>Time</th><th>Got to</th><th>Replay</th></tr></thead>
+          <tbody>${jr.sessions.map(s => {
+            const reached = s.captured ? `${s.captured} task${s.captured === 1 ? '' : 's'}` : s.onboarded ? 'onboarded' : s.signedIn ? 'signed in' : s.entry.startsWith('/app') ? 'app' : 'site';
+            const src = s.referrer ? esc(s.referrer) : '<span style="color:var(--faint)">direct</span>';
+            const replay = s.replayUrl ? `<a href="${esc(s.replayUrl)}" target="_blank" rel="noopener noreferrer">watch</a>` : '<span style="color:var(--faint)">—</span>';
+            return `<tr><td>${ago(s.at)}</td><td class="m">${s.who ? esc(s.who) : '<span style="color:var(--faint)">anonymous</span>'}</td><td>${esc(s.country)}</td><td>${esc(s.device)}</td><td class="m" style="font-size:11.5px">${src}</td><td class="m" style="font-size:11.5px">${esc(s.entry)}</td><td class="m num">${fmt(s.pageviews)}</td><td class="m num">${dur(s.seconds)}</td><td>${reached}</td><td>${replay}</td></tr>`;
+          }).join('')}</tbody>
+        </table></div>` : '<div class="empty">No stranger sessions in the last 7 days.</div>'}
+      </div>`;
+
   const m = d.money || {};
   const moneyPanel = `<div class="panel"><h2>Money ${pill(m.paying ? `${m.paying} paying` : 'no sales yet', m.paying ? 'good' : '')}</h2>
     ${rows([
@@ -238,5 +265,5 @@ export function renderPulse(root, { data: d, error, fetchedAt }) {
   </footer>`;
 
   root.innerHTML = shell(`${statusPhrase} · ${bits.join(' · ')}.`, state, fresh,
-    `${strip}${gate}<section class="grid">${peoplePanel}${visPanel}${moneyPanel}${aiPanel}${relPanel}</section>${footer}`);
+    `${strip}${gate}<section class="grid">${peoplePanel}${journeyPanel}${visPanel}${moneyPanel}${aiPanel}${relPanel}</section>${footer}`);
 }
