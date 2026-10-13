@@ -1,5 +1,7 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { Calendar, ChevronLeft, ChevronRight, X } from 'lucide-react';
+import useAnchoredPopover from './useAnchoredPopover';
 
 const WEEKDAYS = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -26,6 +28,7 @@ function formatDisplay(iso) {
 export default function DatePicker({ value, onChange, placeholder = 'No date', className = '' }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
+  const popRef = useRef(null);
 
   const selected = parseDate(value);
   const [viewYear, setViewYear] = useState(() => selected?.getFullYear() || new Date().getFullYear());
@@ -38,10 +41,13 @@ export default function DatePicker({ value, onChange, placeholder = 'No date', c
     }
   }, [open]);
 
+  const popStyle = useAnchoredPopover({ open, anchorRef: ref, popRef, width: 280, deps: [viewYear, viewMonth] });
+
   useEffect(() => {
     if (!open) return;
     const handleClick = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+      if (ref.current?.contains(e.target) || popRef.current?.contains(e.target)) return;
+      setOpen(false);
     };
     const handleKey = (e) => {
       if (e.key === 'Escape') { e.preventDefault(); setOpen(false); }
@@ -109,10 +115,12 @@ export default function DatePicker({ value, onChange, placeholder = 'No date', c
         </div>
       </button>
 
-      {open && (
+      {open && createPortal(
         <div
-          className="absolute left-0 top-full mt-1.5 z-50 rounded-xl p-3 w-[280px]"
+          ref={popRef}
+          className="z-[70] rounded-xl p-3"
           style={{
+            ...popStyle,
             background: 'rgba(18, 18, 28, 0.95)',
             backdropFilter: 'blur(20px)',
             boxShadow: '0 16px 48px -8px rgba(0,0,0,0.6), inset 0 0 0 1px rgba(255,255,255,0.08)',
@@ -187,7 +195,8 @@ export default function DatePicker({ value, onChange, placeholder = 'No date', c
               Today
             </button>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );

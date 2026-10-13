@@ -1,5 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Clock, X } from 'lucide-react';
+import useAnchoredPopover from './useAnchoredPopover';
 import { formatHHMM, formatHourOption } from '../../lib/dateUtils';
 
 const HOURS = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0'));
@@ -10,6 +12,8 @@ const formatDisplay = formatHHMM;
 export default function TimePicker({ value, onChange, placeholder = 'No time', disabled, className = '' }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
+  const popRef = useRef(null);
+  const popStyle = useAnchoredPopover({ open, anchorRef: ref, popRef });
   const hourRef = useRef(null);
   const minuteRef = useRef(null);
 
@@ -18,7 +22,8 @@ export default function TimePicker({ value, onChange, placeholder = 'No time', d
   useEffect(() => {
     if (!open) return;
     const handleClick = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+      if (ref.current?.contains(e.target) || popRef.current?.contains(e.target)) return;
+      setOpen(false);
     };
     const handleKey = (e) => {
       if (e.key === 'Escape') { e.preventDefault(); setOpen(false); }
@@ -79,10 +84,12 @@ export default function TimePicker({ value, onChange, placeholder = 'No time', d
         </div>
       </button>
 
-      {open && (
+      {open && createPortal(
         <div
-          className="absolute left-0 top-full mt-1.5 z-50 rounded-xl overflow-hidden"
+          ref={popRef}
+          className="z-[70] rounded-xl overflow-hidden"
           style={{
+            ...popStyle,
             background: 'rgba(18, 18, 28, 0.95)',
             backdropFilter: 'blur(20px)',
             boxShadow: '0 16px 48px -8px rgba(0,0,0,0.6), inset 0 0 0 1px rgba(255,255,255,0.08)',
@@ -149,7 +156,8 @@ export default function TimePicker({ value, onChange, placeholder = 'No time', d
               Done
             </button>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );

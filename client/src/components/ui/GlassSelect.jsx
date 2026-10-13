@@ -1,14 +1,19 @@
 import { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { ChevronDown, Check, Plus } from 'lucide-react';
+import useAnchoredPopover from './useAnchoredPopover';
 
 export default function GlassSelect({ value, onChange, options, placeholder = 'Select…', onAdd, addLabel, className = '' }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
+  const popRef = useRef(null);
+  const popStyle = useAnchoredPopover({ open, anchorRef: ref, popRef, width: 'anchor' });
 
   useEffect(() => {
     if (!open) return;
     const handleClick = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+      if (ref.current?.contains(e.target) || popRef.current?.contains(e.target)) return;
+      setOpen(false);
     };
     const handleKey = (e) => {
       if (e.key === 'Escape') { e.preventDefault(); setOpen(false); }
@@ -42,10 +47,12 @@ export default function GlassSelect({ value, onChange, options, placeholder = 'S
         />
       </button>
 
-      {open && (
+      {open && createPortal(
         <div
-          className="absolute left-0 right-0 top-full mt-1.5 z-50 max-h-[240px] overflow-y-auto rounded-xl"
+          ref={popRef}
+          className="z-[70] max-h-[240px] overflow-y-auto rounded-xl"
           style={{
+            ...popStyle,
             background: 'rgba(18, 18, 28, 0.92)',
             backdropFilter: 'blur(20px)',
             boxShadow: '0 16px 48px -8px rgba(0,0,0,0.6), inset 0 0 0 1px rgba(255,255,255,0.08)',
@@ -89,7 +96,8 @@ export default function GlassSelect({ value, onChange, options, placeholder = 'S
               </button>
             )}
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );
