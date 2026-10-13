@@ -335,7 +335,7 @@ function TimeBlock({ task, top, height, col, totalCols, compact, onEdit, onCompl
       <div className={`flex items-start gap-1.5 ${compact ? 'p-1' : 'p-1.5'} h-full`}>
         <button
           onClick={(e) => { e.stopPropagation(); onComplete?.(task.id); }}
-          className="grid place-items-center w-3 h-3 rounded-full border shrink-0 mt-0.5"
+          className="tap-expand grid place-items-center w-3 h-3 rounded-full border shrink-0 mt-0.5"
           style={{ borderColor: `rgb(var(--${tone}-glow))`, opacity: 0.7 }}
           aria-label="Complete"
         />

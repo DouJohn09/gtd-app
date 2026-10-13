@@ -149,7 +149,7 @@ export default function HabitModal({ habit, onClose, onSave, existingCategories 
           </div>
           <button
             onClick={onClose}
-            className="grid place-items-center w-8 h-8 rounded-lg text-text-3 hover:text-text-1 hover:bg-white/5 transition-colors"
+            className="tap-expand grid place-items-center w-8 h-8 rounded-lg text-text-3 hover:text-text-1 hover:bg-white/5 transition-colors"
           >
             <X className="w-4 h-4" />
           </button>

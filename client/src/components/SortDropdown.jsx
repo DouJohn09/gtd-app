@@ -93,7 +93,7 @@ export default function SortDropdown({ value, onChange, completed = false, compa
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="inline-flex items-center gap-1.5 rounded-xl glass px-2.5 py-1.5 transition-colors hover:bg-white/[0.06]"
+        className="tap-row inline-flex items-center gap-1.5 rounded-xl glass px-2.5 py-1.5 transition-colors hover:bg-white/[0.06]"
       >
         <ArrowUpDown className="w-3.5 h-3.5 text-text-3" />
         <span className={`font-mono text-[11px] uppercase tracking-wider text-text-2 ${compact ? 'hidden sm:inline' : ''}`}>

@@ -74,7 +74,7 @@ function CollapsibleSection({ title, eyebrow, icon: Icon, tone = 'violet', count
         <div className="flex items-center gap-3">
           {open ? <ChevronDown className="w-3.5 h-3.5 text-text-3" /> : <ChevronRight className="w-3.5 h-3.5 text-text-3" />}
           <div
-            className="grid place-items-center w-7 h-7 rounded-lg"
+            className="tap-expand grid place-items-center w-7 h-7 rounded-lg"
             style={{ background: `rgb(var(--${tone}) / 0.12)`, boxShadow: `inset 0 0 0 1px rgb(var(--${tone}) / 0.22)` }}
           >
             <Icon className="w-3.5 h-3.5" style={{ color: `rgb(var(--${tone}-glow))` }} />

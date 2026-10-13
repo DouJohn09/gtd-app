@@ -127,13 +127,13 @@ export default function DatePicker({ value, onChange, placeholder = 'No date', c
           }}
         >
           <div className="flex items-center justify-between mb-3">
-            <button type="button" onClick={prevMonth} className="grid place-items-center w-7 h-7 rounded-lg hover:bg-white/[0.06] transition-colors">
+            <button type="button" onClick={prevMonth} className="tap-expand grid place-items-center w-7 h-7 rounded-lg hover:bg-white/[0.06] transition-colors">
               <ChevronLeft className="w-4 h-4 text-text-2" />
             </button>
             <span className="font-mono text-[12px] text-text-1 tracking-wide">
               {MONTHS[viewMonth]} {viewYear}
             </span>
-            <button type="button" onClick={nextMonth} className="grid place-items-center w-7 h-7 rounded-lg hover:bg-white/[0.06] transition-colors">
+            <button type="button" onClick={nextMonth} className="tap-expand grid place-items-center w-7 h-7 rounded-lg hover:bg-white/[0.06] transition-colors">
               <ChevronRight className="w-4 h-4 text-text-2" />
             </button>
           </div>

@@ -223,7 +223,7 @@ export default function Projects() {
             <div className="flex items-center justify-between">
               <MonoLabel>new project</MonoLabel>
               <button type="button" onClick={() => setShowNewProject(false)}
-                      className="grid place-items-center w-7 h-7 rounded-lg border border-white/10 hover:bg-white/5">
+                      className="tap-expand grid place-items-center w-7 h-7 rounded-lg border border-white/10 hover:bg-white/5">
                 <X className="w-3.5 h-3.5" />
               </button>
             </div>
@@ -366,7 +366,7 @@ export default function Projects() {
                           <div className="flex items-center justify-between">
                             <MonoLabel tone={tone}>edit project</MonoLabel>
                             <button type="button" onClick={() => setEditingProject(null)}
-                                    className="grid place-items-center w-7 h-7 rounded-lg border border-white/10 hover:bg-white/5">
+                                    className="tap-expand grid place-items-center w-7 h-7 rounded-lg border border-white/10 hover:bg-white/5">
                               <X className="w-3.5 h-3.5" />
                             </button>
                           </div>

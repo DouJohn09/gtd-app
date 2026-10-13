@@ -15,7 +15,7 @@ function TaskRow({ task, onRestore, onDelete }) {
   return (
     <div className="rounded-2xl glass p-4 flex items-center gap-3 group transition-all">
       <div
-        className="grid place-items-center w-7 h-7 rounded-full flex-shrink-0"
+        className="tap-expand grid place-items-center w-7 h-7 rounded-full flex-shrink-0"
         style={{
           background: 'linear-gradient(180deg, rgb(var(--mint) / 0.85), rgb(var(--mint) / 0.65))',
           boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.18), 0 0 12px rgb(var(--mint) / 0.3)',
@@ -32,14 +32,14 @@ function TaskRow({ task, onRestore, onDelete }) {
       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 touch-show transition-opacity">
         <button
           onClick={() => onRestore(task.id)}
-          className="p-1.5 text-text-3 hover:text-violet-glow rounded-lg transition-colors"
+          className="tap-expand p-1.5 text-text-3 hover:text-violet-glow rounded-lg transition-colors"
           title="Restore to inbox"
         >
           <RotateCcw className="w-3.5 h-3.5" />
         </button>
         <button
           onClick={() => onDelete(task.id)}
-          className="p-1.5 text-text-3 hover:text-rose-glow rounded-lg transition-colors"
+          className="tap-expand p-1.5 text-text-3 hover:text-rose-glow rounded-lg transition-colors"
           title="Delete permanently"
         >
           <Trash2 className="w-3.5 h-3.5" />

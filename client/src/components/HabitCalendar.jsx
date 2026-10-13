@@ -169,7 +169,7 @@ export default function HabitCalendar({ habit, onToggle, onClose }) {
           </div>
           <button
             onClick={onClose}
-            className="grid place-items-center w-8 h-8 rounded-lg text-text-3 hover:text-text-1 hover:bg-white/5 transition-colors flex-shrink-0"
+            className="tap-expand grid place-items-center w-8 h-8 rounded-lg text-text-3 hover:text-text-1 hover:bg-white/5 transition-colors flex-shrink-0"
           >
             <X className="w-4 h-4" />
           </button>
@@ -178,14 +178,14 @@ export default function HabitCalendar({ habit, onToggle, onClose }) {
         <div className="p-4">
           {/* Month nav */}
           <div className="flex items-center justify-between mb-3">
-            <button onClick={goPrev} className="p-1.5 text-text-3 hover:text-text-1 rounded-lg transition-colors">
+            <button onClick={goPrev} className="tap-expand p-1.5 text-text-3 hover:text-text-1 rounded-lg transition-colors">
               <ChevronLeft className="w-4 h-4" />
             </button>
             <span className="font-display text-[15px]">{MONTHS[month]} {year}</span>
             <button
               onClick={goNext}
               disabled={atCurrentMonth}
-              className="p-1.5 text-text-3 hover:text-text-1 rounded-lg transition-colors disabled:opacity-30 disabled:hover:text-text-3"
+              className="tap-expand p-1.5 text-text-3 hover:text-text-1 rounded-lg transition-colors disabled:opacity-30 disabled:hover:text-text-3"
             >
               <ChevronRight className="w-4 h-4" />
             </button>

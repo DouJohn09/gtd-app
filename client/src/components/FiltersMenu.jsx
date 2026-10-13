@@ -85,7 +85,7 @@ export default function FiltersMenu({ toggles = [], filters = [], align = 'right
       <button
         type="button"
         onClick={() => setOpen(o => !o)}
-        className="inline-flex items-center gap-1.5 rounded-xl glass px-2.5 py-1.5 transition-colors hover:bg-white/[0.06]"
+        className="tap-row inline-flex items-center gap-1.5 rounded-xl glass px-2.5 py-1.5 transition-colors hover:bg-white/[0.06]"
         style={active ? {
           background: 'rgb(var(--violet) / 0.12)',
           boxShadow: 'inset 0 0 0 1px rgb(var(--violet) / 0.25)',

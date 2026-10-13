@@ -115,20 +115,20 @@ export default function HabitCard({ habit, onToggle, onEdit, onDelete }) {
       <div className="flex items-center gap-0.5 flex-shrink-0 opacity-0 group-hover:opacity-100 touch-show transition-opacity">
         <button
           onClick={() => setShowCalendar(true)}
-          className="p-1.5 text-text-3 hover:text-violet-glow rounded-lg transition-colors"
+          className="p-1.5 [@media(pointer:coarse)]:p-2.5 text-text-3 hover:text-violet-glow rounded-lg transition-colors"
           title={isQuit ? 'View history & log a slip' : 'View history & log other days'}
         >
           <Calendar className="w-3.5 h-3.5" />
         </button>
         <button
           onClick={() => onEdit(habit)}
-          className="p-1.5 text-text-3 hover:text-text-1 rounded-lg transition-colors"
+          className="p-1.5 [@media(pointer:coarse)]:p-2.5 text-text-3 hover:text-text-1 rounded-lg transition-colors"
         >
           <Pencil className="w-3.5 h-3.5" />
         </button>
         <button
           onClick={() => onDelete(habit.id)}
-          className="p-1.5 text-text-3 hover:text-rose-glow rounded-lg transition-colors"
+          className="p-1.5 [@media(pointer:coarse)]:p-2.5 text-text-3 hover:text-rose-glow rounded-lg transition-colors"
         >
           <Trash2 className="w-3.5 h-3.5" />
         </button>

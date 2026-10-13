@@ -242,7 +242,7 @@ export default function Settings() {
               </div>
               <button
                 onClick={() => setPreview(null)}
-                className="grid place-items-center w-7 h-7 rounded-lg text-text-3 hover:text-text-1 hover:bg-white/5"
+                className="tap-expand grid place-items-center w-7 h-7 rounded-lg text-text-3 hover:text-text-1 hover:bg-white/5"
                 title="Cancel"
               >
                 <X className="w-3.5 h-3.5" />

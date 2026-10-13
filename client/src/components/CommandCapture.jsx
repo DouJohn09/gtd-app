@@ -24,7 +24,7 @@ export default function CommandCapture({ open, onClose }) {
           <div className="mono-label">quick capture</div>
           <div className="flex items-center gap-2">
             <span className="hidden sm:inline font-mono text-[10px] px-1.5 py-0.5 rounded bg-white/5 border border-white/10 text-text-2">esc</span>
-            <button onClick={onClose} className="grid place-items-center w-7 h-7 rounded-lg border border-white/10 hover:bg-white/5">
+            <button onClick={onClose} className="tap-expand grid place-items-center w-7 h-7 rounded-lg border border-white/10 hover:bg-white/5">
               <X className="w-3.5 h-3.5" />
             </button>
           </div>

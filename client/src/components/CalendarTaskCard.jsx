@@ -55,7 +55,7 @@ export default function CalendarTaskCard({ task, onEdit, onComplete, onDragStart
       )}
       <button
         onClick={(e) => { e.stopPropagation(); onComplete?.(task.id); }}
-        className="grid place-items-center w-3 h-3 rounded-full border shrink-0"
+        className="tap-expand grid place-items-center w-3 h-3 rounded-full border shrink-0"
         style={{ borderColor: 'currentColor', opacity: 0.7 }}
         aria-label="Complete"
       />

@@ -257,7 +257,7 @@ export default function Layout() {
           <button
             onClick={logout}
             title="Sign out"
-            className="grid place-items-center w-7 h-7 rounded-lg text-text-3 hover:text-text-1 hover:bg-white/5"
+            className="tap-expand grid place-items-center w-7 h-7 rounded-lg text-text-3 hover:text-text-1 hover:bg-white/5"
           >
             <LogOut className="w-3.5 h-3.5" />
           </button>
@@ -311,7 +311,7 @@ export default function Layout() {
           >
             <div className="flex items-center justify-between mb-4">
               <div className="mono-label">more</div>
-              <button onClick={() => setMoreOpen(false)} className="grid place-items-center w-7 h-7 rounded-lg border border-white/10">
+              <button onClick={() => setMoreOpen(false)} className="tap-expand grid place-items-center w-7 h-7 rounded-lg border border-white/10">
                 <X className="w-3.5 h-3.5" />
               </button>
             </div>

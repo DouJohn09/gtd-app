@@ -369,7 +369,7 @@ export default function Calendar() {
                 <button
                   key={v}
                   onClick={() => setViewType(v)}
-                  className="px-3 py-1.5 text-[12px] font-mono uppercase tracking-wider rounded-lg transition-all"
+                  className="tap-row px-2.5 sm:px-3 py-1.5 text-[12px] font-mono uppercase tracking-wider rounded-lg transition-all"
                   style={
                     active
                       ? { background: 'rgb(var(--violet) / 0.18)', color: 'rgb(var(--violet-glow))', boxShadow: 'inset 0 0 0 1px rgb(var(--violet) / 0.3)' }
@@ -455,10 +455,10 @@ export default function Calendar() {
 
       {/* Period nav */}
       <div ref={periodNavRef} className="flex items-center gap-3 mb-5 scroll-mt-6">
-        <button onClick={handlePrev} className="grid place-items-center w-9 h-9 rounded-xl glass glass-hover">
+        <button onClick={handlePrev} className="tap-expand grid place-items-center w-9 h-9 rounded-xl glass glass-hover">
           <ChevronLeft className="w-4 h-4" />
         </button>
-        <button onClick={handleNext} className="grid place-items-center w-9 h-9 rounded-xl glass glass-hover">
+        <button onClick={handleNext} className="tap-expand grid place-items-center w-9 h-9 rounded-xl glass glass-hover">
           <ChevronRight className="w-4 h-4" />
         </button>
         <button

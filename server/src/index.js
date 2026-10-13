@@ -3,7 +3,9 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import { fileURLToPath } from 'url';
-import { dirname, join, extname } from 'path';
+import { dirname, join, extname, normalize, sep } from 'path';
+import { readFileSync, existsSync, statSync } from 'fs';
+import { createHash } from 'crypto';
 import { pingDb, pool } from './db/pool.js';
 import { captureError, flushErrors } from './lib/observability.js';
 import { requireAuth } from './middleware/auth.js';
@@ -166,12 +168,36 @@ if (process.env.NODE_ENV === 'production') {
     res.sendFile(join(clientDistPath, 'index.html'));
   });
 
-  // Clean URLs: /blog/cleartable-vs-todoist serves cleartable-vs-todoist.html
+  // Landing pages link /style.css etc. by fixed names, and Cloudflare tells
+  // browsers to keep those for 4h, so a deploy reached phones hours late. Each
+  // page is sent with its CSS/JS links stamped with a content hash (?v=…):
+  // a new deploy means new URLs, picked up on the next page load.
+  const assetVersion = {};
+  for (const f of ['style.css', 'blog.css', 'analytics.js', 'consent.js', 'track.js']) {
+    try { assetVersion[f] = createHash('md5').update(readFileSync(join(landingPath, f))).digest('hex').slice(0, 10); } catch { /* missing asset: link stays as is */ }
+  }
+  const assetRef = new RegExp(`((?:href|src)="/?)(${Object.keys(assetVersion).map(f => f.replace('.', '\\.')).join('|')})"`, 'g');
+  const pageCache = new Map();
+  const landingHtml = (file) => {
+    if (!pageCache.has(file)) {
+      pageCache.set(file, readFileSync(file, 'utf8').replace(assetRef, (m, pre, name) => `${pre}${name}?v=${assetVersion[name]}"`));
+    }
+    return pageCache.get(file);
+  };
+  const sendLandingPage = (res, file) => res.type('html').set('Cache-Control', 'no-cache').send(landingHtml(file));
+
+  // HTML pages: / → index.html, /blog/ → blog/index.html, clean URLs like
+  // /blog/cleartable-vs-todoist → cleartable-vs-todoist.html, and *.html.
   app.use((req, res, next) => {
-    if (req.method === 'GET' && !extname(req.path) && req.path !== '/') {
-      const file = join(landingPath, req.path + '.html');
-      res.sendFile(file, (err) => { if (err) next(); });
-    } else next();
+    if (req.method !== 'GET' && req.method !== 'HEAD') return next();
+    const ext = extname(req.path);
+    if (ext && ext !== '.html') return next();
+    let rel = req.path.endsWith('/') ? req.path + 'index.html' : ext ? req.path : req.path + '.html';
+    let file;
+    try { file = normalize(join(landingPath, decodeURIComponent(rel))); } catch { return next(); }
+    if (!file.startsWith(landingPath + sep)) return next();
+    if (!existsSync(file) || !statSync(file).isFile()) return next();
+    sendLandingPage(res, file);
   });
 
   // Landing page at root. The static middleware serves /style.css, /icons/*,
@@ -188,7 +214,7 @@ if (process.env.NODE_ENV === 'production') {
   // page view and gave search engines thousands of soft-404 duplicates.
   app.use((req, res) => {
     res.status(404);
-    if (req.accepts('html')) return res.sendFile(join(landingPath, '404.html'));
+    if (req.accepts('html')) return sendLandingPage(res, join(landingPath, '404.html'));
     res.type('txt').send('Not found');
   });
 }

@@ -62,7 +62,7 @@ function Toast({ toast, onClose }) {
       }}
     >
       <div
-        className="grid place-items-center w-7 h-7 rounded-xl flex-shrink-0"
+        className="tap-expand grid place-items-center w-7 h-7 rounded-xl flex-shrink-0"
         style={{ background: `rgb(var(--${tone}) / 0.14)`, boxShadow: `inset 0 0 0 1px rgb(var(--${tone}) / 0.30)` }}
       >
         <Icon className="w-3.5 h-3.5" style={{ color: `rgb(var(--${tone}-glow))` }} />

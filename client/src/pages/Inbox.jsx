@@ -281,7 +281,7 @@ export default function Inbox() {
                   <TaskCard task={task} onComplete={handleComplete} onEdit={handleEdit} />
                   <button
                     onClick={() => setConfirmDeleteId(task.id)}
-                    className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 text-text-3 hover:text-rose-glow transition-all"
+                    className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 text-text-3 hover:text-rose-glow transition-all [@media(hover:none)]:hidden"
                     title="Delete"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
@@ -308,7 +308,7 @@ export default function Inbox() {
                     <TaskCard task={task} onComplete={handleComplete} onEdit={handleEdit} />
                     <button
                       onClick={() => setConfirmDeleteId(task.id)}
-                      className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 text-text-3 hover:text-rose-glow transition-all"
+                      className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 text-text-3 hover:text-rose-glow transition-all [@media(hover:none)]:hidden"
                       title="Delete"
                     >
                       <Trash2 className="w-3.5 h-3.5" />

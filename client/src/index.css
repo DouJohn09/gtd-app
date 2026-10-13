@@ -255,5 +255,19 @@ input[type="number"] { -moz-appearance: textfield; }
   }
 }
 
+/* Touch screens: fingers need ~44px. Small controls keep their look but get
+   an invisible hit area around them (.tap-expand / checkboxes); buttons and
+   segmented controls grow to a comfortable height. */
+@media (pointer: coarse) {
+  .fresh-check, .tap-expand { position: relative; }
+  .fresh-check::before, .tap-expand::before {
+    content: '';
+    position: absolute;
+    inset: -10px;
+  }
+  .gtd-btn { min-height: 40px; }
+  .tap-row { min-height: 40px; }
+}
+
 /* No grey flash on tap; the app draws its own pressed states. */
 html { -webkit-tap-highlight-color: transparent; }

@@ -533,7 +533,7 @@ function AutopilotNudge() {
           <button
             onClick={markSeen}
             aria-label="Dismiss"
-            className="grid place-items-center w-7 h-7 rounded-lg text-text-3 hover:text-text-1 hover:bg-white/5 transition-colors"
+            className="tap-expand grid place-items-center w-7 h-7 rounded-lg text-text-3 hover:text-text-1 hover:bg-white/5 transition-colors"
           >
             <X className="w-3.5 h-3.5" />
           </button>
@@ -673,7 +673,7 @@ function HabitsCard({ habits, done, pct, onToggle }) {
     <GlassCard>
       <div className="flex items-center justify-between mb-4">
         <MonoLabel>today's habits</MonoLabel>
-        <Link to="/habits" className="font-mono text-[10.5px] text-text-3 inline-flex items-center gap-1 hover:text-text-1">
+        <Link to="/habits" className="tap-expand font-mono text-[10.5px] text-text-3 inline-flex items-center gap-1 hover:text-text-1">
           all <ChevronRight className="w-3 h-3" />
         </Link>
       </div>
@@ -693,7 +693,7 @@ function HabitsCard({ habits, done, pct, onToggle }) {
           <button
             key={h.id}
             onClick={() => onToggle(h.id)}
-            className="flex items-center gap-2.5 w-full text-left py-1 rounded -mx-1 px-1 hover:bg-white/[0.03] transition-colors"
+            className="tap-row flex items-center gap-2.5 w-full text-left py-1 rounded -mx-1 px-1 hover:bg-white/[0.03] transition-colors"
           >
             <FreshCheck checked={!!h.completed_today} onChange={() => onToggle(h.id)} size={18} />
             <span className={`text-[13px] ${h.completed_today ? 'line-through text-text-3' : 'text-text-1'}`}>
