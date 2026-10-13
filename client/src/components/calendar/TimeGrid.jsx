@@ -308,6 +308,10 @@ function TimeBlock({ task, top, height, col, totalCols, compact, onEdit, onCompl
     return <GoogleEventBlock event={task} top={top} height={height} col={col} totalCols={totalCols} compact={compact} />;
   }
 
+  if (task._draft) {
+    return <DraftBlock task={task} top={top} height={height} col={col} totalCols={totalCols} compact={compact} onEdit={onEdit} />;
+  }
+
   const tone = task.list === 'inbox' ? 'amber' :
                task.list === 'waiting_for' ? 'rose' :
                task.list === 'someday_maybe' ? 'violet' : 'mint';
@@ -357,6 +361,39 @@ function TimeBlock({ task, top, height, col, totalCols, compact, onEdit, onCompl
           style={{ background: `rgb(var(--${tone}) / 0.4)` }}
         />
       )}
+    </div>
+  );
+}
+
+// A week-plan proposal: not saved yet, so it's dashed and striped. Dragging
+// it moves it inside the draft (Calendar routes the drop to the board).
+function DraftBlock({ task, top, height, col, totalCols, compact, onEdit }) {
+  return (
+    <div
+      draggable
+      onDragStart={(e) => {
+        e.dataTransfer.setData('text/plain', task.id.toString());
+        e.dataTransfer.effectAllowed = 'move';
+      }}
+      onClick={() => onEdit?.(task)}
+      className="absolute rounded-lg cursor-grab active:cursor-grabbing overflow-hidden pointer-events-auto"
+      style={{
+        ...blockPositionStyle(top, height, col, totalCols),
+        background: 'repeating-linear-gradient(135deg, rgb(var(--violet) / 0.20) 0 6px, rgb(var(--violet) / 0.07) 6px 12px)',
+        border: '1px dashed rgb(var(--violet-glow) / 0.75)',
+      }}
+      title={`Proposed: ${task.title}${task.duration ? ` · ${task.duration}m` : ''}`}
+    >
+      <div className={`${compact ? 'p-1' : 'p-1.5'} h-full`}>
+        <div className={`${compact ? 'text-[10px]' : 'text-[11.5px]'} font-medium leading-tight truncate`} style={{ color: 'rgb(var(--text-1))' }}>
+          {task.title}
+        </div>
+        {height > 30 && (
+          <div className="font-mono text-[9px] mt-0.5" style={{ color: 'rgb(var(--violet-glow))' }}>
+            {formatTimeLabel(timeToMinutes(task.scheduled_time))}{task.duration ? ` · ${task.duration}m` : ''} · draft
+          </div>
+        )}
+      </div>
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { CalendarRange, Check, Clock, PencilLine, Sparkles, CheckCircle2, RefreshCw, CalendarClock, ArrowRightLeft } from 'lucide-react';
+import { CalendarRange, Check, Clock, PencilLine, Sparkles, CheckCircle2, RefreshCw, CalendarClock, ArrowRightLeft, ArrowDown } from 'lucide-react';
 import ConfirmModal from './ui/ConfirmModal';
 import { api } from '../lib/api';
 import { contextLabel } from '../lib/context';
@@ -16,7 +16,7 @@ import { aiToast } from '../lib/aiError';
  * `result` is the /ai/plan-week response; `onOpenTask(task)` opens the editor;
  * `onApplied()` / `onCancel()` close the board.
  */
-export default function WeekPlanBoard({ result, onApplied, onCancel, onOpenTask, onReplan, compact = false }) {
+export default function WeekPlanBoard({ result, onApplied, onCancel, onOpenTask, onReplan, onDraftChange, controlRef, onShowCalendar, compact = false }) {
   const { addToast } = useToast();
   const tasks = useMemo(() => new Map((result?.tasks || []).map(t => [t.id, t])), [result]);
   const days = result?.days || [];
@@ -142,6 +142,34 @@ export default function WeekPlanBoard({ result, onApplied, onCancel, onOpenTask,
     }
   };
 
+  // Live draft for the Calendar behind the board: every kept card as a
+  // proposed item on its day, with its packed slot when times are on, so the
+  // plan can be read against the week's meetings. Nothing is written.
+  useEffect(() => {
+    if (!onDraftChange) return;
+    const items = [];
+    for (const [id, date] of where) {
+      if (!date || omitted.has(id) || completed.has(id)) continue;
+      const t = tasks.get(id);
+      if (!t || t.list === 'completed' || t.deleted) continue;
+      const slot = withTimes ? times.get(id) : null;
+      items.push({
+        ...t,
+        due_date: date,
+        scheduled_time: slot ? slot.start : null,
+        duration: slot ? slot.duration : minsOf(t),
+        _draft: true,
+        _draftUnfit: withTimes && unfit.has(id),
+      });
+    }
+    onDraftChange(items);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [placementsKey, withTimes, times, unfit, tasks]);
+  useEffect(() => () => onDraftChange?.(null), [onDraftChange]);
+
+  // The Calendar routes drags and "complete" on draft items back here.
+  if (controlRef) controlRef.current = { move: moveCard, complete: (id) => { const t = tasks.get(id); if (t) completeTask(t); } };
+
   const onDragStart = (e, taskId) => { e.dataTransfer.setData('text/plain', String(taskId)); e.dataTransfer.effectAllowed = 'move'; };
   const onDropDay = (e, date) => {
     e.preventDefault(); setDragOver(null);
@@ -180,6 +208,11 @@ export default function WeekPlanBoard({ result, onApplied, onCancel, onOpenTask,
           <CalendarRange className="w-3.5 h-3.5" /> the week ahead · {keptCount} task{keptCount === 1 ? '' : 's'} placed
         </span>
         <div className="flex items-center gap-3">
+          {onShowCalendar && (
+            <button onClick={onShowCalendar} className="font-mono text-[10.5px] uppercase tracking-wider text-text-3 hover:text-text-1 transition-colors inline-flex items-center gap-1" title="See the plan next to your meetings">
+              <ArrowDown className="w-3 h-3" /> see in calendar
+            </button>
+          )}
           <button
             onClick={() => setWithTimes(v => !v)}
             className="font-mono text-[10.5px] uppercase tracking-wider inline-flex items-center gap-1 px-2 py-0.5 rounded-md transition-colors"
@@ -288,7 +321,9 @@ export default function WeekPlanBoard({ result, onApplied, onCancel, onOpenTask,
       <div className="flex items-center justify-between gap-3 mt-4 flex-wrap">
         <p className="text-[11.5px] text-text-3 inline-flex items-center gap-1.5"><Sparkles className="w-3 h-3" /> {withTimes
           ? 'Time blocks go to your calendar on apply; drag them in the Calendar to fine-tune.'
-          : 'Days only. Each morning, “Plan my day” puts that day’s tasks into time blocks.'}</p>
+          : onShowCalendar
+            ? 'Days only. Turn on “with times” to see each task’s slot between your meetings in the calendar below.'
+            : 'Days only. Each morning, “Plan my day” puts that day’s tasks into time blocks.'}</p>
         <div className="flex items-center gap-2">
           <button onClick={onCancel} className="gtd-btn gtd-btn-secondary text-[12.5px]">Cancel</button>
           <button onClick={apply} disabled={applying || timing || keptCount === 0} className="gtd-btn gtd-btn-primary inline-flex items-center gap-2 text-[12.5px] disabled:opacity-60">

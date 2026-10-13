@@ -24,6 +24,10 @@ import {
 } from '../lib/dateUtils';
 
 const VIEW_TYPES = ['month', 'week', 'day'];
+const DRAFT_SWATCH = {
+  background: 'repeating-linear-gradient(135deg, rgb(var(--violet) / 0.22) 0 4px, rgb(var(--violet) / 0.08) 4px 8px)',
+  border: '1px dashed rgb(var(--violet-glow) / 0.7)',
+};
 
 export default function Calendar() {
   const [scheduledTasks, setScheduledTasks] = useState([]);
@@ -49,10 +53,19 @@ export default function Calendar() {
   // the board below the header lets the user move/omit before applying.
   const [weekPlan, setWeekPlan] = useState(null);
   const [planningWeek, setPlanningWeek] = useState(false);
+  // The open draft, mirrored into the grid as dashed "proposed" items so the
+  // plan reads against the week's meetings. Drags/completes on those items go
+  // back to the board through weekBoardRef instead of writing the task.
+  const [weekDraft, setWeekDraft] = useState(null);
+  const weekBoardRef = useRef(null);
+  const periodNavRef = useRef(null);
   const planWeek = async () => {
     setPlanningWeek(true);
     try {
-      setWeekPlan({ ...(await api.ai.planWeek()), _nonce: Date.now() });
+      const plan = await api.ai.planWeek();
+      setWeekPlan({ ...plan, _nonce: Date.now() });
+      // Open the week the plan starts in, so the preview is on screen.
+      if (plan?.start) { setViewType('week'); setCurrentDate(new Date(plan.start + 'T00:00:00')); }
     } catch (err) {
       addToast(...aiToast(err, 'Could not plan the week right now.'));
     } finally {
@@ -116,7 +129,13 @@ export default function Calendar() {
 
   const itemsByDate = useMemo(() => {
     const map = {};
+    const draftIds = new Set((weekDraft || []).map(t => t.id));
+    for (const task of weekDraft || []) {
+      (map[task.due_date] ||= []).push(task);
+    }
     for (const task of scheduledTasks) {
+      if (draftIds.has(task.id)) continue; // the draft placement replaces it
+
       const key = task.due_date;
       if (key) {
         if (!map[key]) map[key] = [];
@@ -148,7 +167,8 @@ export default function Calendar() {
       });
     }
     return map;
-  }, [scheduledTasks, googleEvents]);
+  }, [scheduledTasks, googleEvents, weekDraft]);
+  const isDraft = (id) => !!weekDraft?.some(t => t.id === id);
 
   const days = useMemo(() => {
     if (viewType === 'month') return getMonthDays(year, month);
@@ -179,6 +199,7 @@ export default function Calendar() {
   };
 
   const handleComplete = async (id) => {
+    if (isDraft(id)) { weekBoardRef.current?.complete(id); return; }
     try {
       const updated = await api.tasks.complete(id);
       addToast(formatCompletionToast(updated, 'Task completed'), 'success');
@@ -188,6 +209,8 @@ export default function Calendar() {
   const handleEdit = (task) => { setEditingTask(task); setShowModal(true); };
 
   const handleDropTask = async (taskId, newDate, newTime = undefined) => {
+    // A proposed item moves inside the draft only; the board re-packs its slot.
+    if (isDraft(taskId)) { weekBoardRef.current?.move(taskId, newDate); return; }
     const updates = { due_date: newDate };
     if (newTime !== undefined) {
       updates.scheduled_time = newTime;
@@ -376,6 +399,9 @@ export default function Calendar() {
           onApplied={() => { setWeekPlan(null); fetchData(); }}
           onCancel={() => setWeekPlan(null)}
           onOpenTask={handleEdit}
+          onDraftChange={setWeekDraft}
+          controlRef={weekBoardRef}
+          onShowCalendar={() => { setViewType('week'); periodNavRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }}
         />
       )}
 
@@ -427,7 +453,7 @@ export default function Calendar() {
       })()}
 
       {/* Period nav */}
-      <div className="flex items-center gap-3 mb-5">
+      <div ref={periodNavRef} className="flex items-center gap-3 mb-5 scroll-mt-6">
         <button onClick={handlePrev} className="grid place-items-center w-9 h-9 rounded-xl glass glass-hover">
           <ChevronLeft className="w-4 h-4" />
         </button>
@@ -444,6 +470,15 @@ export default function Calendar() {
           {getPeriodLabel()}
         </h2>
       </div>
+
+      {weekDraft && (
+        <div className="flex items-center gap-2 mb-3 font-mono text-[11px] text-text-3">
+          <span className="inline-block w-5 h-3 rounded-sm" style={DRAFT_SWATCH} />
+          {weekDraft.some(t => t.scheduled_time)
+            ? 'Dashed blocks are your week plan draft, packed between your meetings. Drag one to another day to move it; nothing is saved until you apply.'
+            : 'Dashed items are your week plan draft (days only). Turn on “with times” in the plan to see their slots.'}
+        </div>
+      )}
 
       {/* Main */}
       {loading ? (

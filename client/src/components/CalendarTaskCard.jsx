@@ -21,6 +21,9 @@ export default function CalendarTaskCard({ task, onEdit, onComplete, onDragStart
   // It must NOT be draggable: the drop handler only knows the task id and always
   // writes due_date, so dragging the start marker silently moved the DUE date.
   const isStartMarker = task._calendarDate === 'start';
+  // Week-plan proposal (not saved): dashed and striped; its drop and complete
+  // are routed to the open plan by the Calendar page.
+  const isDraft = !!task._draft;
 
   return (
     <div
@@ -31,9 +34,13 @@ export default function CalendarTaskCard({ task, onEdit, onComplete, onDragStart
         onDragStart?.(task.id);
       }}
       onClick={() => onEdit?.(task)}
-      title={isStartMarker ? 'Starts this day — edit the task to change its start date' : undefined}
+      title={isDraft ? (task._draftUnfit ? 'Proposed for this day — no free slot found' : 'Proposed for this day — not saved until you apply the plan') : isStartMarker ? 'Starts this day — edit the task to change its start date' : undefined}
       className="group relative flex items-center gap-1.5 px-2 py-1 rounded-md text-[11.5px] cursor-pointer transition-all"
-      style={{
+      style={isDraft ? {
+        background: 'repeating-linear-gradient(135deg, rgb(var(--violet) / 0.20) 0 6px, rgb(var(--violet) / 0.07) 6px 12px)',
+        border: `1px dashed ${task._draftUnfit ? 'rgb(var(--rose-glow) / 0.75)' : 'rgb(var(--violet-glow) / 0.75)'}`,
+        color: 'rgb(var(--text-1))',
+      } : {
         background: overdue ? 'rgba(251,113,133,0.10)' : tone.bg,
         border: `1px ${isStartMarker ? 'dashed' : 'solid'} ${overdue ? 'rgba(251,113,133,0.25)' : tone.border}`,
         color: overdue ? 'rgb(var(--rose-glow))' : tone.text,
