@@ -251,7 +251,7 @@ nav .container {
    Hero
    ============================================================ */
 .hero {
-  padding-top: 160px;
+  padding-top: 128px;
   padding-bottom: 80px;
   text-align: center;
   position: relative;
@@ -277,6 +277,106 @@ nav .container {
 .hero .subline strong {
   color: var(--text-1);
   font-weight: 500;
+}
+
+/* Promo video right under the hero CTA, framed by a violet→mint glow. */
+.hero-video {
+  max-width: 960px;
+  margin: 48px auto 0;
+}
+
+.hero-video-label {
+  margin-bottom: 14px;
+}
+
+.hero-video-frame {
+  position: relative;
+  padding: 2px;
+  border-radius: 22px;
+  background: linear-gradient(135deg, var(--violet), var(--violet-deep) 45%, var(--mint-deep));
+  box-shadow:
+    0 0 0 1px rgba(196, 181, 253, 0.15),
+    0 24px 90px -10px rgba(124, 58, 237, 0.55),
+    0 0 140px -30px rgba(94, 234, 212, 0.35);
+}
+
+.hero-video-frame video {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 16 / 9;
+  border-radius: 20px;
+  background: #0A0A0F;
+}
+
+.hero-video-play {
+  position: absolute;
+  inset: 2px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  border: 0;
+  border-radius: 20px;
+  background: radial-gradient(circle at center, rgba(10, 10, 15, 0.15), rgba(10, 10, 15, 0.55));
+  color: #fff;
+  font-family: var(--font-body);
+  cursor: pointer;
+}
+
+.hero-video-play[hidden] { display: none; }
+
+.hero-video-play-icon {
+  display: grid;
+  place-items: center;
+  width: 76px;
+  height: 76px;
+  padding-left: 4px;
+  border-radius: 50%;
+  background: var(--violet-deep);
+  box-shadow: 0 0 0 0 rgba(167, 139, 250, 0.6);
+  animation: promo-pulse 2.4s ease-out infinite;
+  transition: transform 0.2s ease;
+}
+
+.hero-video-play:hover .hero-video-play-icon,
+.hero-video-play:focus-visible .hero-video-play-icon {
+  transform: scale(1.08);
+}
+
+.hero-video-play:focus-visible {
+  outline: 2px solid var(--violet-glow);
+  outline-offset: 2px;
+}
+
+.hero-video-play-text {
+  font-size: 16px;
+  font-weight: 500;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: rgba(10, 10, 15, 0.6);
+}
+
+.hero-video-play-text span {
+  color: rgba(255, 255, 255, 0.6);
+  font-weight: 400;
+}
+
+@keyframes promo-pulse {
+  0%   { box-shadow: 0 0 0 0 rgba(167, 139, 250, 0.6); }
+  70%  { box-shadow: 0 0 0 22px rgba(167, 139, 250, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(167, 139, 250, 0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-video-play-icon { animation: none; }
+}
+
+@media (max-width: 640px) {
+  .hero-video { margin-top: 44px; }
+  .hero-video-play-icon { width: 60px; height: 60px; }
+  .hero-video-play-text { font-size: 14px; }
 }
 
 /* ============================================================

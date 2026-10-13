@@ -79,12 +79,12 @@
       {
         "@type": "VideoObject",
         "@id": "https://cleartable.app/#demo-video",
-        "name": "Cleartable in 30 seconds — AI daily planning demo",
-        "description": "The morning brief, capturing a task in plain language, and AI planning the day into approved time blocks.",
-        "contentUrl": "https://cleartable.app/demo.mp4",
-        "thumbnailUrl": "https://cleartable.app/screenshots/app-plan.jpg",
-        "uploadDate": "2026-07-06",
-        "duration": "PT33S",
+        "name": "Cleartable in 47 seconds — the calm task app tour",
+        "description": "Capture a thought in plain language, watch Cleartable organize it, then plan your day around your real calendar.",
+        "contentUrl": "https://cleartable.app/promo.mp4",
+        "thumbnailUrl": "https://cleartable.app/screenshots/promo-poster.jpg",
+        "uploadDate": "2026-10-13",
+        "duration": "PT48S",
         "publisher": { "@id": "https://cleartable.app/#organization" }
       },
       {
@@ -182,6 +182,22 @@
       <div>
         <a href="/app" class="cta-button">Start free with Google</a>
         <p class="capture-note">Free forever. No credit card.</p>
+      </div>
+
+      <!-- Promo video: first thing below the fold, plays with sound on click -->
+      <div class="hero-video" id="tour">
+        <div class="mono-label violet hero-video-label">see it in 47 seconds</div>
+        <div class="hero-video-frame">
+          <video id="promo-video" src="promo.mp4" poster="screenshots/promo-poster.jpg" preload="metadata" playsinline
+                 width="1920" height="1080"
+                 aria-label="47-second tour: capture a thought in plain language, Cleartable organizes it, then plans your day around your calendar"></video>
+          <button type="button" class="hero-video-play" id="promo-play" aria-label="Play the 47-second tour with sound">
+            <span class="hero-video-play-icon" aria-hidden="true">
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.14v13.72a1 1 0 001.52.85l10.6-6.86a1 1 0 000-1.7L9.52 4.29A1 1 0 008 5.14z"/></svg>
+            </span>
+            <span class="hero-video-play-text">Watch the tour <span>· 0:47 · sound on</span></span>
+          </button>
+        </div>
       </div>
     </div>
   </section>
@@ -316,27 +332,6 @@
           <div class="num">≡</div>
           <div class="label">Lists</div>
         </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ========== Preview ========== -->
-  <section class="preview reveal">
-    <div class="container">
-      <div class="mono-label violet" style="text-align: center; margin-bottom: 12px;">the app</div>
-      <h2>Dark, calm, focused.</h2>
-      <div class="preview-carousel">
-        <div class="preview-frame">
-          <div class="preview-bar">
-            <div class="preview-dot"></div>
-            <div class="preview-dot"></div>
-            <div class="preview-dot"></div>
-          </div>
-          <video src="demo.mp4" poster="screenshots/app-plan.jpg" autoplay muted loop playsinline controls
-                 width="1600" height="900" style="display:block;width:100%;height:auto;"
-                 aria-label="30-second demo: the morning brief, capturing a task in plain language, and AI planning the day into approved time blocks"></video>
-        </div>
-        <p class="carousel-caption">The 30-second tour — capture in plain language, then one tap plans your day.</p>
       </div>
     </div>
   </section>
@@ -545,6 +540,26 @@
     }, { threshold: 0.15 });
 
     document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+
+    // Promo video: overlay button starts playback with sound, then native controls take over
+    const promo = document.getElementById('promo-video');
+    const promoPlay = document.getElementById('promo-play');
+    promoPlay.addEventListener('click', () => {
+      promo.controls = true;
+      promo.play();
+    });
+    promo.addEventListener('play', () => {
+      promoPlay.hidden = true;
+      if (!promo.dataset.tracked && window.posthog) {
+        promo.dataset.tracked = '1';
+        window.posthog.capture('promo_video_play');
+      }
+    });
+    promo.addEventListener('ended', () => {
+      promo.controls = false;
+      promo.currentTime = 0;
+      promoPlay.hidden = false;
+    });
 
   </script>
 
