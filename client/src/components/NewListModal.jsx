@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom';
 import { useState, useEffect } from 'react';
 import { X, AlertCircle, List, BookOpen, Tv, UtensilsCrossed, Music, Film, MapPin, Heart, Star, Bookmark, ShoppingBag, Lightbulb } from 'lucide-react';
 import { api } from '../lib/api';
@@ -68,7 +69,7 @@ export default function NewListModal({ list, onClose, onSave }) {
     } finally { setLoading(false); }
   };
 
-  return (
+  return createPortal(
     <div
       className="fixed inset-0 z-50 flex items-start justify-center p-4 sm:p-8 overflow-y-auto"
       style={{ background: 'rgba(8,8,14,0.55)', backdropFilter: 'blur(8px)' }}
@@ -168,6 +169,7 @@ export default function NewListModal({ list, onClose, onSave }) {
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

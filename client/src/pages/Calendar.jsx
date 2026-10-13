@@ -37,7 +37,8 @@ export default function Calendar() {
   const [loading, setLoading] = useState(true);
   const [editingTask, setEditingTask] = useState(null);
   const [showModal, setShowModal] = useState(false);
-  const [viewType, setViewType] = useState('month');
+  // Phones open on the week agenda: a month grid at 360px has no room for titles.
+  const [viewType, setViewType] = useState(() => (window.matchMedia?.('(max-width: 767px)').matches ? 'week' : 'month'));
   const [currentDate, setCurrentDate] = useState(new Date());
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [calendarConnected, setCalendarConnected] = useState(false);

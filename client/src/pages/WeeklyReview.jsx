@@ -22,7 +22,7 @@ const STEPS = [
 
 function StepIndicator({ current }) {
   return (
-    <div className="flex items-center justify-center gap-1.5 mb-10 flex-wrap">
+    <div className="flex items-center justify-center gap-1 sm:gap-1.5 mb-10 flex-wrap">
       {STEPS.map((s, i) => {
         const isActive = s.num === current;
         const isDone = s.num < current;
@@ -30,7 +30,7 @@ function StepIndicator({ current }) {
         return (
           <div key={s.num} className="flex items-center">
             <div
-              className="flex items-center gap-2 px-3 py-1.5 rounded-full font-mono text-[11px] uppercase tracking-wider transition-all"
+              className="flex items-center gap-2 px-2.5 sm:px-3 py-1.5 rounded-full font-mono text-[11px] uppercase tracking-wider transition-all"
               style={
                 isActive
                   ? {
@@ -55,7 +55,7 @@ function StepIndicator({ current }) {
             </div>
             {i < STEPS.length - 1 && (
               <div
-                className="w-6 h-px mx-1"
+                className="w-3 sm:w-6 h-px mx-0.5 sm:mx-1"
                 style={{ background: isDone ? 'rgb(var(--mint) / 0.4)' : 'rgba(255,255,255,0.08)' }}
               />
             )}

@@ -246,3 +246,14 @@ input[type="number"] { -moz-appearance: textfield; }
 @media (hover: none) {
   .touch-show { opacity: 1 !important; }
 }
+
+/* Phones: iOS Safari zooms the page in when a focused field is under 16px,
+   and leaves it zoomed. 16px fields keep the layout still while typing. */
+@media (max-width: 767px) {
+  input:not([type=checkbox]):not([type=radio]):not([type=range]), textarea, select {
+    font-size: 16px !important;
+  }
+}
+
+/* No grey flash on tap; the app draws its own pressed states. */
+html { -webkit-tap-highlight-color: transparent; }

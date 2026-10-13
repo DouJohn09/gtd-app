@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom';
 import { useState, useEffect } from 'react';
 import { X, AlertCircle, Plus, Sparkles, ExternalLink, Repeat, Trash2 } from 'lucide-react';
 import { api } from '../lib/api';
@@ -184,7 +185,7 @@ export default function TaskModal({ task, projects, onClose, onSave }) {
     } finally { setLoading(false); }
   };
 
-  return (
+  return createPortal(
     <div
       className="fixed inset-0 z-50 flex items-start justify-center p-4 sm:p-8 overflow-y-auto"
       style={{ background: 'rgba(8,8,14,0.55)', backdropFilter: 'blur(8px)' }}
@@ -213,7 +214,7 @@ export default function TaskModal({ task, projects, onClose, onSave }) {
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-5 space-y-4 max-h-[70vh] overflow-y-auto">
+        <form onSubmit={handleSubmit} className="p-5 space-y-4 max-h-[calc(100dvh-150px)] sm:max-h-[70vh] overflow-y-auto">
           {error && (
             <div
               className="rounded-xl p-3 flex items-start gap-2"
@@ -643,7 +644,8 @@ export default function TaskModal({ task, projects, onClose, onSave }) {
             </div>
           </button>
 
-          <div className="flex gap-2 pt-3 border-t border-white/[0.05]">
+          {/* Pinned to the bottom of the scrolling form so Save is always in reach */}
+          <div className="sticky -bottom-5 -mx-5 -mb-5 px-5 pb-5 flex gap-2 pt-3 border-t border-white/[0.05]" style={{ background: 'rgba(16,16,24,0.92)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }}>
             {task?.id && (
               <button
                 type="button"
@@ -681,7 +683,8 @@ export default function TaskModal({ task, projects, onClose, onSave }) {
           onCancel={() => setConfirmDelete(false)}
         />
       )}
-    </div>
+    </div>,
+    document.body
   );
 }
 

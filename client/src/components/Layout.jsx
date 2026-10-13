@@ -141,7 +141,7 @@ export default function Layout() {
       <AuroraBackground />
 
       {/* Mobile top bar */}
-      <header className="md:hidden flex items-center justify-between px-4 py-3 relative z-20 border-b border-white/5">
+      <header className="md:hidden flex items-center justify-between px-4 py-3 relative z-20 border-b border-white/5" style={{ paddingTop: 'calc(12px + env(safe-area-inset-top))' }}>
         <div className="flex items-center gap-2.5">
           <div
             className="w-7 h-7 rounded-[9px] grid place-items-center"
@@ -265,14 +265,14 @@ export default function Layout() {
       </aside>
 
       {/* Main */}
-      <main className="flex-1 overflow-auto relative z-10 pb-[76px] md:pb-0">
+      <main className="flex-1 overflow-auto relative z-10 pb-[calc(84px+env(safe-area-inset-bottom))] md:pb-0">
         <ErrorBoundary scope="page" resetKey={location.pathname}>
           <Outlet context={{ refreshCustomLists }} />
         </ErrorBoundary>
       </main>
 
       {/* Mobile bottom tab bar */}
-      <nav className="md:hidden fixed bottom-3 left-3 right-3 z-30 glass rounded-2xl flex items-center px-2 py-2">
+      <nav className="md:hidden fixed left-3 right-3 z-30 glass rounded-2xl flex items-center px-2 py-2" style={{ bottom: 'calc(12px + env(safe-area-inset-bottom))' }}>
         {mobileTabs.map((t) => (
           <NavLink
             key={t.to}
@@ -305,7 +305,8 @@ export default function Layout() {
         <div className="md:hidden fixed inset-0 z-40 flex items-end" onClick={() => setMoreOpen(false)}>
           <div className="absolute inset-0 backdrop-blur-md" style={{ background: 'rgba(8,8,14,0.55)' }} />
           <div
-            className="relative w-full glass rounded-t-3xl p-5 pb-8 animate-rise"
+            className="relative w-full glass rounded-t-3xl p-5 animate-rise max-h-[85vh] overflow-y-auto"
+            style={{ paddingBottom: 'calc(32px + env(safe-area-inset-bottom))' }}
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-4">

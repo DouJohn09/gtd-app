@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom';
 import { useState, useEffect, useMemo } from 'react';
 import { X, Plus, Sparkles } from 'lucide-react';
 
@@ -125,14 +126,14 @@ export default function HabitModal({ habit, onClose, onSave, existingCategories 
     onSave(data);
   };
 
-  return (
+  return createPortal(
     <div
       className="fixed inset-0 z-50 flex items-start justify-center p-4 sm:p-8 overflow-y-auto"
       style={{ background: 'rgba(8,8,14,0.55)', backdropFilter: 'blur(8px)' }}
       onClick={onClose}
     >
       <div
-        className="relative w-full max-w-md my-6 rounded-2xl glass overflow-hidden"
+        className="relative w-full max-w-md my-6 rounded-2xl glass overflow-hidden flex flex-col max-h-[calc(100dvh-80px)] sm:max-h-none"
         onClick={e => e.stopPropagation()}
         style={{ boxShadow: '0 24px 64px -16px rgba(0,0,0,0.55), inset 0 1px 0 rgb(255 255 255 / 0.06), inset 0 0 0 1px rgb(var(--mint) / 0.16)' }}
       >
@@ -177,7 +178,7 @@ export default function HabitModal({ habit, onClose, onSave, existingCategories 
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="p-5 space-y-4 max-h-[65vh] overflow-y-auto">
+        <form onSubmit={handleSubmit} className="p-5 space-y-4 flex-1 min-h-0 sm:max-h-[65vh] overflow-y-auto">
           <div>
             <label className="gtd-label">Type</label>
             <div className="grid grid-cols-2 gap-2">
@@ -376,7 +377,7 @@ export default function HabitModal({ habit, onClose, onSave, existingCategories 
             </div>
           </div>
 
-          <div className="flex gap-2 pt-3 border-t border-white/[0.05]">
+          <div className="sticky -bottom-5 -mx-5 -mb-5 px-5 pb-5 flex gap-2 pt-3 border-t border-white/[0.05]" style={{ background: 'rgba(16,16,24,0.92)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }}>
             <button type="button" onClick={onClose} className="gtd-btn gtd-btn-secondary flex-1 text-[12.5px]">
               Cancel
             </button>
@@ -390,6 +391,7 @@ export default function HabitModal({ habit, onClose, onSave, existingCategories 
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

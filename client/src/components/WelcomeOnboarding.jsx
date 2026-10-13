@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom';
 import { useState } from 'react';
 import { trackEvent } from '../lib/analytics';
 import {
@@ -151,7 +152,7 @@ export default function WelcomeOnboarding() {
     setStep(step + 1);
   };
 
-  return (
+  return createPortal(
     <div
       className="fixed inset-0 z-[70] flex items-center justify-center p-4"
       style={{ background: 'rgba(8,8,14,0.62)', backdropFilter: 'blur(10px)' }}
@@ -329,6 +330,7 @@ export default function WelcomeOnboarding() {
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

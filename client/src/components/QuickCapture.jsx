@@ -90,9 +90,10 @@ export default function QuickCapture({ onCapture, placeholder = "Quick capture â
 
   return (
     <form onSubmit={handleSubmit} className="flex items-center gap-2">
-      <div className="relative flex-1">
+      <div className="relative flex-1 min-w-0">
         <input
           type="text"
+          enterKeyHint="send"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder={useAi ? '"call mom tomorrow" Â· "buy groceries Friday"' : placeholder}
@@ -133,9 +134,10 @@ export default function QuickCapture({ onCapture, placeholder = "Quick capture â
       <button
         type="submit"
         disabled={!title.trim()}
-        className="gtd-btn gtd-btn-primary inline-flex items-center gap-1.5 text-[12.5px] disabled:opacity-50"
+        aria-label="Capture"
+        className="gtd-btn gtd-btn-primary inline-flex items-center gap-1.5 text-[12.5px] disabled:opacity-50 shrink-0 max-sm:px-3"
       >
-        Capture
+        <span className="hidden sm:inline">Capture</span>
         <ArrowRight className="w-3.5 h-3.5" />
       </button>
     </form>
