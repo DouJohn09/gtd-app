@@ -3,7 +3,7 @@ import { TaskModel, ProjectModel, WeeklyReviewModel } from '../db/models.js';
 import { pool } from '../db/pool.js';
 import { processInbox, getDailyPriorities, importNotes, findDuplicates, weeklyReviewAnalysis, smartCapture, planDay, planWeek, AI_INPUT_CAPS } from '../services/ai.js';
 import { syncTaskToCalendar } from '../services/googleCalendar.js';
-import { findFreeSlot, freeRangesFor, timeToMinutes, minutesToTime, eventMinutesOnDay, clampRangesToNow, packPlan } from '../services/scheduling.js';
+import { findFreeSlot, freeRangesFor, timeToMinutes, minutesToTime, eventMinutesOnDay, clampRangesToNow, packPlan, freeRangesFrom } from '../services/scheduling.js';
 import { check, charge, getStatus } from '../services/aiUsage.js';
 import { enforceAiLimit, requireAiEnabled, chargeAiUsage } from '../middleware/aiLimit.js';
 import { getAiMode } from '../services/userPrefs.js';
@@ -857,7 +857,18 @@ router.post('/plan-week', requireAiEnabled, enforceAiLimit, async (req, res) => 
 });
 
 
-// POST /api/ai/week-times { start, placements: [{ taskId, date }] }
+// Union of {start,end} minute ranges, sorted.
+function mergeRanges(ranges) {
+  const out = [];
+  for (const r of [...ranges].sort((a, b) => a.start - b.start)) {
+    const last = out[out.length - 1];
+    if (last && r.start <= last.end) last.end = Math.max(last.end, r.end);
+    else out.push({ ...r });
+  }
+  return out;
+}
+
+// POST /api/ai/week-times { start, placements: [{ taskId, date, estimate?, start? }] }
 // Deterministic time windows for a day-distributed week. No AI: the model
 // already chose the days; here each day's tasks are packed into that day's
 // free ranges (meetings and existing blocks respected, today clamped to now).
@@ -882,17 +893,32 @@ router.post('/week-times', async (req, res) => {
     const times = [];
     const unfit = [];
 
+    // Per placement: the planner's estimate for a task that has none (so the
+    // slot matches the size the board shows), and a start the person pinned
+    // by dragging the block in the Calendar.
     const byDate = new Map();
     for (const p of placements) {
       const t = tasks.get(Number(p.taskId));
       if (!t) continue;
+      const est = Number(p.estimate);
+      const pinned = /^([01]\d|2[0-3]):[0-5]\d$/.test(p.start || '') ? timeToMinutes(p.start) : null;
       if (!byDate.has(p.date)) byDate.set(p.date, []);
-      byDate.get(p.date).push(t);
+      byDate.get(p.date).push({ ...t, _est: Number.isFinite(est) && est > 0 ? est : null, _pinned: pinned });
     }
 
     for (const [date, list] of byDate) {
       const shape = await freeRangesFor(req.user.id, date, req.clientTimezone);
-      const free = date === req.today ? clampRangesToNow(shape.free, nowMins) : shape.free;
+      let free = date === req.today ? clampRangesToNow(shape.free, nowMins) : shape.free;
+      // A start the person picked by hand is honored outside working hours
+      // too, as long as it doesn't overlap a meeting: open that span up.
+      const allDayFree = freeRangesFrom(shape.busy, 0, 24 * 60);
+      for (const t of list) {
+        if (t._pinned == null) continue;
+        const span = { start: t._pinned, end: t._pinned + Math.min(480, Math.max(5, Math.round(t.time_estimate || t._est || 30))) };
+        if (date === req.today && nowMins != null && span.start < nowMins) continue;
+        if (!allDayFree.some(r => r.start <= span.start && span.end <= r.end)) continue;
+        free = mergeRanges([...free, span]);
+      }
       const longest = free.reduce((a, r) => (!a || (r.end - r.start) > (a.end - a.start) ? r : a), null);
       const rank = (t) => {
         const due = dateOnly(t.due_date);
@@ -907,10 +933,12 @@ router.post('/week-times', async (req, res) => {
       });
       const blocks = ordered.map((t, i) => ({
         task_index: t.id,
-        duration: Math.min(480, Math.max(5, t.time_estimate || 30)),
-        // Only the first high-energy task claims the longest window; the rest
-        // flow into the earliest slot so mornings aren't all deep work.
-        start: (t.energy_level === 'high' && longest && i === ordered.findIndex(x => x.energy_level === 'high')) ? longest.start : null,
+        duration: Math.min(480, Math.max(5, Math.round(t.time_estimate || t._est || 30))),
+        // A pinned start wins. Otherwise only the first high-energy task claims
+        // the longest window; the rest flow into the earliest slot so mornings
+        // aren't all deep work.
+        start: t._pinned != null ? t._pinned
+          : (t.energy_level === 'high' && longest && i === ordered.findIndex(x => x.energy_level === 'high')) ? longest.start : null,
       }));
       const { placed, overflow } = packPlan(blocks, free);
       for (const b of placed) times.push({ taskId: b.task_index, date, start: minutesToTime(b.start), duration: b.duration });

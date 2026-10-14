@@ -16,7 +16,7 @@ import { aiToast } from '../lib/aiError';
  * `result` is the /ai/plan-week response; `onOpenTask(task)` opens the editor;
  * `onApplied()` / `onCancel()` close the board.
  */
-export default function WeekPlanBoard({ result, onApplied, onCancel, onOpenTask, onReplan, onDraftChange, controlRef, onShowCalendar, compact = false }) {
+export default function WeekPlanBoard({ result, onApplied, onCancel, onOpenTask, onReplan, onDraftChange, controlRef, onShowCalendar, defaultWithTimes = false, compact = false }) {
   const { addToast } = useToast();
   const tasks = useMemo(() => new Map((result?.tasks || []).map(t => [t.id, t])), [result]);
   const days = result?.days || [];
@@ -98,15 +98,22 @@ export default function WeekPlanBoard({ result, onApplied, onCancel, onOpenTask,
   // Time windows: optional second pass. With it on, every change to the board
   // re-packs each day's tasks into that day's free ranges on the server
   // (deterministic, no AI) and Apply writes the blocks + Google Calendar events.
-  const [withTimes, setWithTimes] = useState(false);
+  const [withTimes, setWithTimes] = useState(defaultWithTimes);
+  // Starts the person chose by dragging a draft block in the Calendar
+  // (taskId → "HH:MM"). Moving a card to another day without a time drops it.
+  const [pinned, setPinned] = useState(() => new Map());
   const [times, setTimes] = useState(() => new Map()); // taskId → { start, duration }
   const [unfit, setUnfit] = useState(() => new Set());
   const [timing, setTiming] = useState(false);
   const timesReq = useRef(0);
-  const placementsKey = [...where.entries()].filter(([id, d]) => d && !omitted.has(id) && !completed.has(id)).map(([id, d]) => `${id}:${d}`).sort().join(',');
+  const placementsKey = [...where.entries()].filter(([id, d]) => d && !omitted.has(id) && !completed.has(id)).map(([id, d]) => `${id}:${d}@${pinned.get(id) || ''}`).sort().join(',');
   useEffect(() => {
     if (!withTimes) return;
-    const placements = [...where.entries()].filter(([id, d]) => d && !omitted.has(id) && !completed.has(id)).map(([taskId, date]) => ({ taskId, date }));
+    const placements = [...where.entries()].filter(([id, d]) => d && !omitted.has(id) && !completed.has(id)).map(([taskId, date]) => ({
+      taskId, date,
+      ...(pinned.get(taskId) ? { start: pinned.get(taskId) } : {}),
+      ...(!tasks.get(taskId)?.time_estimate && aiEst[taskId] ? { estimate: aiEst[taskId] } : {}),
+    }));
     const seq = ++timesReq.current;
     setTiming(true);
     api.ai.weekTimes(start, placements)
@@ -131,7 +138,13 @@ export default function WeekPlanBoard({ result, onApplied, onCancel, onOpenTask,
     ...days.map(d => ({ value: d.date, label: `${d.dayName}${d.date === start ? ' (today)' : ''} · ${Number(d.date.slice(8, 10))}` })),
     { value: '', label: 'Not this week' },
   ];
-  const moveCard = (taskId, date) => {
+  const moveCard = (taskId, date, time) => {
+    setPinned(prev => {
+      if (!time && !prev.has(taskId)) return prev;
+      const n = new Map(prev);
+      if (time) n.set(taskId, time); else n.delete(taskId);
+      return n;
+    });
     if (date) {
       moveTo(taskId, date);
       setOmitted(prev => { const n = new Set(prev); n.delete(taskId); return n; });
@@ -174,7 +187,7 @@ export default function WeekPlanBoard({ result, onApplied, onCancel, onOpenTask,
   const onDropDay = (e, date) => {
     e.preventDefault(); setDragOver(null);
     const id = Number(e.dataTransfer.getData('text/plain'));
-    if (id) { moveTo(id, date); setOmitted(prev => { const n = new Set(prev); n.delete(id); return n; }); }
+    if (id) moveCard(id, date);
   };
   const onDropUnplaced = (e) => {
     e.preventDefault(); setDragOver(null);
@@ -320,14 +333,14 @@ export default function WeekPlanBoard({ result, onApplied, onCancel, onOpenTask,
 
       <div className="flex items-center justify-between gap-3 mt-4 flex-wrap">
         <p className="text-[11.5px] text-text-3 inline-flex items-center gap-1.5"><Sparkles className="w-3 h-3" /> {withTimes
-          ? 'Time blocks go to your calendar on apply; drag them in the Calendar to fine-tune.'
+          ? onShowCalendar ? 'Each task is slotted into free time between your meetings — see it in the calendar below and drag a block to change it. Apply writes the blocks to Google Calendar.' : 'Time blocks go to your calendar on apply; drag them in the Calendar to fine-tune.'
           : onShowCalendar
             ? 'Days only. Turn on “with times” to see each task’s slot between your meetings in the calendar below.'
             : 'Days only. Each morning, “Plan my day” puts that day’s tasks into time blocks.'}</p>
         <div className="flex items-center gap-2">
           <button onClick={onCancel} className="gtd-btn gtd-btn-secondary text-[12.5px]">Cancel</button>
           <button onClick={apply} disabled={applying || timing || keptCount === 0} className="gtd-btn gtd-btn-primary inline-flex items-center gap-2 text-[12.5px] disabled:opacity-60">
-            {applying ? 'Applying…' : `Apply week · ${keptCount}`} <Check className="w-3.5 h-3.5" />
+            {applying ? 'Applying…' : withTimes ? `Apply & block time · ${keptCount}` : `Apply week · ${keptCount}`} <Check className="w-3.5 h-3.5" />
           </button>
         </div>
       </div>

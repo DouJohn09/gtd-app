@@ -210,8 +210,9 @@ export default function Calendar() {
   const handleEdit = (task) => { setEditingTask(task); setShowModal(true); };
 
   const handleDropTask = async (taskId, newDate, newTime = undefined) => {
-    // A proposed item moves inside the draft only; the board re-packs its slot.
-    if (isDraft(taskId)) { weekBoardRef.current?.move(taskId, newDate); return; }
+    // A proposed item moves inside the draft only. Dropped on a time it keeps
+    // that start (if free); dropped on a day the board re-packs its slot.
+    if (isDraft(taskId)) { weekBoardRef.current?.move(taskId, newDate, newTime || undefined); return; }
     const updates = { due_date: newDate };
     if (newTime !== undefined) {
       updates.scheduled_time = newTime;
@@ -402,6 +403,7 @@ export default function Calendar() {
           onOpenTask={handleEdit}
           onDraftChange={setWeekDraft}
           controlRef={weekBoardRef}
+          defaultWithTimes
           onShowCalendar={() => { setViewType('week'); periodNavRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }}
         />
       )}
@@ -476,7 +478,7 @@ export default function Calendar() {
         <div className="flex items-center gap-2 mb-3 font-mono text-[11px] text-text-3">
           <span className="inline-block w-5 h-3 rounded-sm" style={DRAFT_SWATCH} />
           {weekDraft.some(t => t.scheduled_time)
-            ? 'Dashed blocks are your week plan draft, packed between your meetings. Drag one to another day to move it; nothing is saved until you apply.'
+            ? 'Dashed blocks are your week plan draft, packed into free time between your meetings. Drag one to another time or day; nothing is saved until you apply, then the blocks go to Google Calendar.'
             : 'Dashed items are your week plan draft (days only). Turn on “with times” in the plan to see their slots.'}
         </div>
       )}
