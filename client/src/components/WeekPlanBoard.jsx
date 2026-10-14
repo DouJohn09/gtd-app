@@ -374,7 +374,11 @@ function Card({ task, reason, time = null, aiEstimate = null, omitted = false, m
             </span>
             {task.context && <span className="font-mono text-[9.5px] text-text-3">{contextLabel(task.context)}</span>}
             {task.due_date && <span className="font-mono text-[9.5px]" style={{ color: 'rgb(var(--amber-glow))' }}>due {String(task.due_date).slice(5, 10)}</span>}
-            <span className="ml-auto inline-flex items-center gap-2">
+          </div>
+          {/* Own row, wrapping: on the 7-column board a card is too narrow to
+              fit these after the meta chips, and they spilled out of the card. */}
+          <div className="flex items-center gap-x-2.5 gap-y-1 mt-1 flex-wrap">
+            <span className="inline-flex items-center gap-x-2 gap-y-1 flex-wrap">
               {moveOptions && onMove && (
                 <label className="relative font-mono text-[9.5px] text-text-3 hover:text-violet-glow inline-flex items-center gap-0.5 cursor-pointer" title="Move to another day">
                   <ArrowRightLeft className="w-2.5 h-2.5" /> move
