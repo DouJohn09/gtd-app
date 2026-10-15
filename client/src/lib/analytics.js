@@ -35,7 +35,14 @@ export function initAnalytics() {
   initialized = true;
 }
 
+// Same origin as the landing page, so it can read this and skip tracking.
+// Kept on sign-out: the device stays the founder's.
+const INTERNAL_KEY = 'ct_internal';
+
 export function identifyUser(user) {
+  if (user?.is_internal) {
+    try { localStorage.setItem(INTERNAL_KEY, '1'); } catch { /* storage blocked */ }
+  }
   if (!initialized || !user?.id) return;
   posthog.identify(String(user.id), {
     email: user.email,

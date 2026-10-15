@@ -177,7 +177,11 @@ async function visitors() {
 // ─── Journeys (PostHog: landing page → app → sign-in → first task) ────────
 // Read-only personal API key (POSTHOG_PERSONAL_API_KEY, "query:read") +
 // POSTHOG_PROJECT_ID. Founder accounts (STATS_EXCLUDE_EMAILS) are dropped by
-// person, so their anonymous pre-sign-in pageviews are excluded too.
+// person, so their anonymous pre-sign-in pageviews are excluded too. The
+// landing page is cookieless, so a founder's visit in a fresh tab is a new
+// anonymous person: anonymous people on a device a founder used while signed
+// in are dropped as well (and founder browsers no longer send landing
+// events at all, see landing-page/analytics.js).
 async function journeys() {
   const key = process.env.POSTHOG_PERSONAL_API_KEY;
   const project = process.env.POSTHOG_PROJECT_ID;
@@ -186,8 +190,15 @@ async function journeys() {
   return cached('journeys', 10 * 60_000, async () => {
     const lit = (s) => `'${String(s).replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`;
     const skip = excluded();
+    const founders = `(SELECT id FROM persons WHERE lower(properties.email) IN (${skip.map(lit).join(', ')}))`;
+    // PostHog keeps no IPs for this project, so "same device" is the next best
+    // thing: city + device + OS + browser + exact screen size, as seen on a
+    // founder's signed-in events.
+    const fp = 'properties.$geoip_city_name, properties.$device_type, properties.$os, properties.$browser, properties.$screen_width, properties.$screen_height';
+    const founderDevices = `(SELECT DISTINCT ${fp} FROM events WHERE timestamp > now() - INTERVAL 60 DAY AND person_id IN ${founders} AND properties.$screen_width IS NOT NULL)`;
+    const anonOnFounderDevice = `(SELECT DISTINCT person_id FROM events WHERE timestamp > now() - INTERVAL 35 DAY AND person.properties.email IS NULL AND (${fp}) IN ${founderDevices})`;
     const notFounder = skip.length
-      ? `person_id NOT IN (SELECT id FROM persons WHERE lower(properties.email) IN (${skip.map(lit).join(', ')}))`
+      ? `person_id NOT IN ${founders} AND person_id NOT IN ${anonOnFounderDevice}`
       : '1 = 1';
     const run = async (query) => {
       const r = await fetch(`${host}/api/projects/${encodeURIComponent(project)}/query/`, {

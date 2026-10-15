@@ -6,7 +6,7 @@ import { OAuth2Client } from 'google-auth-library';
 import jwt from 'jsonwebtoken';
 import { pool } from '../db/pool.js';
 import { requireAuth } from '../middleware/auth.js';
-import { isAdminEmail } from '../lib/admin.js';
+import { isAdminEmail, isInternalEmail } from '../lib/admin.js';
 import { exchangeCodeForTokens, revokeCalendarAccess, isCalendarConnected, calendarScopeFlags, syncUpcomingTasks } from '../services/googleCalendar.js';
 import { isProActive } from '../services/billing.js';
 import { cancelSubscription } from '../services/paddle.js';
@@ -129,6 +129,7 @@ router.post('/google', loginLimiter, async (req, res) => {
         created_at: user.created_at || null,
         onboarded_at: user.onboarded_at || null,
         is_admin: isAdminEmail(user.email),
+        is_internal: isInternalEmail(user.email),
       }
     });
   } catch (error) {
@@ -170,6 +171,7 @@ router.get('/me', async (req, res) => {
     user.google_calendar_write = calendarFlags.write;
     user.google_calendar_read = calendarFlags.read;
     user.is_admin = isAdminEmail(user.email);
+    user.is_internal = isInternalEmail(user.email);
     delete user.google_calendar_scopes;
     // Derived entitlement the client gates on. Keep current_period_end so the UI
     // can show "Pro until <date>" for canceled/past-due subscriptions.

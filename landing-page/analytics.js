@@ -9,6 +9,8 @@
   var KEY = 'phc_mMtTYMDa95YHgD4vU2PAM3VM7nTG4xrwrQWhfwVsSi4C';
   var host = location.hostname;
   if (host !== 'cleartable.app' && host !== 'www.cleartable.app') return; // no tracking on local/preview
+  /* Founder/team browsers (marked by the app on sign-in) are not visitors. */
+  try { if (localStorage.getItem('ct_internal') === '1') return; } catch (e) { /* storage blocked */ }
 
   var id;
   try {

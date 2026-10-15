@@ -114,7 +114,7 @@ export function renderPulse(root, { data: d, error, fetchedAt }) {
     ? tile('Real visitors', pill('not set up'), '—', 'Connect Cloudflare Web Analytics to count people, not bots.')
     : vis.error
       ? tile('Real visitors', pill('error', 'warn'), '—', esc(vis.error))
-      : tile('Real visitors', pill(`${fmt(vis.last30)} · 30d`), `${fmt(vis.today)}<small>today</small>`, `${fmt(vis.last7)} in the last 7 days`, spark((vis.daily || []).slice(-14).map(x => x.visits)));
+      : tile('Real visitors', pill(`${fmt(vis.last30)} · 30d`), `${fmt(vis.today)}<small>today</small>`, `${fmt(vis.last7)} in the last 7 days · incl. your own visits`, spark((vis.daily || []).slice(-14).map(x => x.visits)));
 
   const su = d.signUps || {};
   const suTile = tile('Sign-ups', pill(`${fmt(su.allTime)} all time`, su.today ? 'good' : ''),
