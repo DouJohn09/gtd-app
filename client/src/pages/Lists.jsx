@@ -11,6 +11,7 @@ import { useTaskFilters, applyFilters } from '../components/FilterDropdown';
 import FiltersMenu, { ActiveFilters } from '../components/FiltersMenu';
 import { useAiFocus, partitionByAi } from '../hooks/useAiFocus';
 import { useAiMode } from '../hooks/useAiMode';
+import { useTaskListKeys } from '../hooks/useHotkeys';
 import MonoLabel from '../components/ui/MonoLabel';
 
 const CONFIDENCE_COLOR = {
@@ -131,6 +132,18 @@ export default function Lists() {
     catch (err) { addToast(err.message, 'error'); }
   };
   const handleEdit = (task) => { setEditingTask(task); setShowModal(true); };
+
+  // Keyboard: j/k select, Enter open, x done, f star for Today, ⌫ delete.
+  useTaskListKeys({
+    tasks: [...tasks, ...deferredTasks],
+    onOpen: handleEdit,
+    onComplete: handleComplete,
+    onDelete: (id) => setConfirmDeleteId(id),
+    onStar: async (task) => {
+      try { await api.tasks.update(task.id, { is_daily_focus: !task.is_daily_focus }); fetchData(); }
+      catch (err) { addToast(err.message, 'error'); }
+    },
+  });
 
   const { contexts: listContexts, projects: listProjects } = useTaskFilters(tasks);
   const sortedTasks = useMemo(

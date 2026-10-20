@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Outlet, NavLink, useLocation } from 'react-router-dom';
+import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Inbox, FolderKanban, ListTodo, Clock, CloudSun,
   Sparkles, Target, LogOut, CheckCircle2, RotateCcw, CalendarDays,
@@ -13,6 +13,8 @@ import NewListModal from './NewListModal';
 import AuroraBackground from './AuroraBackground';
 import CommandCapture from './CommandCapture';
 import WelcomeOnboarding from './WelcomeOnboarding';
+import ShortcutsHelp from './ShortcutsHelp';
+import { shortcutsBlocked } from '../hooks/useHotkeys';
 import ErrorBoundary from './ErrorBoundary';
 
 const navGroups = [
@@ -119,13 +121,14 @@ export default function Layout() {
 
   useEffect(() => { refreshCustomLists(); }, [refreshCustomLists]);
 
-  // Cmd/Ctrl + K opens capture; 'open-capture' lets pages trigger it too
-  // (e.g. the Dashboard first-run tour's "Start capturing" button).
+  // Cmd/Ctrl + K opens capture (with Shift: and starts dictating);
+  // 'open-capture' lets pages trigger it too (e.g. the Dashboard first-run
+  // tour's "Start capturing" button).
   useEffect(() => {
     const onKey = (e) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
-        setCaptureOpen(true);
+        setCaptureOpen(e.shiftKey ? 'voice' : true);
       }
     };
     const onOpen = () => setCaptureOpen(true);
@@ -136,6 +139,30 @@ export default function Layout() {
       window.removeEventListener('open-capture', onOpen);
     };
   }, []);
+
+  // "?" lists every shortcut; "g" then a letter jumps to a page. Listens in
+  // the capture phase so a pending "g" wins over page keys (Calendar's "w",
+  // Today's "p", ...).
+  const navigate = useNavigate();
+  const [showKeys, setShowKeys] = useState(false);
+  useEffect(() => {
+    const GO = { t: '/', i: '/inbox', c: '/calendar', p: '/projects', n: '/lists/next_actions', w: '/lists/waiting_for', r: '/review', h: '/habits' };
+    let pendingG = 0;
+    const onKey = (e) => {
+      if (shortcutsBlocked(e)) return;
+      if (pendingG && Date.now() - pendingG < 1500 && GO[e.key]) {
+        e.preventDefault();
+        pendingG = 0;
+        navigate(GO[e.key]);
+        return;
+      }
+      pendingG = 0;
+      if (e.key === 'g') { e.preventDefault(); pendingG = Date.now(); return; }
+      if (e.key === '?') { e.preventDefault(); setShowKeys(true); }
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, [navigate]);
 
   return (
     <div className="min-h-screen flex flex-col md:flex-row relative">
@@ -303,7 +330,7 @@ export default function Layout() {
 
       {/* Mobile "More" sheet */}
       {moreOpen && (
-        <div className="md:hidden fixed inset-0 z-40 flex items-end" onClick={() => setMoreOpen(false)}>
+        <div data-modal className="md:hidden fixed inset-0 z-40 flex items-end" onClick={() => setMoreOpen(false)}>
           <div className="absolute inset-0 backdrop-blur-md" style={{ background: 'rgba(8,8,14,0.55)' }} />
           <div
             className="relative w-full glass rounded-t-3xl p-5 animate-rise max-h-[85vh] overflow-y-auto"
@@ -368,7 +395,8 @@ export default function Layout() {
         </div>
       )}
 
-      <CommandCapture open={captureOpen} onClose={() => setCaptureOpen(false)} />
+      <CommandCapture key={String(captureOpen)} open={!!captureOpen} voice={captureOpen === 'voice'} onClose={() => setCaptureOpen(false)} />
+      {showKeys && <ShortcutsHelp onClose={() => setShowKeys(false)} />}
 
       {user && !user.onboarded_at && <WelcomeOnboarding />}
 

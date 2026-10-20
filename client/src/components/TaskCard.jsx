@@ -40,6 +40,7 @@ export default function TaskCard({ task, onComplete, onEdit, showList = false, q
 
   return (
     <div
+      data-task-id={task.id}
       className="relative rounded-2xl glass p-4 flex items-start gap-3 transition-all"
       style={
         isCompleted

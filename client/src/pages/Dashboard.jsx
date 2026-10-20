@@ -25,6 +25,7 @@ import GlassCard from '../components/ui/GlassCard';
 import Chip from '../components/ui/Chip';
 import FreshCheck from '../components/ui/FreshCheck';
 import MonoLabel from '../components/ui/MonoLabel';
+import { useHotkeys } from '../hooks/useHotkeys';
 
 const TONE_BY_LIST = {
   inbox: 'amber',
@@ -93,6 +94,9 @@ export default function Dashboard() {
     api.ai.dayBrief().then(b => { if (alive) setBrief(b); }).catch(() => {});
     return () => { alive = false; };
   }, [briefKey, aiOff]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Keyboard: p runs "Plan my day" (same conditions as the button).
+  useHotkeys({ p: () => { if (!aiOff && !planResult && !planLoading) runPlanDay(); } });
 
   const runPlanDay = async () => {
     setPlanLoading(true);
@@ -256,6 +260,7 @@ export default function Dashboard() {
           <button
             onClick={runPlanDay}
             disabled={planLoading}
+            title="Plan my day (p)"
             className="gtd-btn gtd-btn-primary mt-5 inline-flex items-center gap-1.5 text-[12.5px] disabled:opacity-70"
           >
             {planLoading

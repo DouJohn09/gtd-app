@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { ArrowRight, Sparkles, Mic } from 'lucide-react';
 import { api } from '../lib/api';
 import { trackEvent } from '../lib/analytics';
@@ -33,7 +33,7 @@ function formatBookedToast(bookedSlot) {
   return `Booked ${dayLabel} at ${timeLabel} (${bookedSlot.duration}m)`;
 }
 
-export default function QuickCapture({ onCapture, placeholder = "Quick capture — what's on your mind?", autoFocus = false }) {
+export default function QuickCapture({ onCapture, placeholder = "Quick capture — what's on your mind?", autoFocus = false, startListening = false }) {
   const [title, setTitle] = useState('');
   const [smartMode, setSmartMode] = useState(true);
   const { mode, aiOff } = useAiMode();
@@ -44,6 +44,11 @@ export default function QuickCapture({ onCapture, placeholder = "Quick capture �
     setTitle((prev) => (prev ? prev + ' ' + transcript : transcript));
   }, []);
   const { listening, toggle: toggleMic } = useSpeechRecognition({ onResult: onSpeechResult });
+  // Opened with ⌘⇧K: start dictating right away.
+  useEffect(() => {
+    if (startListening && speechSupported) toggleMic();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Fire-and-forget capture: clear the input the moment the user submits so
   // they can keep typing the next idea while the AI classifies in the

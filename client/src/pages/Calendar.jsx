@@ -11,6 +11,7 @@ import DayView from '../components/calendar/DayView';
 import UnscheduledSidebar from '../components/calendar/UnscheduledSidebar';
 import MonoLabel from '../components/ui/MonoLabel';
 import WeekPlanBoard from '../components/WeekPlanBoard';
+import { useHotkeys } from '../hooks/useHotkeys';
 import { useAiMode } from '../hooks/useAiMode';
 import { aiToast } from '../lib/aiError';
 import {
@@ -194,6 +195,13 @@ export default function Calendar() {
     setCurrentDate(d);
   };
   const handleToday = () => setCurrentDate(new Date());
+
+  // Keyboard: ←/→ previous/next period, t today, m/w/d view, p plan my week.
+  useHotkeys({
+    ArrowLeft: handlePrev, ArrowRight: handleNext, t: handleToday,
+    m: () => setViewType('month'), w: () => setViewType('week'), d: () => setViewType('day'),
+    p: () => { if (!aiOff && !weekPlan && !planningWeek) planWeek(); },
+  });
   const handleDayClick = (date) => {
     setCurrentDate(new Date(date + 'T00:00:00'));
     setViewType('day');
@@ -355,7 +363,7 @@ export default function Calendar() {
               onClick={planWeek}
               disabled={planningWeek || !!weekPlan}
               className="gtd-btn gtd-btn-primary inline-flex items-center gap-1.5 text-[12.5px] disabled:opacity-60"
-              title="AI proposes a day for each open task; you adjust, then apply"
+              title="AI slots each open task into your week; you adjust, then apply (p)"
             >
               <CalendarRange className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">{planningWeek ? 'Planning…' : 'Plan my week'}</span>
@@ -457,14 +465,15 @@ export default function Calendar() {
 
       {/* Period nav */}
       <div ref={periodNavRef} className="flex items-center gap-3 mb-5 scroll-mt-6">
-        <button onClick={handlePrev} className="tap-expand grid place-items-center w-9 h-9 rounded-xl glass glass-hover">
+        <button onClick={handlePrev} title="Previous (←)" className="tap-expand grid place-items-center w-9 h-9 rounded-xl glass glass-hover">
           <ChevronLeft className="w-4 h-4" />
         </button>
-        <button onClick={handleNext} className="tap-expand grid place-items-center w-9 h-9 rounded-xl glass glass-hover">
+        <button onClick={handleNext} title="Next (→)" className="tap-expand grid place-items-center w-9 h-9 rounded-xl glass glass-hover">
           <ChevronRight className="w-4 h-4" />
         </button>
         <button
           onClick={handleToday}
+          title="Today (t)"
           className="font-mono text-[11px] uppercase tracking-wider px-3 py-2 rounded-xl glass glass-hover text-text-2 hover:text-text-1"
         >
           today

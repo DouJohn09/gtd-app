@@ -6,6 +6,7 @@ import { aiToast } from '../lib/aiError';
 import { useToast } from '../components/Toast';
 import { useAuth } from '../contexts/AuthContext';
 import { useAiMode } from '../hooks/useAiMode';
+import { useTaskListKeys } from '../hooks/useHotkeys';
 import QuickCapture from '../components/QuickCapture';
 import TaskCard from '../components/TaskCard';
 import TaskModal from '../components/TaskModal';
@@ -99,6 +100,25 @@ export default function Inbox() {
     try { await api.tasks.delete(id); addToast('Deleted', 'success'); fetchData(); }
     catch (err) { addToast(err.message, 'error'); }
   };
+
+  // Keyboard: j/k select, Enter open, x done, f star for Today, ⌫ delete,
+  // n / w / s file it to Next Actions / Waiting For / Someday.
+  const moveTo = (list, label) => async (task) => {
+    try { await api.tasks.update(task.id, { list }); addToast(`Moved to ${label}`, 'success'); fetchData(); }
+    catch (err) { addToast(err.message, 'error'); }
+  };
+  const toggleStar = async (task) => {
+    try { await api.tasks.update(task.id, { is_daily_focus: !task.is_daily_focus }); fetchData(); }
+    catch (err) { addToast(err.message, 'error'); }
+  };
+  useTaskListKeys({
+    tasks: [...tasks, ...deferredTasks],
+    onOpen: handleEdit,
+    onComplete: handleComplete,
+    onDelete: (id) => setConfirmDeleteId(id),
+    onStar: toggleStar,
+    extra: { n: moveTo('next_actions', 'Next Actions'), w: moveTo('waiting_for', 'Waiting For'), s: moveTo('someday_maybe', 'Someday/Maybe') },
+  });
 
   const runProcessInbox = async () => {
     if (aiLoading) return;

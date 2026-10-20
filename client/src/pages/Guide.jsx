@@ -134,7 +134,10 @@ export default function Guide() {
         <div className="ml-auto self-center flex-shrink-0"><Go to="/review">Review</Go></div>
       </section>
 
-      <p className="mt-10 text-[12.5px] text-text-3 inline-flex items-center gap-1.5">
+      <p className="mt-10 text-[12.5px] text-text-3">
+        On a keyboard? Press <kbd className="kbd">?</kbd> anywhere for shortcuts, like <kbd className="kbd">g</kbd> <kbd className="kbd">i</kbd> for the Inbox.
+      </p>
+      <p className="mt-3 text-[12.5px] text-text-3 inline-flex items-center gap-1.5">
         <ListChecks className="w-3.5 h-3.5" /> Questions or ideas? Write to <a className="text-text-2 hover:text-text-1 underline underline-offset-2" href="mailto:hello@cleartable.app">hello@cleartable.app</a>.
       </p>
     </div>

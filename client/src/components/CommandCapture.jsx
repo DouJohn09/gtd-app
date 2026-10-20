@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { X } from 'lucide-react';
 import QuickCapture from './QuickCapture';
 
-export default function CommandCapture({ open, onClose }) {
+export default function CommandCapture({ open, voice = false, onClose }) {
   useEffect(() => {
     if (!open) return;
     const onKey = (e) => { if (e.key === 'Escape') onClose(); };
@@ -13,7 +13,7 @@ export default function CommandCapture({ open, onClose }) {
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-start justify-center pt-[12vh] sm:pt-[18vh] px-4">
+    <div data-modal className="fixed inset-0 z-[100] flex items-start justify-center pt-[12vh] sm:pt-[18vh] px-4">
       <div
         className="absolute inset-0 backdrop-blur-md"
         style={{ background: 'rgba(8,8,14,0.55)' }}
@@ -34,7 +34,7 @@ export default function CommandCapture({ open, onClose }) {
             modal is dismissed explicitly via Esc, the X, or click-outside.
             Binding it to AI-completion (as before) yanked the modal away
             mid-typing when the prior capture's AI finished. */}
-        <QuickCapture autoFocus />
+        <QuickCapture autoFocus startListening={voice} />
         <div className="mt-4 font-mono text-[11px] text-text-3">
           tip · keep typing to capture more<span className="hidden sm:inline"> · <span className="text-text-2">esc</span> when done</span>
         </div>

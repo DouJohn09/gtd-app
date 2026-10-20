@@ -1,5 +1,5 @@
 import { createPortal } from 'react-dom';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { X, AlertCircle, Plus, Sparkles, ExternalLink, Repeat, Trash2 } from 'lucide-react';
 import { api } from '../lib/api';
 import { contextLabel } from '../lib/context';
@@ -44,6 +44,7 @@ const DAY_OPTIONS = [
 
 export default function TaskModal({ task, projects, onClose, onSave }) {
   const { addToast } = useToast();
+  const formRef = useRef(null);
   const [form, setForm] = useState({
     title: '', notes: '', list: 'inbox', context: '', project_id: '',
     waiting_for_person: '', due_date: '', start_date: '', scheduled_time: '', duration: '',
@@ -96,6 +97,11 @@ export default function TaskModal({ task, projects, onClose, onSave }) {
   useEffect(() => {
     const handler = (e) => {
       if (e.key === 'Escape' && !e.defaultPrevented) onClose();
+      // ⌘/Ctrl+Enter saves from any field.
+      if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        formRef.current?.requestSubmit();
+      }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
@@ -214,7 +220,7 @@ export default function TaskModal({ task, projects, onClose, onSave }) {
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-5 space-y-4 max-h-[calc(100dvh-150px)] sm:max-h-[70vh] overflow-y-auto">
+        <form ref={formRef} onSubmit={handleSubmit} className="p-5 space-y-4 max-h-[calc(100dvh-150px)] sm:max-h-[70vh] overflow-y-auto">
           {error && (
             <div
               className="rounded-xl p-3 flex items-start gap-2"

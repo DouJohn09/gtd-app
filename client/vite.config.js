@@ -27,6 +27,7 @@ export default defineConfig(({ command }) => {
         // it can include them in the SW precache.
         includeAssets: [
           'favicon.png',
+          'favicon.svg',
           'icons/apple-touch-icon.png',
         ],
         manifest: {
