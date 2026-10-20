@@ -1,10 +1,11 @@
-import { useState, useCallback, useEffect } from 'react';
-import { ArrowRight, Sparkles, Mic } from 'lucide-react';
+import { useState, useCallback, useEffect, useRef } from 'react';
+import { ArrowRight, Sparkles } from 'lucide-react';
 import { api } from '../lib/api';
 import { trackEvent } from '../lib/analytics';
 import { useToast } from './Toast';
 import { useAiMode } from '../hooks/useAiMode';
 import { useSpeechRecognition, speechSupported } from '../hooks/useSpeechRecognition';
+import MicButton, { InterimLine } from './MicButton';
 import { formatHHMM } from '../lib/dateUtils';
 
 const LIST_LABELS = {
@@ -43,10 +44,18 @@ export default function QuickCapture({ onCapture, placeholder = "Quick capture �
   const onSpeechResult = useCallback((transcript) => {
     setTitle((prev) => (prev ? prev + ' ' + transcript : transcript));
   }, []);
-  const { listening, toggle: toggleMic } = useSpeechRecognition({ onResult: onSpeechResult });
-  // Opened with ⌘⇧K: start dictating right away.
+  const speech = useSpeechRecognition({ onResult: onSpeechResult });
+  const inputRef = useRef(null);
+  // Opened by voice: ⌘⇧K starts listening until a tap on the mic; holding
+  // Option (startListening === 'hold') listens until Option is released.
+  // Either way the text waits in the field to be checked and sent.
   useEffect(() => {
-    if (startListening && speechSupported) toggleMic();
+    if (!startListening || !speechSupported) return;
+    speech.start();
+    if (startListening !== 'hold') return;
+    const onEnd = () => speech.stop();
+    window.addEventListener('dictate-hold-end', onEnd, { once: true });
+    return () => window.removeEventListener('dictate-hold-end', onEnd);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -59,6 +68,7 @@ export default function QuickCapture({ onCapture, placeholder = "Quick capture �
     const text = title.trim();
     if (!text) return;
     setTitle('');
+    if (speech.listening) speech.stop();
 
     (async () => {
       try {
@@ -94,57 +104,48 @@ export default function QuickCapture({ onCapture, placeholder = "Quick capture �
   };
 
   return (
-    <form onSubmit={handleSubmit} className="flex items-center gap-2">
-      <div className="relative flex-1 min-w-0">
-        <input
-          type="text"
-          enterKeyHint="send"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          placeholder={useAi ? '"call mom tomorrow" · "buy groceries Friday"' : placeholder}
-          className={`gtd-input w-full ${aiOff ? 'pl-3' : 'pl-10'} pr-3`}
-          autoFocus={autoFocus}
-        />
-        {!aiOff && (
-          <button
-            type="button"
-            onClick={() => setSmartMode(!smartMode)}
-            className="absolute left-2 top-1/2 -translate-y-1/2 grid place-items-center w-7 h-7 rounded-lg transition-all"
-            style={
-              smartMode
-                ? { color: 'rgb(var(--violet-glow))', background: 'rgb(var(--violet) / 0.10)', boxShadow: 'inset 0 0 0 1px rgb(var(--violet) / 0.22)' }
-                : { color: 'rgb(var(--text-3))' }
-            }
-            title={smartMode ? 'Smart Capture on — click to disable' : 'Smart Capture off — click to enable'}
-          >
-            <Sparkles className="w-3.5 h-3.5" />
-          </button>
-        )}
-      </div>
-      {speechSupported && (
+    <>
+      <form onSubmit={handleSubmit} className="flex items-center gap-2">
+        <div className="relative flex-1 min-w-0">
+          <input
+            type="text"
+            enterKeyHint="send"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder={useAi ? '"call mom tomorrow" · "buy groceries Friday"' : placeholder}
+            className={`gtd-input w-full ${aiOff ? 'pl-3' : 'pl-10'} pr-3`}
+            autoFocus={autoFocus}
+            ref={inputRef}
+            data-dictate
+          />
+          {!aiOff && (
+            <button
+              type="button"
+              onClick={() => setSmartMode(!smartMode)}
+              className="absolute left-2 top-1/2 -translate-y-1/2 grid place-items-center w-7 h-7 rounded-lg transition-all"
+              style={
+                smartMode
+                  ? { color: 'rgb(var(--violet-glow))', background: 'rgb(var(--violet) / 0.10)', boxShadow: 'inset 0 0 0 1px rgb(var(--violet) / 0.22)' }
+                  : { color: 'rgb(var(--text-3))' }
+              }
+              title={smartMode ? 'Smart Capture on — click to disable' : 'Smart Capture off — click to enable'}
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+        <MicButton speech={speech} fieldRef={inputRef} />
         <button
-          type="button"
-          onClick={toggleMic}
-          className="grid place-items-center w-9 h-9 rounded-lg transition-all shrink-0"
-          style={
-            listening
-              ? { color: '#ef4444', background: 'rgba(239,68,68,0.12)', boxShadow: 'inset 0 0 0 1px rgba(239,68,68,0.3)' }
-              : { color: 'rgb(var(--text-3))' }
-          }
-          title={listening ? 'Stop dictation' : 'Dictate task'}
+          type="submit"
+          disabled={!title.trim()}
+          aria-label="Capture"
+          className="gtd-btn gtd-btn-primary inline-flex items-center gap-1.5 text-[12.5px] disabled:opacity-50 shrink-0 max-sm:px-3"
         >
-          <Mic className="w-4 h-4" />
+          <span className="hidden sm:inline">Capture</span>
+          <ArrowRight className="w-3.5 h-3.5" />
         </button>
-      )}
-      <button
-        type="submit"
-        disabled={!title.trim()}
-        aria-label="Capture"
-        className="gtd-btn gtd-btn-primary inline-flex items-center gap-1.5 text-[12.5px] disabled:opacity-50 shrink-0 max-sm:px-3"
-      >
-        <span className="hidden sm:inline">Capture</span>
-        <ArrowRight className="w-3.5 h-3.5" />
-      </button>
-    </form>
+      </form>
+      <InterimLine speech={speech} />
+    </>
   );
 }

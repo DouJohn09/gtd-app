@@ -2,6 +2,8 @@ import { createPortal } from 'react-dom';
 import { useState, useEffect, useRef } from 'react';
 import { X, AlertCircle, Plus, Sparkles, ExternalLink, Repeat, Trash2 } from 'lucide-react';
 import { api } from '../lib/api';
+import { useSpeechRecognition } from '../hooks/useSpeechRecognition';
+import MicButton, { InterimLine } from './MicButton';
 import { contextLabel } from '../lib/context';
 import { useToast } from './Toast';
 import GlassSelect from './ui/GlassSelect';
@@ -45,6 +47,12 @@ const DAY_OPTIONS = [
 export default function TaskModal({ task, projects, onClose, onSave }) {
   const { addToast } = useToast();
   const formRef = useRef(null);
+  // Dictation into title / notes; spoken text is appended to the field.
+  const titleRef = useRef(null);
+  const notesRef = useRef(null);
+  const append = (key) => (text) => setForm(f => ({ ...f, [key]: f[key] ? `${f[key]} ${text}` : text }));
+  const titleSpeech = useSpeechRecognition({ onResult: append('title') });
+  const notesSpeech = useSpeechRecognition({ onResult: append('notes') });
   const [form, setForm] = useState({
     title: '', notes: '', list: 'inbox', context: '', project_id: '',
     waiting_for_person: '', due_date: '', start_date: '', scheduled_time: '', duration: '',
@@ -233,25 +241,37 @@ export default function TaskModal({ task, projects, onClose, onSave }) {
 
           <div>
             <label className="gtd-label">Title</label>
-            <input
-              type="text"
-              value={form.title}
-              onChange={(e) => setForm({ ...form, title: e.target.value })}
-              className="gtd-input"
-              required
-              autoFocus
-              placeholder="What needs doing?"
-            />
+            <div className="flex items-center gap-2">
+              <input
+                ref={titleRef}
+                data-dictate
+                type="text"
+                value={form.title}
+                onChange={(e) => setForm({ ...form, title: e.target.value })}
+                className="gtd-input"
+                required
+                autoFocus
+                placeholder="What needs doing?"
+              />
+              <MicButton speech={titleSpeech} fieldRef={titleRef} />
+            </div>
+            <InterimLine speech={titleSpeech} />
           </div>
 
           <div>
             <label className="gtd-label">Notes</label>
-            <textarea
-              value={form.notes}
-              onChange={(e) => setForm({ ...form, notes: e.target.value })}
-              className="gtd-input min-h-[80px] resize-none"
-              placeholder="Anything else?"
-            />
+            <div className="flex items-start gap-2">
+              <textarea
+                ref={notesRef}
+                data-dictate
+                value={form.notes}
+                onChange={(e) => setForm({ ...form, notes: e.target.value })}
+                className="gtd-input min-h-[80px] resize-none"
+                placeholder="Anything else?"
+              />
+              <MicButton speech={notesSpeech} fieldRef={notesRef} />
+            </div>
+            <InterimLine speech={notesSpeech} />
             <NotesLinks notes={form.notes} />
           </div>
 

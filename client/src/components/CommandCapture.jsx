@@ -34,7 +34,7 @@ export default function CommandCapture({ open, voice = false, onClose }) {
             modal is dismissed explicitly via Esc, the X, or click-outside.
             Binding it to AI-completion (as before) yanked the modal away
             mid-typing when the prior capture's AI finished. */}
-        <QuickCapture autoFocus startListening={voice} />
+        <QuickCapture autoFocus startListening={voice === 'hold' ? 'hold' : !!voice} />
         <div className="mt-4 font-mono text-[11px] text-text-3">
           tip · keep typing to capture more<span className="hidden sm:inline"> · <span className="text-text-2">esc</span> when done</span>
         </div>

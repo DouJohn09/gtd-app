@@ -3,7 +3,7 @@ import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Inbox, FolderKanban, ListTodo, Clock, CloudSun,
   Sparkles, Target, LogOut, CheckCircle2, RotateCcw, CalendarDays,
-  Command, Settings, MoreHorizontal, X, Plus, List, BarChart3, Activity, BookOpen,
+  Command, Settings, MoreHorizontal, X, Plus, List, BarChart3, Activity, BookOpen, Mic,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useAiMode } from '../hooks/useAiMode';
@@ -15,6 +15,7 @@ import CommandCapture from './CommandCapture';
 import WelcomeOnboarding from './WelcomeOnboarding';
 import ShortcutsHelp from './ShortcutsHelp';
 import { shortcutsBlocked } from '../hooks/useHotkeys';
+import { speechSupported } from '../hooks/useSpeechRecognition';
 import ErrorBoundary from './ErrorBoundary';
 
 const navGroups = [
@@ -164,6 +165,41 @@ export default function Layout() {
     return () => window.removeEventListener('keydown', onKey, true);
   }, [navigate]);
 
+  // Hold Option (Alt) on its own to dictate: into the focused field if it
+  // takes dictation (data-dictate), otherwise into a freshly opened capture.
+  // Releasing Option stops; the text waits in the field to be checked. Any
+  // other key while Option is down cancels, so Option+letter still types.
+  useEffect(() => {
+    if (!speechSupported) return;
+    let timer = null;
+    let active = false;
+    const end = () => {
+      clearTimeout(timer); timer = null;
+      if (active) { active = false; window.dispatchEvent(new Event('dictate-hold-end')); }
+    };
+    const onDown = (e) => {
+      if (e.key !== 'Alt') { if (timer) { clearTimeout(timer); timer = null; } return; }
+      if (e.repeat || timer || active || e.metaKey || e.ctrlKey || e.shiftKey) return;
+      timer = setTimeout(() => {
+        timer = null;
+        active = true;
+        const field = document.activeElement?.closest?.('[data-dictate]');
+        if (field) window.dispatchEvent(new CustomEvent('dictate-hold-start', { detail: { target: field } }));
+        else setCaptureOpen('hold');
+      }, 300);
+    };
+    const onUp = (e) => { if (e.key === 'Alt') end(); };
+    window.addEventListener('keydown', onDown, true);
+    window.addEventListener('keyup', onUp, true);
+    window.addEventListener('blur', end);
+    return () => {
+      window.removeEventListener('keydown', onDown, true);
+      window.removeEventListener('keyup', onUp, true);
+      window.removeEventListener('blur', end);
+      clearTimeout(timer);
+    };
+  }, []);
+
   return (
     <div className="min-h-screen flex flex-col md:flex-row relative">
       <AuroraBackground />
@@ -179,12 +215,15 @@ export default function Layout() {
           </div>
           <div className="font-display text-[18px] leading-none">Cleartable</div>
         </div>
-        <button
-          onClick={() => setCaptureOpen(true)}
-          className="glass glass-hover rounded-full px-3 py-1.5 flex items-center gap-2 text-[12px] text-text-2"
-        >
-          <Command className="w-3.5 h-3.5" /> capture
-        </button>
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={() => setCaptureOpen(true)}
+            className="glass glass-hover rounded-full px-3 py-1.5 flex items-center gap-2 text-[12px] text-text-2"
+          >
+            <Command className="w-3.5 h-3.5" /> capture
+          </button>
+          <VoiceCaptureButton onOpen={setCaptureOpen} className="glass glass-hover rounded-full w-8 h-8" />
+        </div>
       </header>
 
       {/* Sidebar (desktop) — sticky + viewport-height so the user card stays
@@ -205,14 +244,17 @@ export default function Layout() {
           </div>
         </div>
 
-        <button
-          onClick={() => setCaptureOpen(true)}
-          className="glass glass-hover flex items-center gap-2 px-3 py-2 mb-5 rounded-[11px] text-left"
-        >
-          <Command className="w-3.5 h-3.5 text-text-3" />
-          <span className="text-[12.5px] text-text-3 flex-1">Quick capture</span>
-          <span className="font-mono text-[10px] px-1.5 py-0.5 rounded bg-white/5 border border-white/10 text-text-2">⌘K</span>
-        </button>
+        <div className="flex items-center gap-1.5 mb-5">
+          <button
+            onClick={() => setCaptureOpen(true)}
+            className="glass glass-hover flex-1 min-w-0 flex items-center gap-2 px-3 py-2 rounded-[11px] text-left"
+          >
+            <Command className="w-3.5 h-3.5 text-text-3" />
+            <span className="text-[12.5px] text-text-3 flex-1">Quick capture</span>
+            <span className="font-mono text-[10px] px-1.5 py-0.5 rounded bg-white/5 border border-white/10 text-text-2">⌘K</span>
+          </button>
+          <VoiceCaptureButton onOpen={setCaptureOpen} className="glass glass-hover rounded-[11px] w-9 h-9" />
+        </div>
 
         <nav className="flex-1 overflow-y-auto -mx-1 px-1">
           {groups.map((group, gi) => (
@@ -395,7 +437,7 @@ export default function Layout() {
         </div>
       )}
 
-      <CommandCapture key={String(captureOpen)} open={!!captureOpen} voice={captureOpen === 'voice'} onClose={() => setCaptureOpen(false)} />
+      <CommandCapture key={String(captureOpen)} open={!!captureOpen} voice={captureOpen === 'voice' || captureOpen === 'hold' ? captureOpen : false} onClose={() => setCaptureOpen(false)} />
       {showKeys && <ShortcutsHelp onClose={() => setShowKeys(false)} />}
 
       {user && !user.onboarded_at && <WelcomeOnboarding />}
@@ -407,5 +449,37 @@ export default function Layout() {
         />
       )}
     </div>
+  );
+}
+
+// Mic next to the capture entry points: hold it to dictate a capture
+// (release stops), or tap to open capture already listening.
+function VoiceCaptureButton({ onOpen, className = '' }) {
+  if (!speechSupported) return null;
+  return (
+    <button
+      type="button"
+      onPointerDown={(e) => {
+        if (e.button && e.button !== 0) return;
+        e.preventDefault();
+        const at = Date.now();
+        onOpen('hold');
+        // The capture overlay opens under the pointer, so the release lands
+        // on it, not on this button: listen on the window.
+        const release = () => {
+          window.removeEventListener('pointerup', release);
+          window.removeEventListener('pointercancel', release);
+          if (Date.now() - at >= 300) window.dispatchEvent(new Event('dictate-hold-end'));
+        };
+        window.addEventListener('pointerup', release);
+        window.addEventListener('pointercancel', release);
+      }}
+      onContextMenu={(e) => e.preventDefault()}
+      className={`tap-expand grid place-items-center shrink-0 select-none touch-none text-text-3 hover:text-text-1 ${className}`}
+      title="Hold to dictate a capture, or tap to start (⌘⇧K, or hold ⌥ Option)"
+      aria-label="Dictate a capture"
+    >
+      <Mic className="w-3.5 h-3.5" />
+    </button>
   );
 }
