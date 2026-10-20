@@ -3,7 +3,7 @@ import { Outlet, NavLink, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, Inbox, FolderKanban, ListTodo, Clock, CloudSun,
   Sparkles, Target, LogOut, CheckCircle2, RotateCcw, CalendarDays,
-  Command, Settings, MoreHorizontal, X, Plus, List, BarChart3, Activity,
+  Command, Settings, MoreHorizontal, X, Plus, List, BarChart3, Activity, BookOpen,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useAiMode } from '../hooks/useAiMode';
@@ -46,6 +46,7 @@ const navGroups = [
   {
     label: 'system',
     items: [
+      { to: '/guide',     icon: BookOpen,      label: 'Guide' },
       { to: '/settings',  icon: Settings,      label: 'Settings' },
     ],
   },

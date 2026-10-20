@@ -1,9 +1,10 @@
 import { createPortal } from 'react-dom';
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { trackEvent } from '../lib/analytics';
 import {
   LayoutDashboard, Inbox, FolderKanban, CalendarDays, ListTodo, Clock,
-  CloudSun, Target, RotateCcw, Sparkles, Command, Zap, ListChecks, Star,
+  CloudSun, Target, RotateCcw, Sparkles, Command, Zap, ListChecks, Star, CalendarClock, BookOpen,
 } from 'lucide-react';
 import { api } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
@@ -31,10 +32,16 @@ const LOOP_STEPS = [
     text: 'Once a day, empty the Inbox. Each note becomes a next step: do it, schedule it, hand it off, or park it for someday.',
   },
   {
+    icon: CalendarClock,
+    tone: 'violet',
+    title: 'Plan',
+    text: '“Plan my day” slots your tasks between your meetings; “Plan my week” spreads them over the days ahead. You see every slot before anything is booked.',
+  },
+  {
     icon: Star,
     tone: 'mint',
     title: 'Focus',
-    text: 'Star what matters now. Today shows only that — a short list you can actually finish.',
+    text: 'Today shows only what matters now: a short list you can actually finish.',
   },
 ];
 
@@ -42,26 +49,26 @@ const NAV_GROUPS = [
   {
     label: 'workflow',
     items: [
-      { icon: LayoutDashboard, name: 'Today',     text: 'Your day: starred tasks, habits, what’s due.' },
-      { icon: Inbox,           name: 'Inbox',     text: 'Everything you capture waits here to be sorted.' },
-      { icon: FolderKanban,    name: 'Projects',  text: 'Anything that takes more than one step.' },
-      { icon: CalendarDays,    name: 'Calendar',  text: 'Drag tasks into real time slots.' },
+      { icon: LayoutDashboard, name: 'Today',     text: 'Your day, and “Plan my day”.' },
+      { icon: Inbox,           name: 'Inbox',     text: 'Everything you capture lands here.' },
+      { icon: FolderKanban,    name: 'Projects',  text: 'Anything with more than one step.' },
+      { icon: CalendarDays,    name: 'Calendar',  text: 'Your meetings and tasks, side by side.' },
     ],
   },
   {
     label: 'lists',
     items: [
-      { icon: ListTodo, name: 'Next Actions',  text: 'Sorted tasks ready to do, filterable by context like @home.' },
-      { icon: Clock,    name: 'Waiting For',   text: 'Handed off — track who owes you what.' },
-      { icon: CloudSun, name: 'Someday/Maybe', text: 'Ideas parked for later, never lost.' },
+      { icon: ListTodo, name: 'Next Actions',  text: 'Ready to do, by context like @home.' },
+      { icon: Clock,    name: 'Waiting For',   text: 'Who owes you what.' },
+      { icon: CloudSun, name: 'Someday/Maybe', text: 'Ideas parked for later.' },
     ],
   },
   {
     label: 'rituals',
     items: [
-      { icon: Target,   name: 'Habits',        text: 'Small routines, tracked gently — no guilt streaks.' },
-      { icon: RotateCcw, name: 'Weekly Review & Planning', text: 'Ten minutes a week to keep the system trusted — then lay out the week ahead.' },
-      { icon: Sparkles, name: 'AI Assistant',  text: 'Bulk tools: process the Inbox, plan your day.' },
+      { icon: Target,    name: 'Habits',            text: 'Small routines, tracked gently.' },
+      { icon: RotateCcw, name: 'Review & Planning', text: 'A weekly reset, then “Plan my week”.' },
+      { icon: Sparkles,  name: 'AI Assistant',      text: 'Bulk tools, like sorting the whole Inbox.' },
     ],
   },
 ];
@@ -120,7 +127,7 @@ export default function WelcomeOnboarding() {
     catch { addToast('Could not save your choice — you can set it later in Settings.', 'info'); }
   };
 
-  const finish = async () => {
+  const finish = async ({ quiet = false } = {}) => {
     if (finishing) return; // guard: a double-tap must not seed the samples twice
     setFinishing(true);
     // Persist completion BEFORE seeding. onboarded_at is the idempotency key: if
@@ -141,9 +148,16 @@ export default function WelcomeOnboarding() {
       if (results.some(r => r.status === 'fulfilled')) {
         window.dispatchEvent(new Event('task-captured'));
       }
-    } else {
+    } else if (!quiet) {
       window.dispatchEvent(new Event('open-capture'));
     }
+  };
+
+  const navigate = useNavigate();
+  const openGuide = async () => {
+    await saveMode();
+    await finish({ quiet: true });
+    navigate('/guide');
   };
 
   const next = async () => {
@@ -158,14 +172,14 @@ export default function WelcomeOnboarding() {
       style={{ background: 'rgba(8,8,14,0.62)', backdropFilter: 'blur(10px)' }}
     >
       <div
-        className="w-full max-w-2xl max-h-[88vh] overflow-y-auto rounded-2xl glass relative"
+        className="w-full max-w-2xl max-h-[88dvh] flex flex-col overflow-hidden rounded-2xl glass relative"
         style={{ boxShadow: '0 24px 64px -16px rgba(0,0,0,0.55), inset 0 1px 0 rgb(255 255 255 / 0.06)' }}
       >
         <div
           className="absolute -top-12 -right-12 w-48 h-48 rounded-full pointer-events-none"
           style={{ background: 'radial-gradient(circle, rgba(167,139,250,0.16), transparent 70%)' }}
         />
-        <div className="p-7 sm:p-8 relative">
+        <div className="px-7 pt-7 sm:px-8 sm:pt-8 pb-2 relative flex-1 min-h-0 overflow-y-auto overflow-x-hidden scrollbar-thin">
           <div className="flex items-center justify-between mb-4">
             <MonoLabel tone="violet">{['welcome', 'the map', 'ai', 'ready'][step]} · {step + 1}/4</MonoLabel>
             <button
@@ -180,7 +194,7 @@ export default function WelcomeOnboarding() {
             <>
               <h2 className="font-display text-[28px] leading-tight">Welcome to Cleartable</h2>
               <p className="mt-2 text-[13.5px] text-text-2 max-w-md leading-relaxed">
-                A clear head in three moves. Everything in the app hangs off this loop.
+                A clear head in four moves. Everything in the app hangs off this loop.
               </p>
               <div className="mt-5 grid gap-2.5">
                 {LOOP_STEPS.map((s, i) => (
@@ -211,11 +225,11 @@ export default function WelcomeOnboarding() {
             <>
               <h2 className="font-display text-[28px] leading-tight">Find your way around</h2>
               <p className="mt-2 text-[13.5px] text-text-2 max-w-md leading-relaxed">
-                The sidebar mirrors the loop — capture up top, lists in the middle, rituals below.
+                The sidebar follows the loop: capture at the top, lists in the middle, rituals below.
               </p>
-              <div className="mt-5 grid gap-4 sm:grid-cols-2">
+              <div className="mt-5 grid gap-4 sm:grid-cols-3">
                 {NAV_GROUPS.map(group => (
-                  <div key={group.label} className={group.label === 'workflow' ? 'sm:row-span-2' : ''}>
+                  <div key={group.label}>
                     <MonoLabel className="mb-2">{group.label}</MonoLabel>
                     <div className="grid gap-1.5">
                       {group.items.map(item => (
@@ -300,33 +314,46 @@ export default function WelcomeOnboarding() {
                   </p>
                 </div>
               </label>
+              <button
+                onClick={openGuide}
+                disabled={finishing}
+                className="mt-3 w-full text-left flex items-start gap-3 rounded-xl p-3.5 transition-all hover:bg-white/[0.04] disabled:opacity-50"
+                style={{ boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.08)' }}
+              >
+                <BookOpen className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" style={{ color: 'rgb(var(--violet-glow))' }} />
+                <div>
+                  <div className="text-[13px] font-medium text-text-1">Read the Guide</div>
+                  <p className="text-[12px] text-text-3 mt-1 leading-relaxed">
+                    How to get the most out of Cleartable: a daily and weekly rhythm, and where everything lives. It stays in the sidebar for later.
+                  </p>
+                </div>
+              </button>
             </>
           )}
-
-          <div className="mt-6 flex items-center gap-2">
-            {step > 0 && (
-              <button onClick={() => setStep(step - 1)} className="gtd-btn gtd-btn-secondary text-[12.5px]">
-                Back
-              </button>
-            )}
-            <button
-              onClick={next}
-              disabled={finishing}
-              className="gtd-btn gtd-btn-primary inline-flex items-center gap-1.5 text-[12.5px] disabled:opacity-50"
-            >
-              {last
-                ? (finishing ? 'Setting up…' : seedSamples ? 'Add samples & start' : <><Command className="w-3.5 h-3.5" /> Start capturing</>)
-                : 'Next'}
+        </div>
+        <div className="px-7 sm:px-8 pt-4 pb-7 sm:pb-8 relative flex items-center gap-2">
+          {step > 0 && (
+            <button onClick={() => setStep(step - 1)} className="gtd-btn gtd-btn-secondary text-[12.5px]">
+              Back
             </button>
-            <div className="ml-auto flex gap-1.5">
-              {[0, 1, 2, 3].map(i => (
-                <span
-                  key={i}
-                  className="w-1.5 h-1.5 rounded-full transition-colors"
-                  style={{ background: i === step ? 'rgb(var(--violet-glow))' : 'rgba(255,255,255,0.12)' }}
-                />
-              ))}
-            </div>
+          )}
+          <button
+            onClick={next}
+            disabled={finishing}
+            className="gtd-btn gtd-btn-primary inline-flex items-center gap-1.5 text-[12.5px] disabled:opacity-50"
+          >
+            {last
+              ? (finishing ? 'Setting up…' : seedSamples ? 'Add samples & start' : <><Command className="w-3.5 h-3.5" /> Start capturing</>)
+              : 'Next'}
+          </button>
+          <div className="ml-auto flex gap-1.5">
+            {[0, 1, 2, 3].map(i => (
+              <span
+                key={i}
+                className="w-1.5 h-1.5 rounded-full transition-colors"
+                style={{ background: i === step ? 'rgb(var(--violet-glow))' : 'rgba(255,255,255,0.12)' }}
+              />
+            ))}
           </div>
         </div>
       </div>

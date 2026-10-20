@@ -13,6 +13,7 @@ import Insights from './pages/Insights';
 import Pulse from './pages/Pulse';
 import Calendar from './pages/Calendar';
 import Settings from './pages/Settings';
+import Guide from './pages/Guide';
 import CustomList from './pages/CustomList';
 import Login from './pages/Login';
 
@@ -43,6 +44,7 @@ export default function App() {
         <Route path="ai" element={<AIAssistant />} />
         <Route path="custom-lists/:listId" element={<CustomList />} />
         <Route path="settings" element={<Settings />} />
+        <Route path="guide" element={<Guide />} />
         <Route path="pulse" element={<Pulse />} />
       </Route>
     </Routes>
