@@ -129,11 +129,15 @@ async function visitors() {
       { date_leq: isoDay(Date.now() - start * DAY) },
     ] }));
     const since7 = { AND: [{ siteTag: site }, { date_geq: isoDay(Date.now() - 6 * DAY) }, { date_leq: to }] };
+    // Rolling 24 h, so the headline matches the "8 h ago" rows in the
+    // journeys below instead of resetting at UTC midnight.
+    const last24 = { AND: [{ siteTag: site }, { datetime_geq: new Date(Date.now() - DAY).toISOString() }] };
     const detail7 = { AND: [{ siteTag: site }, { date_geq: isoDay(Date.now() - 6 * DAY) }, { date_leq: to }, { userAgentBrowser_neq: 'ChromeHeadless' }, { userAgentBrowser_neq: 'Unknown' }] };
     const F = 'AccountRumPageloadEventsAdaptiveGroupsFilter_InputObject';
-    const query = `query ($account: String!, ${windows.map((_, i) => `$w${i}: ${F}`).join(', ')}, $since7: ${F}, $detail7: ${F}) {
+    const query = `query ($account: String!, ${windows.map((_, i) => `$w${i}: ${F}`).join(', ')}, $since7: ${F}, $detail7: ${F}, $last24: ${F}) {
       viewer { accounts(filter: { accountTag: $account }) {
         ${windows.map((_, i) => `w${i}: rumPageloadEventsAdaptiveGroups(limit: 10, filter: $w${i}, orderBy: [date_ASC]) { count sum { visits } dimensions { date } }`).join('\n        ')}
+        last24: rumPageloadEventsAdaptiveGroups(limit: 1, filter: $last24) { sum { visits } }
         referrers: rumPageloadEventsAdaptiveGroups(limit: 8, filter: $since7, orderBy: [sum_visits_DESC]) { sum { visits } dimensions { refererHost } }
         pages: rumPageloadEventsAdaptiveGroups(limit: 8, filter: $since7, orderBy: [count_DESC]) { count dimensions { requestPath } }
         countries: rumPageloadEventsAdaptiveGroups(limit: 8, filter: $since7, orderBy: [sum_visits_DESC]) { sum { visits } dimensions { countryName } }
@@ -144,7 +148,7 @@ async function visitors() {
       const r = await fetch('https://api.cloudflare.com/client/v4/graphql', {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query, variables: { account, since7, detail7, ...Object.fromEntries(windows.map((w, i) => [`w${i}`, w])) } }),
+        body: JSON.stringify({ query, variables: { account, since7, detail7, last24, ...Object.fromEntries(windows.map((w, i) => [`w${i}`, w])) } }),
         signal: AbortSignal.timeout(10_000),
       });
       const j = await r.json();
@@ -155,7 +159,7 @@ async function visitors() {
         .sort((x, y) => x.date.localeCompare(y.date));
       const sum = (days) => daily.filter(d => d.date >= isoDay(Date.now() - (days - 1) * DAY)).reduce((s, d) => s + d.visits, 0);
       return {
-        today: sum(1), last7: sum(7), last30: sum(30),
+        today: sum(1), last24h: (a.last24 || []).reduce((s, g) => s + (g.sum?.visits || 0), 0), last7: sum(7), last30: sum(30),
         daily,
         referrers: (a.referrers || []).map(g => ({ host: g.dimensions.refererHost || '(direct)', visits: g.sum.visits })),
         pages: (a.pages || []).map(g => ({ path: g.dimensions.requestPath, views: g.count })),

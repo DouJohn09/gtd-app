@@ -85,14 +85,14 @@ export function renderPulse(root, { data: d, error, fetchedAt }) {
   const state = error || dbDown || monitorDown || checkFailed ? 'bad' : (skipped.length || checkStale ? 'warn' : 'good');
 
   const vis = d.visitors;
-  const visitorsToday = vis && !vis.error ? vis.today : null;
+  const visitorsToday = vis && !vis.error ? (vis.last24h ?? vis.today) : null;
   const newToday = d.signUps?.today ?? 0;
   const inq = d.inquiries?.last24h ?? 0;
   const statusPhrase = state === 'bad'
     ? (error ? 'The app is <em>not answering</em>' : dbDown ? 'The database is <em>down</em>' : checkFailed ? 'The last health check <em>failed</em>' : 'The app is <em>down</em>')
     : state === 'warn' ? (checkStale ? 'Health checks are <em>not running</em>' : 'Running, with <em>an AI model skipped</em>') : 'All systems up';
   const bits = [
-    visitorsToday == null ? null : `${visitorsToday === 0 ? 'no' : fmt(visitorsToday)} real visitor${visitorsToday === 1 ? '' : 's'} today`,
+    visitorsToday == null ? null : `${visitorsToday === 0 ? 'no' : fmt(visitorsToday)} real visitor${visitorsToday === 1 ? '' : 's'} in 24 h`,
     `${newToday === 0 ? 'no' : fmt(newToday)} new sign-up${newToday === 1 ? '' : 's'}`,
     inq ? `${inq} new ${inq === 1 ? 'inquiry' : 'inquiries'}` : null,
   ].filter(Boolean);
@@ -114,7 +114,7 @@ export function renderPulse(root, { data: d, error, fetchedAt }) {
     ? tile('Real visitors', pill('not set up'), '—', 'Connect Cloudflare Web Analytics to count people, not bots.')
     : vis.error
       ? tile('Real visitors', pill('error', 'warn'), '—', esc(vis.error))
-      : tile('Real visitors', pill(`${fmt(vis.last30)} · 30d`), `${fmt(vis.today)}<small>today</small>`, `${fmt(vis.last7)} in the last 7 days · incl. your own visits`, spark((vis.daily || []).slice(-14).map(x => x.visits)));
+      : tile('Real visitors', pill(`${fmt(vis.last30)} · 30d`), `${fmt(vis.last24h ?? vis.today)}<small>last 24 h</small>`, `${fmt(vis.last7)} in the last 7 days · incl. your own visits`, spark((vis.daily || []).slice(-14).map(x => x.visits)));
 
   const su = d.signUps || {};
   const suTile = tile('Sign-ups', pill(`${fmt(su.allTime)} all time`, su.today ? 'good' : ''),
