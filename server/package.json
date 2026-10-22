@@ -13,7 +13,7 @@
     "test:habits": "node scripts/test-habit-stats.mjs",
     "test:ai-schema": "node scripts/test-ai-schema.mjs",
     "test:relative-date": "node scripts/test-relative-date.mjs",
-    "test": "node scripts/test-habit-stats.mjs && node scripts/test-ai-schema.mjs && node scripts/test-relative-date.mjs"
+    "test": "node scripts/test-http-errors.mjs && node scripts/test-habit-stats.mjs && node scripts/test-ai-schema.mjs && node scripts/test-relative-date.mjs"
   },
   "dependencies": {
     "@paddle/paddle-node-sdk": "^3.8.0",
