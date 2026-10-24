@@ -2,7 +2,7 @@
    GA4 loads only after the visitor accepts (basic Consent Mode); the choice
    is remembered for 12 months. With the placeholder ID nothing runs at all. */
 (function () {
-  var GA_ID = 'G-XXXXXXXXXX';
+  var GA_ID = 'G-F4E4BYWM6C';
   if (GA_ID.indexOf('XXXX') !== -1) return; // GA not configured yet — no banner, no tracking
 
   var KEY = 'ct-consent';
