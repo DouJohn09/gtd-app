@@ -206,12 +206,12 @@ export function renderPulse(root, { data: d, error, fetchedAt }) {
           <span class="step" style="color:var(--faint)">people · 30 days</span>
         </div>
         ${(jr.sessions || []).length ? `<div class="table-wrap"><table>
-          <thead><tr><th>When</th><th>Who</th><th>Country</th><th>Device</th><th>Source</th><th>Entry</th><th>Pages</th><th>Time</th><th>Got to</th><th>Replay</th></tr></thead>
+          <thead><tr><th>When</th><th>Replay</th><th>Who</th><th>Country</th><th>Device</th><th>Source</th><th>Entry</th><th>Pages</th><th>Time</th><th>Got to</th></tr></thead>
           <tbody>${jr.sessions.map(s => {
             const reached = s.captured ? `${s.captured} task${s.captured === 1 ? '' : 's'}` : s.onboarded ? 'onboarded' : s.signedIn ? 'signed in' : s.entry.startsWith('/app') ? 'app' : 'site';
             const src = s.referrer ? esc(s.referrer) : '<span style="color:var(--faint)">direct</span>';
             const replay = s.replayUrl ? `<a href="${esc(s.replayUrl)}" target="_blank" rel="noopener noreferrer">watch</a>` : '<span style="color:var(--faint)">—</span>';
-            return `<tr><td>${ago(s.at)}</td><td class="m">${s.who ? esc(s.who) : '<span style="color:var(--faint)">anonymous</span>'}</td><td>${esc(s.country)}</td><td>${esc(s.device)}</td><td class="m" style="font-size:11.5px">${src}</td><td class="m" style="font-size:11.5px">${esc(s.entry)}</td><td class="m num">${fmt(s.pageviews)}</td><td class="m num">${dur(s.seconds)}</td><td>${reached}</td><td>${replay}</td></tr>`;
+            return `<tr><td>${ago(s.at)}</td><td>${replay}</td><td class="m">${s.who ? esc(s.who) : '<span style="color:var(--faint)">anonymous</span>'}</td><td>${esc(s.country)}</td><td>${esc(s.device)}</td><td class="m" style="font-size:11.5px">${src}</td><td class="m" style="font-size:11.5px">${esc(s.entry)}</td><td class="m num">${fmt(s.pageviews)}</td><td class="m num">${dur(s.seconds)}</td><td>${reached}</td></tr>`;
           }).join('')}</tbody>
         </table></div>` : '<div class="empty">No stranger sessions in the last 7 days.</div>'}
       </div>`;
