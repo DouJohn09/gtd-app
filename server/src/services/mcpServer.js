@@ -20,6 +20,7 @@ function slim(t) {
   if (t.project_name) out.project = t.project_name;
   if (t.context) out.context = t.context;
   if (t.due_date) out.due_date = String(t.due_date).slice(0, 10);
+  if (t.deadline) out.deadline = String(t.deadline).slice(0, 10);
   if (t.scheduled_time) out.time = t.scheduled_time;
   if (t.duration) out.duration_minutes = t.duration;
   if (t.waiting_for_person) out.waiting_for = t.waiting_for_person;
@@ -46,7 +47,8 @@ async function findProject(userId, name) {
 const taskFields = {
   notes: z.string().max(5000).optional().describe('Longer details, links'),
   list: z.enum(LISTS).optional().describe('inbox = unsorted; next_actions = to do; waiting_for = someone else owes it; someday_maybe = not now'),
-  due_date: DATE.optional().describe('Due date, YYYY-MM-DD'),
+  due_date: DATE.optional().describe('Due date, YYYY-MM-DD: the day it is planned for'),
+  deadline: DATE.optional().describe('Hard "by" date, YYYY-MM-DD, when it differs from the due date ("by Friday")'),
   time: TIME.optional().describe('Start time on the due date, HH:MM 24-hour. Puts it on the calendar.'),
   duration_minutes: z.number().int().min(5).max(720).optional(),
   context: z.string().max(40).optional().describe('Where/how, e.g. @home, @work, @phone, @computer, @errands'),
@@ -57,7 +59,7 @@ const taskFields = {
 
 async function toTaskData(userId, a) {
   const data = {};
-  for (const k of ['notes', 'list', 'due_date', 'context', 'priority']) if (a[k] !== undefined) data[k] = a[k];
+  for (const k of ['notes', 'list', 'due_date', 'deadline', 'context', 'priority']) if (a[k] !== undefined) data[k] = a[k];
   if (a.time !== undefined) data.scheduled_time = a.time;
   if (a.duration_minutes !== undefined) data.duration = a.duration_minutes;
   if (a.waiting_for !== undefined) data.waiting_for_person = a.waiting_for;

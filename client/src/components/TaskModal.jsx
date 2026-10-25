@@ -55,7 +55,7 @@ export default function TaskModal({ task, projects, onClose, onSave }) {
   const notesSpeech = useSpeechRecognition({ onResult: append('notes') });
   const [form, setForm] = useState({
     title: '', notes: '', list: 'inbox', context: '', project_id: '',
-    waiting_for_person: '', due_date: '', start_date: '', scheduled_time: '', duration: '',
+    waiting_for_person: '', due_date: '', deadline: '', start_date: '', scheduled_time: '', duration: '',
     energy_level: '', time_estimate: '', priority: null,
     is_daily_focus: false,
     recurrence_rule: '', recurrence_interval: 1, recurrence_days: '', recurrence_type: 'absolute',
@@ -87,6 +87,7 @@ export default function TaskModal({ task, projects, onClose, onSave }) {
         project_id: task.project_id ? String(task.project_id) : '',
         waiting_for_person: task.waiting_for_person || '',
         due_date: task.due_date || '',
+        deadline: task.deadline || '',
         start_date: task.start_date || '',
         scheduled_time: task.scheduled_time || '',
         duration: task.duration || '',
@@ -171,6 +172,7 @@ export default function TaskModal({ task, projects, onClose, onSave }) {
         project_id: form.project_id ? parseInt(form.project_id) : null,
         waiting_for_person: form.waiting_for_person.trim() || null,
         due_date: form.due_date || null,
+        deadline: form.deadline || null,
         start_date: form.start_date || null,
         scheduled_time: form.scheduled_time || null,
         duration: form.duration ? parseInt(form.duration) : null,
@@ -534,6 +536,22 @@ export default function TaskModal({ task, projects, onClose, onSave }) {
                 placeholder="No due date"
               />
             </div>
+          </div>
+
+          {/* A deadline apart from the due date: the planner may put the task on
+              an earlier day, never past this one. */}
+          <div className="grid grid-cols-2 gap-4 items-end">
+            <div>
+              <label className="gtd-label">Deadline</label>
+              <DatePicker
+                value={form.deadline}
+                onChange={(v) => setForm({ ...form, deadline: v })}
+                placeholder="Same as due date"
+              />
+            </div>
+            <p className="font-mono text-[10px] text-text-3 pb-2">
+              due = the day you plan it &middot; deadline = must be done by
+            </p>
           </div>
 
           {/* Time blocking */}

@@ -160,8 +160,8 @@ export const TaskModel = {
         title, notes, list, context, project_id, waiting_for_person,
         due_date, start_date, scheduled_time, duration, energy_level,
         time_estimate, priority, is_daily_focus, position,
-        recurrence_rule, recurrence_interval, recurrence_days, recurrence_type, user_id
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
+        recurrence_rule, recurrence_interval, recurrence_days, recurrence_type, user_id, deadline
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)
       RETURNING id`,
       [
         task.title,
@@ -184,13 +184,14 @@ export const TaskModel = {
         task.recurrence_days || null,
         task.recurrence_type || 'absolute',
         userId,
+        task.deadline || null,
       ]
     );
     return this.getById(rows[0].id, userId);
   },
 
   async update(id, updates, userId) {
-    const allowedFields = ['title', 'notes', 'list', 'context', 'project_id', 'waiting_for_person', 'due_date', 'start_date', 'scheduled_time', 'duration', 'energy_level', 'time_estimate', 'priority', 'is_daily_focus', 'completed_at', 'position', 'recurrence_rule', 'recurrence_interval', 'recurrence_days', 'recurrence_type'];
+    const allowedFields = ['title', 'notes', 'list', 'context', 'project_id', 'waiting_for_person', 'due_date', 'deadline', 'start_date', 'scheduled_time', 'duration', 'energy_level', 'time_estimate', 'priority', 'is_daily_focus', 'completed_at', 'position', 'recurrence_rule', 'recurrence_interval', 'recurrence_days', 'recurrence_type'];
     // Reject a project_id the caller doesn't own (clearing to null is still allowed).
     if (updates.project_id && !(await projectBelongsTo(updates.project_id, userId))) {
       updates = { ...updates };
@@ -310,7 +311,7 @@ export const TaskModel = {
     try {
       await client.query('BEGIN');
       const { rowCount } = await client.query(
-        `UPDATE tasks SET due_date = $1, start_date = $2, is_daily_focus = false, completed_at = NULL, updated_at = NOW()
+        `UPDATE tasks SET due_date = $1, start_date = $2, deadline = NULL, is_daily_focus = false, completed_at = NULL, updated_at = NOW()
           WHERE id = $3 AND user_id = $4
             AND due_date IS NOT DISTINCT FROM $5::date AND start_date IS NOT DISTINCT FROM $6::date`,
         [nextDue, nextStart, task.id, userId, task.due_date || null, task.start_date || null]

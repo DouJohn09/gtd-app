@@ -707,8 +707,11 @@ export async function planWeek(tasks, week, userContexts) {
   const taskList = tasks.map((t, i) => {
     const parts = [`${i + 1}. "${t.title}" [${t.context || 'no context'}]`];
     if (t.project_name) parts.push(`(Project: ${t.project_name})`);
-    if (t.due_date) {
-      const due = String(t.due_date).slice(0, 10);
+    // The deadline when one is set (the due date is then only where it was
+    // planned last time), else the due date.
+    const dueBy = t.deadline || t.due_date;
+    if (dueBy) {
+      const due = String(dueBy).slice(0, 10);
       parts.push(due < week.days[0].date ? `Due: ${due} (OVERDUE)` : `Due: ${due}`);
     }
     if (t.start_date) parts.push(`Not before: ${String(t.start_date).slice(0, 10)}`);

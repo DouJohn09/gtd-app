@@ -1,4 +1,4 @@
-import { Check, Clock, Zap, Tag, FolderOpen, User, ExternalLink, Repeat, CalendarClock, CalendarDays } from 'lucide-react';
+import { Check, Clock, Zap, Tag, FolderOpen, User, ExternalLink, Repeat, CalendarClock, CalendarDays, Flag } from 'lucide-react';
 import { siteLabel, linkify } from '../lib/linkify.jsx';
 import { contextLabel } from '../lib/context';
 import { listLabel } from '../lib/listLabel';
@@ -149,6 +149,17 @@ export default function TaskCard({ task, onComplete, onEdit, showList = false, q
               <CalendarDays className="w-2.5 h-2.5" />
               {isOverdue(task.due_date) ? 'overdue · ' : 'due '}
               {new Date(task.due_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+            </span>
+          )}
+
+          {task.deadline && task.deadline !== task.due_date && !isCompleted && (
+            <span
+              className="font-mono text-[10.5px] inline-flex items-center gap-1"
+              style={{ color: isOverdue(task.deadline) ? 'rgb(var(--rose-glow))' : 'rgb(var(--amber-glow))' }}
+            >
+              <Flag className="w-2.5 h-2.5" />
+              {isOverdue(task.deadline) ? 'missed deadline · ' : 'by '}
+              {new Date(task.deadline + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
             </span>
           )}
 

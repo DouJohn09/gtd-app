@@ -409,13 +409,15 @@ router.post('/apply-plan', async (req, res) => {
 
     const updated = [];
     const { rows: estRows } = await pool.query(
-      'SELECT id, time_estimate FROM tasks WHERE user_id = $1 AND id = ANY($2::int[])',
+      'SELECT id, time_estimate, due_date, deadline FROM tasks WHERE user_id = $1 AND id = ANY($2::int[])',
       [req.user.id, items.map(i => Number(i.taskId)).filter(Number.isInteger)]
     );
     const hasEstimate = new Map(estRows.map(r => [r.id, !!r.time_estimate]));
+    const rowsById = new Map(estRows.map(r => [r.id, r]));
     for (const item of items) {
       const task = await TaskModel.update(item.taskId, {
         due_date: req.today,
+        ...keepDeadline(rowsById.get(Number(item.taskId)), req.today),
         scheduled_time: item.start,
         duration: Math.min(480, Math.max(5, Number(item.duration) || 30)),
         // A block the person accepted is the best estimate a task without one
@@ -510,6 +512,14 @@ function dayNameOf(dateStr) {
   return new Date(dateStr + 'T12:00:00Z').toLocaleDateString('en-US', { weekday: 'long', timeZone: 'UTC' });
 }
 const dateOnly = (v) => (v ? String(v).slice(0, 10) : null);
+// The date a task must be done by: its deadline, else its due date.
+const deadlineOf = (t) => dateOnly(t.deadline) || dateOnly(t.due_date);
+// Moving a task to an earlier day keeps its old due date as the deadline
+// (once; a deadline already set stays), so "by Friday" outlives the plan.
+function keepDeadline(row, newDate) {
+  const due = dateOnly(row?.due_date);
+  return row && !row.deadline && due && due > newDate ? { deadline: due } : {};
+}
 
 // The shape of the coming days: free minutes after meetings and time blocks,
 // tasks already given a time on each day (fixed, not candidates), and a
@@ -564,7 +574,7 @@ async function weekCandidates(userId, start, end, today) {
     TaskModel.getAll('next_actions', userId, end),
     TaskModel.getAll('inbox', userId, end),
   ]);
-  const dueBy = (t) => { const due = dateOnly(t.due_date); return !!due && due <= end; };
+  const dueBy = (t) => { const due = deadlineOf(t); return !!due && due <= end; };
   return [...next, ...inbox.filter(dueBy)]
     .filter(t => {
       const due = dateOnly(t.due_date);
@@ -584,7 +594,7 @@ async function inboxNotPlanned(userId, end) {
   const { rows: [row] } = await pool.query(
     `SELECT COUNT(*)::int AS n FROM tasks
       WHERE user_id = $1 AND list = 'inbox'
-        AND (due_date IS NULL OR due_date > $2::date)`,
+        AND (COALESCE(deadline, due_date) IS NULL OR COALESCE(deadline, due_date) > $2::date)`,
     [userId, end]
   );
   return row.n;
@@ -612,7 +622,7 @@ function reconcileWeek(proposal, tasks, days) {
   // keep the whole window (the first day is still preferred via `wanted`).
   const boundsFor = (t) => {
     const from = dateOnly(t.start_date);
-    const due = dateOnly(t.due_date);
+    const due = deadlineOf(t);
     const lo = from && from > start ? from : start;
     let hi = end;
     if (due && due >= start && due < end) hi = due;
@@ -652,7 +662,7 @@ function reconcileWeek(proposal, tasks, days) {
   tasks.forEach((t, i) => {
     const idx = i + 1;
     if (seen.has(idx)) return;
-    const due = dateOnly(t.due_date);
+    const due = deadlineOf(t);
     if (due && due <= end && tryPlace(t, idx, null, 'Has a due date this week.')) return;
     unplaced.push({ task_index: idx, taskId: t.id, reason: 'Not placed — the week is full or it can wait.' });
   });
@@ -767,7 +777,7 @@ router.post('/week-times', async (req, res) => {
 
     const ids = [...new Set(placements.map(p => Number(p.taskId)))];
     const { rows: taskRows } = await pool.query(
-      `SELECT id, title, due_date, priority, energy_level, time_estimate, duration FROM tasks WHERE user_id = $1 AND id = ANY($2::int[])`,
+      `SELECT id, title, due_date, deadline, priority, energy_level, time_estimate, duration FROM tasks WHERE user_id = $1 AND id = ANY($2::int[])`,
       [req.user.id, ids]
     );
     const tasks = new Map(taskRows.map(t => [t.id, t]));
@@ -803,7 +813,7 @@ router.post('/week-times', async (req, res) => {
       }
       const longest = free.reduce((a, r) => (!a || (r.end - r.start) > (a.end - a.start) ? r : a), null);
       const rank = (t) => {
-        const due = dateOnly(t.due_date);
+        const due = deadlineOf(t);
         const dueScore = due && due <= date ? 0 : 1;
         const energy = { high: 0, medium: 1, low: 2 }[t.energy_level] ?? 1;
         return [dueScore, -(t.priority || 0), energy, -(t.time_estimate || 30)];
@@ -857,11 +867,17 @@ router.post('/apply-week', async (req, res) => {
 
     const updated = [];
     const timedByDate = new Map();
+    const { rows: before } = await pool.query(
+      'SELECT id, due_date, deadline FROM tasks WHERE user_id = $1 AND id = ANY($2::int[])',
+      [req.user.id, items.map(i => Number(i.taskId))]
+    );
+    const beforeById = new Map(before.map(r => [r.id, r]));
     for (const item of items) {
       const timed = /^([01]\d|2[0-3]):[0-5]\d$/.test(item.start || '');
       const est = Number(item.estimate);
       const task = await TaskModel.update(Number(item.taskId), {
         due_date: item.date,
+        ...keepDeadline(beforeById.get(Number(item.taskId)), item.date),
         // With time windows on, the week writes the block too; otherwise the
         // morning planner does it and any old time is cleared.
         scheduled_time: timed ? item.start : null,
