@@ -1424,3 +1424,206 @@ footer .footer-badges a:hover img { opacity: 1; }
 .pricing-card .plan-cta:hover { background: rgba(255, 255, 255, 0.06); transform: translateY(-1px); }
 .pricing-card.featured .plan-cta { background: var(--violet-deep); color: #fff; box-shadow: none; }
 .pricing-card.featured .plan-cta:hover { background: var(--violet); }
+
+/* ========== Hero loop: speak → sorted → planned ==========
+   Scenes stack in one stage; data-scene on #hero-loop picks the visible one
+   and hero-loop.js adds the in-scene steps (.listening, .typed, .in …). */
+.hero-loop {
+  max-width: 760px;
+  margin: 44px auto 0;
+  text-align: left;
+}
+
+.loop-frame {
+  border-radius: 18px;
+  padding: 1px;
+  background: linear-gradient(135deg, rgba(167, 139, 250, 0.55), rgba(255, 255, 255, 0.08) 45%, rgba(94, 234, 212, 0.45));
+  box-shadow: 0 30px 90px -20px rgba(124, 58, 237, 0.45), 0 0 120px -40px rgba(94, 234, 212, 0.35);
+}
+
+.loop-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 11px 14px;
+  border-radius: 17px 17px 0 0;
+  background: #1A1A25;
+  border-bottom: 1px solid var(--border);
+}
+.loop-bar i { width: 9px; height: 9px; border-radius: 50%; background: rgba(255, 255, 255, 0.12); }
+.loop-bar-title { margin-left: 8px; font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.08em; color: var(--text-3); }
+
+.loop-stage {
+  position: relative;
+  height: 380px;
+  overflow: hidden;
+  border-radius: 0 0 17px 17px;
+  background:
+    radial-gradient(circle at 15% 0%, rgba(124, 58, 237, 0.18), transparent 55%),
+    radial-gradient(circle at 100% 100%, rgba(20, 184, 166, 0.14), transparent 50%),
+    #12121A;
+  transition: opacity 0.45s ease;
+}
+.loop-stage.fade { opacity: 0; }
+
+.loop-scene {
+  position: absolute;
+  inset: 0;
+  padding: 30px 40px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  opacity: 0;
+  transform: translateY(10px) scale(0.985);
+  transition: opacity 0.45s ease, transform 0.45s ease;
+  pointer-events: none;
+}
+.loop-stage[data-scene="capture"] .loop-capture,
+.loop-stage[data-scene="sorted"] .loop-sorted,
+.loop-stage[data-scene="day"] .loop-day { opacity: 1; transform: none; }
+
+.loop-scene svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+
+/* Scene 1 — capture by voice */
+.loop-modes { display: flex; gap: 10px; }
+.loop-mode {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 8px 15px;
+  border-radius: 11px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text-2);
+  font-size: 14px;
+  transition: background 0.25s, color 0.25s, border-color 0.25s, transform 0.15s;
+}
+.loop-speak.on { background: rgba(251, 113, 133, 0.14); border-color: rgba(251, 113, 133, 0.5); color: var(--rose-glow); }
+
+.loop-card {
+  position: relative;
+  width: 100%;
+  max-width: 540px;
+  min-height: 190px;
+  padding: 18px 20px 56px;
+  border-radius: 16px;
+  border: 1px solid var(--border-strong);
+  background: rgba(255, 255, 255, 0.05);
+  box-shadow: 0 20px 50px -20px rgba(0, 0, 0, 0.6);
+}
+.loop-card-head { display: flex; align-items: center; gap: 8px; font-family: var(--font-display); font-size: 22px; color: var(--text-1); }
+.loop-rec { width: 8px; height: 8px; border-radius: 50%; background: var(--text-3); }
+.listening .loop-rec { background: var(--rose); animation: loop-blink 1s ease-in-out infinite; }
+
+.loop-wave { display: flex; align-items: center; gap: 3px; height: 34px; margin: 12px 0 8px; }
+.loop-wave i { flex: 1; max-width: 4px; height: 3px; border-radius: 2px; background: rgba(251, 113, 133, 0.35); }
+.listening .loop-wave i { background: var(--rose); animation: loop-wave 0.9s ease-in-out infinite alternate; animation-delay: calc(var(--i) * -0.13s); }
+
+.loop-transcript { min-height: 46px; font-size: 15.5px; line-height: 1.5; color: var(--text-1); }
+.loop-transcript:empty::before { content: 'Listening…'; color: var(--text-3); }
+.loop-transcript .w { opacity: 0; transition: opacity 0.25s; }
+.loop-transcript .w.in { opacity: 1; }
+
+.loop-send {
+  position: absolute; right: 14px; bottom: 14px;
+  display: grid; place-items: center;
+  width: 36px; height: 36px;
+  border-radius: 10px;
+  background: var(--violet-deep);
+  color: #fff;
+  transition: transform 0.15s;
+}
+.loop-send svg { width: 17px; height: 17px; }
+
+/* Scene 2 — sorted */
+.loop-label { display: inline-flex; align-items: center; gap: 7px; font-family: var(--font-mono); font-size: 11.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--violet-glow); }
+.loop-tasks { list-style: none; width: 100%; max-width: 560px; display: flex; flex-direction: column; gap: 9px; }
+.loop-tasks li {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  transition: opacity 0.4s ease, transform 0.4s cubic-bezier(.2,.9,.3,1.2);
+}
+.loop-check { width: 16px; height: 16px; border-radius: 50%; border: 1.5px solid var(--border-strong); flex: none; }
+.loop-task-title { flex: 1; font-size: 15px; color: var(--text-1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.loop-chips { display: flex; gap: 6px; flex: none; }
+.loop-chips b { font-weight: 500; font-family: var(--font-mono); font-size: 11px; padding: 3px 8px; border-radius: 999px; }
+.c-violet { color: var(--violet-glow); background: rgba(167, 139, 250, 0.14); }
+.c-mint { color: var(--mint-glow); background: rgba(94, 234, 212, 0.12); }
+.c-amber { color: var(--amber-glow); background: rgba(251, 191, 36, 0.12); }
+.c-rose { color: var(--rose-glow); background: rgba(251, 113, 133, 0.13); }
+
+.loop-plan {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 9px 16px;
+  border-radius: 11px;
+  background: linear-gradient(135deg, var(--violet-deep), #6D28D9);
+  color: #fff;
+  font-size: 14px;
+  box-shadow: 0 8px 24px -8px rgba(124, 58, 237, 0.7);
+  transition: transform 0.15s, opacity 0.4s;
+}
+
+/* Steps hidden until the script reveals them (only while it runs). */
+.loop-stage.animated .loop-tasks li { opacity: 0; transform: translateY(12px); }
+.loop-stage.animated .loop-tasks li.in { opacity: 1; transform: none; }
+.loop-stage.animated .loop-plan { opacity: 0; }
+.loop-stage.animated .loop-plan.in { opacity: 1; }
+
+/* Scene 3 — the day */
+.loop-grid { --hour: 70px; position: relative; width: 100%; max-width: 560px; height: calc(var(--hour) * 3.2); }
+.loop-hour {
+  position: absolute; left: 0; right: 0; top: calc(var(--at) * var(--hour));
+  padding-top: 2px;
+  border-top: 1px solid var(--border);
+  font-family: var(--font-mono); font-size: 10.5px; color: var(--text-3);
+}
+.loop-event {
+  position: absolute; left: 62px; right: 0;
+  top: calc(var(--from) * var(--hour) + 2px);
+  height: calc(var(--len) * var(--hour) - 4px);
+  min-height: 13px;
+  display: flex; align-items: center;
+  padding: 0 10px;
+  border-radius: 7px;
+  font-size: 12.5px;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.loop-event.meeting { background: rgba(255, 255, 255, 0.06); border: 1px solid var(--border); color: var(--text-2); }
+.loop-event.block { transition: opacity 0.4s ease, transform 0.45s cubic-bezier(.2,.9,.3,1.2); }
+.loop-event.mint { background: rgba(20, 184, 166, 0.22); border: 1px solid rgba(94, 234, 212, 0.45); color: var(--mint-glow); }
+.loop-event.violet { background: rgba(124, 58, 237, 0.3); border: 1px solid rgba(167, 139, 250, 0.55); color: #EDE9FE; }
+.loop-stage.animated .loop-event.block { opacity: 0; transform: translateX(26px); }
+.loop-stage.animated .loop-event.block.in { opacity: 1; transform: none; }
+
+/* Pointer */
+.loop-cursor {
+  position: absolute; left: 0; top: 0;
+  width: 22px; height: 22px;
+  color: #fff;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.6));
+  opacity: 0;
+  transform: translate(var(--x, 600px), var(--y, 330px));
+  transition: transform 0.7s cubic-bezier(.45,.05,.25,1), opacity 0.3s;
+  pointer-events: none;
+}
+.loop-cursor svg { width: 22px; height: 22px; fill: currentColor; stroke: #12121A; stroke-width: 1.2; }
+.loop-stage.animated .loop-cursor { opacity: 1; }
+.press { transform: scale(0.94) !important; }
+
+@keyframes loop-wave { from { height: 4px; } to { height: calc(8px + var(--h) * 24px); } }
+@keyframes loop-blink { 50% { opacity: 0.3; } }
+
+@media (max-width: 640px) {
+  .hero-loop { margin-top: 34px; }
+  .loop-stage { height: 400px; }
+  .loop-scene { padding: 22px 16px; }
+  .loop-tasks li { flex-wrap: wrap; row-gap: 6px; }
+  .loop-task-title { flex-basis: calc(100% - 28px); }
+  .loop-chips { margin-left: 28px; }
+  .loop-grid { --hour: 72px; }
+  .loop-event { left: 48px; }
+}
