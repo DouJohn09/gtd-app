@@ -49,6 +49,7 @@ export default function HabitModal({ habit, onClose, onSave, existingCategories 
   const [form, setForm] = useState({
     name: '', description: '', frequency: 'daily', target_days: [],
     category: '', color: '#a78bfa', type: 'build',
+    when: 'any', preferred_time: '07:00', duration: 30,
   });
   const [customCategory, setCustomCategory] = useState(false);
   const [customCategoryValue, setCustomCategoryValue] = useState('');
@@ -75,6 +76,9 @@ export default function HabitModal({ habit, onClose, onSave, existingCategories 
         category: isCustom ? '__custom__' : cat,
         color: habit.color || '#a78bfa',
         type: habit.type || 'build',
+        when: habit.preferred_time ? 'time' : habit.time_of_day || 'any',
+        preferred_time: habit.preferred_time || '07:00',
+        duration: habit.duration || 30,
       });
       if (isCustom) { setCustomCategory(true); setCustomCategoryValue(cat); }
     }
@@ -122,7 +126,13 @@ export default function HabitModal({ habit, onClose, onSave, existingCategories 
       // while state is still [] or [NaN] (empty input), which the server would read
       // as 1×/week. Clamp to a real number so the saved target matches what's shown.
       target_days: isQuit ? null : normalizeTargetDays(form.frequency, form.target_days),
+      // When it happens — a fixed time, or a part of the day the planner
+      // finds room in. Quit habits and "any time" reserve nothing.
+      preferred_time: !isQuit && form.when === 'time' ? form.preferred_time : null,
+      time_of_day: !isQuit && ['morning', 'afternoon', 'evening'].includes(form.when) ? form.when : null,
+      duration: !isQuit && form.when !== 'any' ? Number(form.duration) || 30 : null,
     };
+    delete data.when;
     onSave(data);
   };
 
@@ -349,6 +359,61 @@ export default function HabitModal({ habit, onClose, onSave, existingCategories 
               </div>
               <p className="text-[11.5px] text-text-3 mt-1.5">
                 Counts from the day you create it — e.g. every 3 days.
+              </p>
+            </div>
+          )}
+
+          {form.type !== 'quit' && (
+            <div>
+              <label className="gtd-label">When</label>
+              <div className="flex flex-wrap gap-1.5">
+                {[['any', 'Any time'], ['morning', 'Morning'], ['afternoon', 'Afternoon'], ['evening', 'Evening'], ['time', 'At a time']].map(([value, label]) => {
+                  const active = form.when === value;
+                  return (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => setForm({ ...form, when: value })}
+                      className="px-2.5 py-1 rounded-lg text-[12px] transition-colors"
+                      style={active
+                        ? { background: 'rgb(var(--violet) / 0.16)', boxShadow: 'inset 0 0 0 1px rgb(var(--violet) / 0.45)', color: 'rgb(var(--text-1))' }
+                        : { boxShadow: 'inset 0 0 0 1px rgb(255 255 255 / 0.08)', color: 'rgb(var(--text-3))' }}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+              {form.when !== 'any' && (
+                <div className="flex items-center gap-2 mt-2.5">
+                  {form.when === 'time' && (
+                    <input
+                      type="time"
+                      value={form.preferred_time}
+                      onChange={e => setForm({ ...form, preferred_time: e.target.value })}
+                      className="gtd-input w-32"
+                      required
+                    />
+                  )}
+                  <select
+                    value={form.duration}
+                    onChange={e => setForm({ ...form, duration: Number(e.target.value) })}
+                    className="gtd-input w-32"
+                  >
+                    {[5, 10, 15, 20, 30, 45, 60, 90, 120].map(m => (
+                      <option key={m} value={m}>{m < 60 ? `${m} min` : `${m / 60} h`.replace('1.5 h', '1½ h')}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              <p className="text-[11.5px] text-text-3 mt-1.5">
+                {form.when === 'any'
+                  ? 'Pick a time or part of the day and Plan my day keeps room for it; it also shows in your calendar.'
+                  : form.frequency === 'weekly'
+                    ? '"Times per week" habits have no set day, so plans don\'t reserve time for them.'
+                    : form.when === 'time'
+                      ? 'Plans and the calendar keep this time free on the days it\'s due.'
+                      : 'Plans find a free slot for it in that part of the day.'}
               </p>
             </div>
           )}

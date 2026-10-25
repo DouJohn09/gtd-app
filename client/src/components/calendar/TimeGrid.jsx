@@ -312,6 +312,10 @@ function TimeBlock({ task, top, height, col, totalCols, compact, onEdit, onCompl
     return <DraftBlock task={task} top={top} height={height} col={col} totalCols={totalCols} compact={compact} onEdit={onEdit} />;
   }
 
+  if (task.type === 'habit') {
+    return <HabitBlock habit={task} top={top} height={height} col={col} totalCols={totalCols} compact={compact} onToggle={onComplete} />;
+  }
+
   const tone = task.list === 'inbox' ? 'amber' :
                task.list === 'waiting_for' ? 'rose' :
                task.list === 'someday_maybe' ? 'violet' : 'mint';
@@ -393,6 +397,45 @@ function DraftBlock({ task, top, height, col, totalCols, compact, onEdit }) {
             {formatTimeLabel(timeToMinutes(task.scheduled_time))}{task.duration ? ` · ${task.duration}m` : ''} · draft
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+// A habit's reserved time: soft, in the habit's colour, not draggable (its
+// time is set on the habit). Clicking marks it done for that day.
+function HabitBlock({ habit, top, height, col, totalCols, compact, onToggle }) {
+  const done = habit.status === 'done';
+  return (
+    <div
+      onClick={() => onToggle?.(habit.id)}
+      className="absolute rounded-lg cursor-pointer pointer-events-auto overflow-hidden"
+      style={{
+        ...blockPositionStyle(top, height, col, totalCols),
+        background: `${habit.color}1a`,
+        boxShadow: `inset 0 0 0 1px ${habit.color}55, inset 3px 0 0 ${habit.color}`,
+        opacity: done ? 0.5 : 1,
+      }}
+      title={`${habit.title} · habit — click to ${done ? 'undo' : 'mark done'}`}
+    >
+      <div className={`flex items-start gap-1.5 ${compact ? 'p-1' : 'p-1.5'} h-full`}>
+        <span
+          className="w-3 h-3 rounded-full shrink-0 mt-0.5"
+          style={{ boxShadow: `inset 0 0 0 1.5px ${habit.color}`, background: done ? habit.color : 'transparent' }}
+        />
+        <div className="flex-1 min-w-0">
+          <div
+            className={`${compact ? 'text-[10px]' : 'text-[11.5px]'} font-medium leading-tight truncate ${done ? 'line-through' : ''}`}
+            style={{ color: habit.color }}
+          >
+            {habit.title}
+          </div>
+          {!compact && height > 32 && (
+            <div className="font-mono text-[9px] text-text-3 mt-0.5">
+              {formatTimeLabel(timeToMinutes(habit.scheduled_time))} · {habit.duration}m · habit
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

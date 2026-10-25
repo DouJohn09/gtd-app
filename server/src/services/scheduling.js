@@ -1,6 +1,7 @@
 import { TaskModel } from '../db/models.js';
 import { getCalendarEvents } from './googleCalendar.js';
 import { todayInTz } from '../lib/dateTime.js';
+import { timedHabits, placeHabits } from './habitBlocks.js';
 
 const SLOT_STEP_MINS = 15;
 
@@ -114,10 +115,13 @@ export function collectBusyRanges(dateStr, gcalEvents, ownTasks, timeZone) {
     if (interval) ranges.push(interval);
   }
 
-  // Merge overlapping
-  ranges.sort((a, b) => a[0] - b[0]);
+  return mergeBusy(ranges);
+}
+
+// Sorted union of [start, end] minute ranges.
+function mergeBusy(ranges) {
   const merged = [];
-  for (const r of ranges) {
+  for (const r of [...ranges].sort((a, b) => a[0] - b[0])) {
     if (merged.length && r[0] <= merged[merged.length - 1][1]) {
       merged[merged.length - 1][1] = Math.max(merged[merged.length - 1][1], r[1]);
     } else {
@@ -138,8 +142,17 @@ async function busyRangesFor(userId, dateStr, timeZone) {
     console.error('busyRangesFor: GCal fetch failed:', err.message);
   }
   const { start: workStart, end: workEnd } = workingHoursFor(dateStr);
-  const busy = collectBusyRanges(dateStr, gcalEvents, ownTasks, timeZone);
-  return { busy, workStart, workEnd, gcalEvents, ownTasks };
+  const meetingsAndBlocks = collectBusyRanges(dateStr, gcalEvents, ownTasks, timeZone);
+  // Habits with a time (or a part of the day) are busy too, so plans, free-slot
+  // booking and week capacity leave room for them.
+  let habitBlocks = [];
+  try {
+    habitBlocks = placeHabits(await timedHabits(userId, dateStr), dateStr, meetingsAndBlocks);
+  } catch (err) {
+    console.error('busyRangesFor: habits failed:', err.message);
+  }
+  const busy = mergeBusy([...meetingsAndBlocks, ...habitBlocks.filter(b => b.start != null).map(b => [b.start, b.end])]);
+  return { busy, workStart, workEnd, gcalEvents, ownTasks, habitBlocks };
 }
 
 // The gaps inside working hours once busy ranges are subtracted — the raw
@@ -161,10 +174,10 @@ export function freeRangesFrom(busy, workStart, workEnd) {
 // `events` is the fetched context (own scheduled tasks + Google events) so
 // callers that also need the raw day (the planner) don't fetch twice.
 export async function freeRangesFor(userId, dateStr, timeZone) {
-  const { busy, workStart, workEnd, gcalEvents, ownTasks } = await busyRangesFor(userId, dateStr, timeZone);
+  const { busy, workStart, workEnd, gcalEvents, ownTasks, habitBlocks } = await busyRangesFor(userId, dateStr, timeZone);
   const free = freeRangesFrom(busy, workStart, workEnd);
   const totalFreeMins = free.reduce((sum, r) => sum + (r.end - r.start), 0);
-  return { free, busy, workStart, workEnd, totalFreeMins, gcalEvents, ownTasks };
+  return { free, busy, workStart, workEnd, totalFreeMins, gcalEvents, ownTasks, habitBlocks };
 }
 
 // Drop the part of the day that's already gone: ranges ending before `now`

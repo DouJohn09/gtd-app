@@ -3,6 +3,7 @@ import { CalendarDays } from 'lucide-react';
 import TaskCard from '../TaskCard';
 import CalendarEventCard from '../CalendarEventCard';
 import TimeGrid from './TimeGrid';
+import HabitChip from './HabitChip';
 
 function googleEventToBlock(event) {
   if (event.all_day || !event.start_time) return null;
@@ -65,6 +66,8 @@ export default function DayView({ date, items, onEditTask, onCompleteTask, onDro
             {allDayItems.map(item => (
               item.type === 'google_event' ? (
                 <CalendarEventCard key={item.id} event={item} expanded />
+              ) : item.type === 'habit' ? (
+                <HabitChip key={item.id} habit={item} onToggle={onCompleteTask} />
               ) : (
                 <div
                   key={item.id}

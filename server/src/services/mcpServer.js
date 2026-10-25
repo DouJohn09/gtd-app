@@ -206,7 +206,13 @@ export function buildMcpServer({ userId, timezone, today }) {
       })),
       habits: habits
         .filter(h => h.frequency === 'weekly' || isDueOn(h, today))
-        .map(h => ({ name: h.name, ...(h.type === 'quit' && { kind: 'quit' }), status: status.get(h.id) || 'not yet' })),
+        .map(h => ({
+          name: h.name,
+          ...(h.type === 'quit' && { kind: 'quit' }),
+          ...((h.preferred_time || h.time_of_day) && { when: h.preferred_time || h.time_of_day }),
+          ...(h.duration && { duration_minutes: h.duration }),
+          status: status.get(h.id) || 'not yet',
+        })),
     });
   });
 

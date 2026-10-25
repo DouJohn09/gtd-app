@@ -121,6 +121,17 @@ export default function PlanReviewPanel({ result, onApplied, onCancel, onOpenTas
       {result.calibration && (
         <p className="text-[12px] text-text-3 leading-relaxed mb-3">{result.calibration}</p>
       )}
+      {result.habitBlocks?.length > 0 && (
+        <p className="text-[12px] text-text-3 leading-relaxed mb-3">
+          Kept free for habits:{' '}
+          {result.habitBlocks.map((h, i) => (
+            <span key={h.habitId}>
+              {i > 0 && ', '}
+              <span style={{ color: h.color || undefined }}>{h.name}</span> {h.start} ({h.duration}m)
+            </span>
+          ))}
+        </p>
+      )}
 
       <div className="space-y-2">
         {plan.map((b) => {

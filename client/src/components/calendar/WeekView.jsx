@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import CalendarTaskCard from '../CalendarTaskCard';
 import CalendarEventCard from '../CalendarEventCard';
+import HabitChip from './HabitChip';
 import TimeGrid, { HOUR_START, HOUR_END, COMPACT_HOUR_HEIGHT, timeToMinutes, formatTimeLabel } from './TimeGrid';
 
 const GUTTER = 40;
@@ -31,6 +32,7 @@ function splitItems(items) {
 }
 
 function ItemCard({ item, onEditTask, onCompleteTask }) {
+  if (item.type === 'habit') return <HabitChip habit={item} onToggle={onCompleteTask} />;
   return item.type === 'google_event' ? (
     <CalendarEventCard event={item} />
   ) : (

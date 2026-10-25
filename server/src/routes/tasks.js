@@ -4,6 +4,8 @@ import { pool } from '../db/pool.js';
 import { analyzeTask } from '../services/ai.js';
 import { enforceAiLimit, requireAiEnabled, chargeAiUsage } from '../middleware/aiLimit.js';
 import { getCalendarEvents, syncTaskToCalendar, deleteTaskFromCalendar, getCalendarStatus, getLastSyncError } from '../services/googleCalendar.js';
+import { timedHabits, placeHabits } from '../services/habitBlocks.js';
+import { collectBusyRanges } from '../services/scheduling.js';
 import { serverError } from '../lib/httpErrors.js';
 
 const router = Router();
@@ -47,6 +49,12 @@ router.get('/daily-focus', async (req, res) => {
   }
 });
 
+const nextDay = (d) => {
+  const x = new Date(`${d}T00:00:00Z`);
+  x.setUTCDate(x.getUTCDate() + 1);
+  return x.toISOString().slice(0, 10);
+};
+
 router.get('/calendar', async (req, res) => {
   try {
     const { start, end } = req.query;
@@ -67,7 +75,21 @@ router.get('/calendar', async (req, res) => {
     // Google rejects), so a revoke on Google's side shows up on this load.
     const calendar = { ...(await getCalendarStatus(req.user.id)), syncError: getLastSyncError(req.user.id) };
 
-    res.json({ scheduled, unscheduled, googleEvents, calendar });
+    // Habits with a time or a part of the day, placed per day the same way the
+    // planner places them (after meetings and time-blocked tasks).
+    const habits = [];
+    if (/^\d{4}-\d{2}-\d{2}$/.test(start) && /^\d{4}-\d{2}-\d{2}$/.test(end) && start <= end) {
+      const timed = await timedHabits(req.user.id, start, end);
+      if (timed.habits.length) {
+        const scheduledByDate = scheduled.map(t => ({ ...t, due_date: t.due_date ? String(t.due_date).slice(0, 10) : null }));
+        for (let d = start, i = 0; d <= end && i < 62; d = nextDay(d), i++) {
+          const busy = collectBusyRanges(d, googleEvents, scheduledByDate, req.clientTimezone);
+          for (const b of placeHabits(timed, d, busy)) habits.push({ ...b, date: d });
+        }
+      }
+    }
+
+    res.json({ scheduled, unscheduled, googleEvents, calendar, habits });
   } catch (error) {
     serverError(req, res, error);
   }

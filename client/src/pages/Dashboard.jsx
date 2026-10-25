@@ -204,8 +204,14 @@ export default function Dashboard() {
   const dayDenom = focusTotal + shippedToday;
   const dayPct = dayDenom ? Math.round((shippedToday / dayDenom) * 100) : 0;
 
-  const habitsDone = habits.filter(h => h.completed_today).length;
-  const habitsPct = habits.length ? Math.round((habitsDone / habits.length) * 100) : 0;
+  // Only habits scheduled for today, in the order of the day: fixed times,
+  // then morning → afternoon → evening, then any-time ones.
+  const PART_ORDER = { morning: '08', afternoon: '13', evening: '18' };
+  const todayHabits = habits
+    .filter(h => h.due_today !== false)
+    .sort((a, b) => (a.preferred_time || PART_ORDER[a.time_of_day] || '99').localeCompare(b.preferred_time || PART_ORDER[b.time_of_day] || '99'));
+  const habitsDone = todayHabits.filter(h => h.completed_today).length;
+  const habitsPct = todayHabits.length ? Math.round((habitsDone / todayHabits.length) * 100) : 0;
 
   const statCards = [
     { key: 'inbox',         label: 'Inbox',         value: stats?.inbox || 0,         icon: Inbox,    link: '/inbox' },
@@ -433,7 +439,8 @@ export default function Dashboard() {
         <aside className="col-span-12 xl:col-span-4 flex flex-col gap-5">
           <MomentumCard pct={dayPct} completedToday={shippedToday} />
           <HabitsCard
-            habits={habits}
+            habits={todayHabits}
+            hasAny={habits.length > 0}
             done={habitsDone}
             pct={habitsPct}
             onToggle={async (id) => { await api.habits.toggle(id); fetchData(); }}
@@ -660,7 +667,20 @@ function MomentumCard({ pct, completedToday }) {
   );
 }
 
-function HabitsCard({ habits, done, pct, onToggle }) {
+const HABIT_PART = { morning: 'morning', afternoon: 'afternoon', evening: 'evening' };
+
+function HabitsCard({ habits, hasAny, done, pct, onToggle }) {
+  if (hasAny && !habits.length) {
+    return (
+      <GlassCard>
+        <div className="flex items-center justify-between mb-3">
+          <MonoLabel>today's habits</MonoLabel>
+          <Link to="/habits" className="font-mono text-[10.5px] text-text-3 hover:text-text-1">all</Link>
+        </div>
+        <div className="font-display italic text-[16px] text-text-2">Nothing scheduled today.</div>
+      </GlassCard>
+    );
+  }
   if (!habits.length) {
     return (
       <GlassCard>
@@ -704,6 +724,9 @@ function HabitsCard({ habits, done, pct, onToggle }) {
             <span className={`text-[13px] ${h.completed_today ? 'line-through text-text-3' : 'text-text-1'}`}>
               {h.name}
             </span>
+            {(h.preferred_time || HABIT_PART[h.time_of_day]) && (
+              <span className="font-mono text-[10px] text-text-3">{h.preferred_time || HABIT_PART[h.time_of_day]}</span>
+            )}
             {h.streak > 0 && (
               <span className="ml-auto font-mono text-[10.5px] text-amber-glow inline-flex items-center gap-1">
                 <Flame className="w-3 h-3" />{h.streak}

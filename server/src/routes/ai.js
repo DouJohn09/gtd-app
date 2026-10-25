@@ -310,14 +310,17 @@ router.post('/plan-day', requireAiEnabled, enforceAiLimit, async (req, res) => {
     const totalFreeMins = freeRanges.reduce((sum, r) => sum + (r.end - r.start), 0);
     const meetings = buildMeetings(dayShape, req.today, req.clientTimezone);
 
-    const { rows: habits } = await pool.query(
-      `SELECT h.name, (hl.id IS NOT NULL) AS completed_today
+    const { rows: habitRows } = await pool.query(
+      `SELECT h.id, h.name, (hl.id IS NOT NULL) AS completed_today
        FROM habits h
        LEFT JOIN habit_logs hl ON hl.habit_id = h.id AND hl.completed_date = $2 AND hl.status = 'done'
        WHERE h.user_id = $1 AND h.active = true
        ORDER BY h.name`,
       [req.user.id, req.today]
     );
+    // Habits with a time already sit inside `busy`; tell the model when they are.
+    const habitSlot = new Map(dayShape.habitBlocks.filter(b => b.start != null).map(b => [b.habitId, `${minutesToTime(b.start)}-${minutesToTime(b.end)}`]));
+    const habits = habitRows.map(h => ({ name: h.name, completed_today: h.completed_today, time: habitSlot.get(h.id) || null }));
 
     const dayName = new Date().toLocaleDateString('en-US', { weekday: 'long', timeZone: req.clientTimezone || 'UTC' });
     const result = await planDay(candidates, {
@@ -349,6 +352,10 @@ router.post('/plan-day', requireAiEnabled, enforceAiLimit, async (req, res) => {
     );
 
     result.tasks = candidates;
+    // Shown alongside the proposed blocks so the plan reads as the whole day.
+    result.habitBlocks = dayShape.habitBlocks
+      .filter(b => b.start != null && b.status !== 'done')
+      .map(b => ({ habitId: b.habitId, name: b.name, color: b.color, start: minutesToTime(b.start), duration: b.end - b.start }));
     res.json(result);
   } catch (error) {
     if (error instanceof LimitError) {

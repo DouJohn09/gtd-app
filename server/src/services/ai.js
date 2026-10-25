@@ -562,7 +562,7 @@ const nextDay = (dateStr) => {
 //
 // `day` = { today, dayName, freeRanges, totalFreeMins, workStart, workEnd,
 //           meetings: [{title, start, end}]  (minutes-of-day),
-//           habits: [{name, completed_today}] }
+//           habits: [{name, completed_today, time?}] }
 export async function planDay(tasks, day, userContexts) {
   if (!aiConfigured()) return { error: 'AI provider not configured' };
 
@@ -593,7 +593,7 @@ export async function planDay(tasks, day, userContexts) {
     ? day.freeRanges.map(r => `${minutesToTime(r.start)}-${minutesToTime(r.end)} (${r.end - r.start}m)`).join(', ')
     : 'none';
   const habitsLine = day.habits.length
-    ? day.habits.map(h => `${h.name}${h.completed_today ? ' (done)' : ''}`).join(', ')
+    ? day.habits.map(h => `${h.name}${h.time ? ` ${h.time}` : ''}${h.completed_today ? ' (done)' : ''}`).join(', ')
     : 'none';
 
   const parsed = await complete('plan-day', {
@@ -607,7 +607,7 @@ THE DAY:
 - Working hours: ${minutesToTime(day.workStart)}-${minutesToTime(day.workEnd)}
 - Busy (meetings + already-scheduled blocks): ${meetingsLine}
 - Free windows: ${freeLine} — ${day.totalFreeMins} free minutes in total
-- Habits today (context only — never schedule habits as blocks): ${habitsLine}
+- Habits today (times shown are already reserved and left out of the free windows; never schedule habits as blocks): ${habitsLine}
 
 CANDIDATE TASKS:
 ${taskList}

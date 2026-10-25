@@ -34,6 +34,7 @@ export default function Calendar() {
   const [scheduledTasks, setScheduledTasks] = useState([]);
   const [unscheduledTasks, setUnscheduledTasks] = useState([]);
   const [googleEvents, setGoogleEvents] = useState([]);
+  const [habitBlocks, setHabitBlocks] = useState([]);
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [editingTask, setEditingTask] = useState(null);
@@ -103,6 +104,7 @@ export default function Calendar() {
       setScheduledTasks(calendarData.scheduled);
       setUnscheduledTasks(calendarData.unscheduled);
       setGoogleEvents(calendarData.googleEvents || []);
+      setHabitBlocks(calendarData.habits || []);
       const cal = calendarData.calendar;
       if (cal) {
         if (connectedRef.current && !cal.connected) {
@@ -154,6 +156,24 @@ export default function Calendar() {
       if (!map[key]) map[key] = [];
       map[key].push(event);
     }
+    // Habits with a time or part of the day, in day and week views only (a
+    // month grid would repeat them on every cell).
+    if (viewType !== 'month') {
+      for (const h of habitBlocks) {
+        (map[h.date] ||= []).push({
+          id: `habit-${h.habitId}-${h.date}`,
+          type: 'habit',
+          habitId: h.habitId,
+          title: h.name,
+          color: h.color || '#a78bfa',
+          status: h.status,
+          timeOfDay: h.timeOfDay,
+          duration: h.duration,
+          due_date: h.date,
+          scheduled_time: h.start != null ? `${String(Math.floor(h.start / 60)).padStart(2, '0')}:${String(h.start % 60).padStart(2, '0')}` : null,
+        });
+      }
+    }
     for (const key of Object.keys(map)) {
       map[key].sort((a, b) => {
         const aIsEvent = a.type === 'google_event';
@@ -169,7 +189,7 @@ export default function Calendar() {
       });
     }
     return map;
-  }, [scheduledTasks, googleEvents, weekDraft]);
+  }, [scheduledTasks, googleEvents, weekDraft, habitBlocks, viewType]);
   const isDraft = (id) => !!weekDraft?.some(t => t.id === id);
 
   const days = useMemo(() => {
@@ -208,6 +228,16 @@ export default function Calendar() {
   };
 
   const handleComplete = async (id) => {
+    // Habit blocks and chips: toggle done for that day.
+    if (typeof id === 'string' && id.startsWith('habit-')) {
+      const [, habitId, ...date] = id.split('-');
+      const day = date.join('-');
+      const current = habitBlocks.find(h => String(h.habitId) === habitId && h.date === day);
+      const next = current?.status === 'done' ? 'none' : 'done';
+      setHabitBlocks(prev => prev.map(h => (h === current ? { ...h, status: next } : h)));
+      try { await api.habits.toggle(Number(habitId), day, next); } catch (err) { addToast(err.message, 'error'); fetchData(); }
+      return;
+    }
     if (isDraft(id)) { weekBoardRef.current?.complete(id); return; }
     try {
       const updated = await api.tasks.complete(id);

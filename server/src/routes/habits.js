@@ -31,6 +31,9 @@ router.get('/', async (req, res) => {
 
     const result = habits.map(h => ({
       ...h,
+      // Scheduled for today. Weekly "N times a week" habits have no set day,
+      // so they count as due every day.
+      due_today: h.frequency === 'weekly' || isDueOn(h, today),
       target_days: h.target_days ? JSON.parse(h.target_days) : null,
       today_status: todayStatus.get(h.id) || 'none',
       completed_today: todayStatus.get(h.id) === 'done', // kept for back-compat
@@ -204,6 +207,26 @@ router.put('/:id/logs/:date', async (req, res) => {
   }
 });
 
+// When the habit happens: a fixed start time OR a part of the day, plus an
+// optional length. A fixed time wins over a part of the day. Fields not sent
+// are left alone (undefined); null clears.
+const TIME_OF_DAY = ['morning', 'afternoon', 'evening'];
+function timingFrom(body) {
+  const out = {};
+  if (body.preferred_time !== undefined) {
+    out.preferred_time = /^([01]\d|2[0-3]):[0-5]\d$/.test(body.preferred_time || '') ? body.preferred_time : null;
+  }
+  if (body.time_of_day !== undefined) {
+    out.time_of_day = TIME_OF_DAY.includes(body.time_of_day) ? body.time_of_day : null;
+  }
+  if (out.preferred_time) out.time_of_day = null;
+  if (body.duration !== undefined) {
+    const d = parseInt(body.duration, 10);
+    out.duration = Number.isFinite(d) && d >= 5 && d <= 480 ? d : null;
+  }
+  return out;
+}
+
 // POST /api/habits - create a habit
 router.post('/', async (req, res) => {
   try {
@@ -213,9 +236,10 @@ router.post('/', async (req, res) => {
     }
     await assertWithinLimit(req.user.id, 'habits');
 
+    const timing = timingFrom(req.body);
     const { rows } = await pool.query(
-      `INSERT INTO habits (name, description, frequency, target_days, category, color, type, user_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
+      `INSERT INTO habits (name, description, frequency, target_days, category, color, type, user_id, preferred_time, time_of_day, duration)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`,
       [
         name.trim(),
         description || null,
@@ -225,10 +249,14 @@ router.post('/', async (req, res) => {
         color || '#3b82f6',
         type === 'quit' ? 'quit' : 'build',
         req.user.id,
+        timing.preferred_time ?? null,
+        timing.time_of_day ?? null,
+        timing.duration ?? null,
       ]
     );
     const habit = rows[0];
     habit.target_days = habit.target_days ? JSON.parse(habit.target_days) : null;
+    habit.due_today = habit.frequency === 'weekly' || isDueOn(habit, req.today);
     habit.today_status = 'none';
     habit.completed_today = false;
     res.status(201).json(habit);
@@ -255,6 +283,7 @@ router.put('/:id', async (req, res) => {
     if (color !== undefined)       { fields.push(`color = $${fields.length + 1}`); values.push(color); }
     if (active !== undefined)      { fields.push(`active = $${fields.length + 1}`); values.push(!!active); }
     if (type !== undefined)        { fields.push(`type = $${fields.length + 1}`); values.push(type === 'quit' ? 'quit' : 'build'); }
+    for (const [k, v] of Object.entries(timingFrom(req.body))) { fields.push(`${k} = $${fields.length + 1}`); values.push(v); }
 
     if (fields.length === 0) return res.status(400).json({ error: 'No fields to update' });
 
