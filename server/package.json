@@ -16,6 +16,7 @@
     "test": "node scripts/test-http-errors.mjs && node scripts/test-habit-stats.mjs && node scripts/test-ai-schema.mjs && node scripts/test-relative-date.mjs"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.2",
     "@paddle/paddle-node-sdk": "^3.8.0",
     "@sentry/node": "^9.47.1",
     "cors": "^2.8.5",
@@ -28,6 +29,7 @@
     "node-pg-migrate": "^7.9.1",
     "openai": "^4.28.0",
     "pg": "^8.20.0",
-    "sql.js": "^1.10.0"
+    "sql.js": "^1.10.0",
+    "zod": "^3.25.76"
   }
 }

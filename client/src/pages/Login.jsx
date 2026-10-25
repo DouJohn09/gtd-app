@@ -15,6 +15,12 @@ export default function Login() {
   const [code, setCode] = useState('');
   const [sending, setSending] = useState(false);
   const linkTried = useRef(false);
+  // Where to go once signed in (?next=/connect?request=…). Read once, before
+  // the emailed-link handler clears the query; same-origin paths only.
+  const [next] = useState(() => {
+    const n = new URLSearchParams(window.location.search).get('next');
+    return n && n.startsWith('/') && !n.startsWith('//') ? n : '/';
+  });
 
   // The emailed link lands here as /login?token=…; sign in with it once and
   // drop it from the address bar.
@@ -33,7 +39,7 @@ export default function Login() {
       .finally(() => setSigningIn(false));
   }, [loginWithEmail]);
 
-  if (user) return <Navigate to="/" replace />;
+  if (user) return <Navigate to={next} replace />;
 
   const sendCode = async (e) => {
     e?.preventDefault();

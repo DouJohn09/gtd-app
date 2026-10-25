@@ -7,6 +7,7 @@ import { useAiMode } from '../hooks/useAiMode';
 import MonoLabel from '../components/ui/MonoLabel';
 import ConfirmModal from '../components/ui/ConfirmModal';
 import BillingSection from '../components/BillingSection';
+import ConnectedApps from '../components/ConnectedApps';
 
 export default function Settings() {
   const { addToast } = useToast();
@@ -369,6 +370,8 @@ export default function Settings() {
           ))}
         </div>
       </section>
+
+      <ConnectedApps />
 
       <section className="glass rounded-2xl p-6 mt-6">
         <MonoLabel className="mb-2">notifications</MonoLabel>

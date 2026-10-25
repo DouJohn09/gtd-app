@@ -28,6 +28,7 @@ import clientErrorsRouter from './routes/clientErrors.js';
 import internalRouter from './routes/internal.js';
 import adminRouter from './routes/admin.js';
 import notificationsRouter from './routes/notifications.js';
+import mcpRouter from './routes/mcp.js';
 import { startHeartbeat } from './services/heartbeat.js';
 import { startModelWatchdog } from './services/aiRouter.js';
 
@@ -47,6 +48,11 @@ app.use(helmet({
   crossOriginEmbedderPolicy: false,
   crossOriginOpenerPolicy: { policy: 'same-origin-allow-popups' },
 }));
+
+// MCP server + its OAuth endpoints. Before the global CORS (AI apps and MCP
+// inspectors call from any origin; the router sets its own CORS) and before
+// the landing/SPA fallbacks, since OAuth discovery uses fixed root paths.
+app.use(mcpRouter);
 
 // Prod is same-origin (Express serves the client), so CORS only needs to admit
 // local Vite dev servers. Override with CORS_ORIGINS (comma-separated) if needed.

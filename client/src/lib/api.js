@@ -234,4 +234,12 @@ export const api = {
   account: {
     delete: () => fetchApi('/auth/account', { method: 'DELETE' }),
   },
+  // AI apps (Claude, ChatGPT, Grok) connected over MCP.
+  oauth: {
+    request: (id) => fetchApi(`/oauth/requests/${encodeURIComponent(id)}`),
+    approve: (id) => fetchApi(`/oauth/requests/${encodeURIComponent(id)}/approve`, { method: 'POST' }),
+    deny: (id) => fetchApi(`/oauth/requests/${encodeURIComponent(id)}/deny`, { method: 'POST' }),
+    connections: () => fetchApi('/oauth/connections'),
+    disconnect: (clientId) => fetchApi(`/oauth/connections/${encodeURIComponent(clientId)}`, { method: 'DELETE' }),
+  },
 };

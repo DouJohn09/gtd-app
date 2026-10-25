@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from './contexts/AuthContext';
 import Layout from './components/Layout';
 import Dashboard from './pages/Dashboard';
@@ -16,21 +16,27 @@ import Settings from './pages/Settings';
 import Guide from './pages/Guide';
 import CustomList from './pages/CustomList';
 import Login from './pages/Login';
+import Connect from './pages/Connect';
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
+  const location = useLocation();
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center">
       <div className="w-6 h-6 rounded-full border-2 border-violet/30 border-t-violet animate-spin" />
     </div>
   );
-  return user ? children : <Navigate to="/login" replace />;
+  // Send people back where they were headed after signing in (e.g. the
+  // "connect Claude" page an AI app opened).
+  const next = location.pathname === '/' ? '' : `?next=${encodeURIComponent(location.pathname + location.search)}`;
+  return user ? children : <Navigate to={`/login${next}`} replace />;
 }
 
 export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
+      <Route path="/connect" element={<ProtectedRoute><Connect /></ProtectedRoute>} />
       <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
         <Route index element={<Dashboard />} />
         <Route path="inbox" element={<Inbox />} />
