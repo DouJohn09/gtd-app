@@ -28,6 +28,19 @@ function snapMinutes(mins) {
   return Math.round(mins / SNAP_MINUTES) * SNAP_MINUTES;
 }
 
+// The block being dragged: where inside it the pointer grabbed it and how long
+// it is. dataTransfer can't be read during dragover, so this lives here. The
+// drop then puts the block's top where it is shown, not the pointer, and the
+// preview has the block's real height. Drags from outside the grid (chips,
+// the unscheduled list) leave it empty: top = pointer, 30 minutes.
+let dragging = null;
+function startBlockDrag(e, duration) {
+  const rect = e.currentTarget.getBoundingClientRect();
+  const grabMins = rect.height > 0 ? ((e.clientY - rect.top) / rect.height) * duration : 0;
+  dragging = { grabMins: Math.max(0, grabMins), duration };
+}
+const endBlockDrag = () => { dragging = null; };
+
 // Lay overlapping events out as side-by-side columns.
 // Each item gets `_col` (0-indexed) and `_totalCols` (cluster width divisor).
 function computeLayout(blocks) {
@@ -150,9 +163,13 @@ export default function TimeGrid({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const yToMinutes = (y) => {
-    const minsFromStart = (y / hourHeight) * 60;
-    return HOUR_START * 60 + snapMinutes(minsFromStart);
+  const yToMinutes = (y) => HOUR_START * 60 + snapMinutes((y / hourHeight) * 60);
+
+  // Start of the dragged block for a pointer at y, snapped and kept inside the day.
+  const dropStart = (y) => {
+    const duration = dragging?.duration || 30;
+    const mins = HOUR_START * 60 + snapMinutes((y / hourHeight) * 60 - (dragging?.grabMins || 0));
+    return Math.max(HOUR_START * 60, Math.min(HOUR_END * 60 - duration, mins));
   };
 
   const handleDragOver = (e) => {
@@ -166,12 +183,11 @@ export default function TimeGrid({
     e.preventDefault();
     const rect = containerRef.current?.getBoundingClientRect();
     if (!rect) return;
-    const y = e.clientY - rect.top;
-    const mins = Math.max(HOUR_START * 60, Math.min(HOUR_END * 60 - 30, yToMinutes(y)));
-    const time = minutesToTime(mins);
+    const time = minutesToTime(dropStart(e.clientY - rect.top));
     const taskId = parseInt(e.dataTransfer.getData('text/plain'));
     if (taskId) onDropTask?.(taskId, date, time);
     setDragOverY(null);
+    endBlockDrag();
   };
 
   // Resize via mouse
@@ -253,8 +269,8 @@ export default function TimeGrid({
             className="absolute right-1 pointer-events-none rounded-md"
             style={{
               left: gutter,
-              top: `${Math.max(0, ((snapMinutes((dragOverY / hourHeight) * 60)) / 60) * hourHeight)}px`,
-              height: `${hourHeight}px`,
+              top: `${((dropStart(dragOverY) - HOUR_START * 60) / 60) * hourHeight}px`,
+              height: `${Math.max(20, ((dragging?.duration || 30) / 60) * hourHeight - 2)}px`,
               background: 'rgba(167,139,250,0.10)',
               boxShadow: 'inset 0 0 0 1.5px rgba(167,139,250,0.5)',
             }}
@@ -326,7 +342,9 @@ function TimeBlock({ task, top, height, col, totalCols, compact, onEdit, onCompl
       onDragStart={(e) => {
         e.dataTransfer.setData('text/plain', task.id.toString());
         e.dataTransfer.effectAllowed = 'move';
+        startBlockDrag(e, task.duration || 60);
       }}
+      onDragEnd={endBlockDrag}
       onClick={() => onEdit?.(task)}
       className="absolute rounded-lg cursor-pointer transition-all overflow-hidden pointer-events-auto group"
       style={{
@@ -378,7 +396,9 @@ function DraftBlock({ task, top, height, col, totalCols, compact, onEdit }) {
       onDragStart={(e) => {
         e.dataTransfer.setData('text/plain', task.id.toString());
         e.dataTransfer.effectAllowed = 'move';
+        startBlockDrag(e, task.duration || 60);
       }}
+      onDragEnd={endBlockDrag}
       onClick={() => onEdit?.(task)}
       className="absolute rounded-lg cursor-grab active:cursor-grabbing overflow-hidden pointer-events-auto"
       style={{
