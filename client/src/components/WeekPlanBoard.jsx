@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { CalendarRange, Check, Clock, PencilLine, Sparkles, CheckCircle2, RefreshCw, CalendarClock, ArrowRightLeft, ArrowDown } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import ConfirmModal from './ui/ConfirmModal';
 import { api } from '../lib/api';
 import { contextLabel } from '../lib/context';
@@ -250,6 +251,12 @@ export default function WeekPlanBoard({ result, onApplied, onCancel, onOpenTask,
         </div>
       </div>
       {result?.summary && <p className="text-[13px] text-text-2 leading-relaxed mb-3">{result.summary}</p>}
+      {result?.inboxNotPlanned > 0 && (
+        <p className="text-[12px] text-text-3 mb-3">
+          {result.inboxNotPlanned === 1 ? '1 inbox item isn\u2019t' : `${result.inboxNotPlanned} inbox items aren\u2019t`} in this plan.{' '}
+          <Link to="/inbox" className="text-text-2 underline underline-offset-2 hover:text-text-1">Sort the Inbox</Link> to plan {result.inboxNotPlanned === 1 ? 'it' : 'them'}.
+        </p>
+      )}
 
       <div className={`grid gap-2 ${compact ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4' : 'grid-cols-1 md:grid-cols-3 xl:grid-cols-7'}`}>
         {visibleDays.map((d) => {

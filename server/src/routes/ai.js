@@ -512,17 +512,20 @@ function dayNameOf(dateStr) {
 const dateOnly = (v) => (v ? String(v).slice(0, 10) : null);
 
 // The shape of the coming days: free minutes after meetings and time blocks,
-// tasks already dated on each day (fixed, not candidates), and a capacity that
-// leaves slack and scales by how much of a planned day this person finishes.
+// tasks already given a time on each day (fixed, not candidates), and a
+// capacity that leaves slack and scales by how much of a planned day this
+// person finishes. Dated tasks without a time are candidates, so they aren't
+// counted here a second time.
 async function weekShape(userId, start, tz, reality, today = start) {
   const dates = Array.from({ length: WEEK_DAYS }, (_, i) => addDays(start, i));
   const end = dates[dates.length - 1];
   const { rows: fixedRows } = await pool.query(
     `SELECT id, title, due_date, scheduled_time, time_estimate, duration
        FROM tasks
-      WHERE user_id = $1 AND list = 'next_actions'
+      WHERE user_id = $1 AND list IN ('next_actions', 'inbox')
+        AND scheduled_time IS NOT NULL
         AND due_date BETWEEN $2::date AND $3::date
-      ORDER BY due_date, scheduled_time NULLS LAST`,
+      ORDER BY due_date, scheduled_time`,
     [userId, start, end]
   );
   const finishFactor = reality && reality.level !== 'none'
@@ -539,8 +542,8 @@ async function weekShape(userId, start, tz, reality, today = start) {
     const freeMins = free.reduce((sum, r) => sum + (r.end - r.start), 0);
     const busyMins = shape.busy.reduce((sum, r) => sum + (r.end - r.start), 0);
     const meetings = buildMeetings(shape, date, tz).length;
-    // Dated-but-untimed tasks already on this day eat capacity too (timed ones
-    // are already inside `busy`).
+    // Timed tasks are already inside `busy`; they're listed so the model
+    // knows the day isn't empty.
     const fixed = fixedRows
       .filter(r => dateOnly(r.due_date) === date)
       .map(r => ({ id: r.id, title: r.title, mins: r.scheduled_time ? 0 : (r.time_estimate || r.duration || 30), timed: !!r.scheduled_time }));
@@ -551,20 +554,40 @@ async function weekShape(userId, start, tz, reality, today = start) {
   return { days, start, end, finishFactor };
 }
 
-// Candidates: next actions that are not already dated inside the window and
-// that may start by the window's end. Overdue and undated tasks qualify.
+// Candidates: next actions that may start by the window's end, plus inbox
+// tasks with a deadline by then (a deadline counts whatever list it sits in).
+// A due date is a deadline, not a booking: reconcileWeek places the task on a
+// day up to it. Only tasks already given a time in the window stay put.
+// Dated tasks go first so the cap never drops a deadline.
 async function weekCandidates(userId, start, end, today) {
-  const all = await TaskModel.getAll('next_actions', userId, end);
-  return all
+  const [next, inbox] = await Promise.all([
+    TaskModel.getAll('next_actions', userId, end),
+    TaskModel.getAll('inbox', userId, end),
+  ]);
+  const dueBy = (t) => { const due = dateOnly(t.due_date); return !!due && due <= end; };
+  return [...next, ...inbox.filter(dueBy)]
     .filter(t => {
       const due = dateOnly(t.due_date);
       const from = dateOnly(t.start_date);
       if (from && from > end) return false;
-      if (due && due >= start && due <= end) return false; // fixed on a day already
+      if (t.scheduled_time && due && due >= start && due <= end) return false; // has its time already
       if (due === today && t.scheduled_time) return false;
       return true;
     })
+    .sort((a, b) => Number(dueBy(b)) - Number(dueBy(a)))
     .slice(0, MAX_WEEK_CANDIDATES);
+}
+
+// Inbox tasks the week leaves alone (no deadline by its end), so the board can
+// say they weren't forgotten.
+async function inboxNotPlanned(userId, end) {
+  const { rows: [row] } = await pool.query(
+    `SELECT COUNT(*)::int AS n FROM tasks
+      WHERE user_id = $1 AND list = 'inbox'
+        AND (due_date IS NULL OR due_date > $2::date)`,
+    [userId, end]
+  );
+  return row.n;
 }
 
 // Deterministic guarantee layer: bounds and capacity hold whatever the model said.
@@ -648,12 +671,15 @@ router.get('/week-brief', async (req, res) => {
     const start = /^\d{4}-\d{2}-\d{2}$/.test(req.query.start || '') ? req.query.start : req.today;
     const reality = await planReality(req.user.id, req.clientTimezone, { today: req.today }).catch(() => null);
     const shape = await weekShape(req.user.id, start, req.clientTimezone, reality, req.today);
-    const candidates = await weekCandidates(req.user.id, shape.start, shape.end, req.today);
+    const [candidates, inboxLeft] = await Promise.all([
+      weekCandidates(req.user.id, shape.start, shape.end, req.today),
+      inboxNotPlanned(req.user.id, shape.end),
+    ]);
     const { rows: [row] } = await pool.query(
       'SELECT applied_at, created_at FROM weekly_plans WHERE user_id = $1 AND week_start = $2',
       [req.user.id, start]
     );
-    res.json({ ...shape, candidates: candidates.length, existingPlan: row ? { applied: !!row.applied_at, createdAt: row.created_at } : null });
+    res.json({ ...shape, candidates: candidates.length, inboxNotPlanned: inboxLeft, existingPlan: row ? { applied: !!row.applied_at, createdAt: row.created_at } : null });
   } catch (error) {
     serverError(req, res, error);
   }
@@ -682,10 +708,13 @@ router.post('/plan-week', requireAiEnabled, enforceAiLimit, async (req, res) => 
       getUserContexts(req.user.id),
     ]);
     const shape = await weekShape(req.user.id, start, req.clientTimezone, reality, req.today);
-    const candidates = await weekCandidates(req.user.id, shape.start, shape.end, req.today);
+    const [candidates, inboxLeft] = await Promise.all([
+      weekCandidates(req.user.id, shape.start, shape.end, req.today),
+      inboxNotPlanned(req.user.id, shape.end),
+    ]);
 
     if (candidates.length === 0) {
-      return res.json({ ...shape, placements: [], unplaced: [], tasks: [], summary: 'Nothing to distribute — every next action is already dated or waiting on a start date.' });
+      return res.json({ ...shape, placements: [], unplaced: [], tasks: [], inboxNotPlanned: inboxLeft, summary: 'Nothing to plan — every next action already has a time or waits on a start date.' });
     }
 
     const result = await planWeek(candidates, { days: shape.days, profile: planningProfileText(reality) }, userContexts);
@@ -693,7 +722,7 @@ router.post('/plan-week', requireAiEnabled, enforceAiLimit, async (req, res) => 
     await chargeAiUsage(req);
 
     const reconciled = reconcileWeek(result, candidates, shape.days);
-    const payload = { ...reconciled, summary: result.summary, start: shape.start, end: shape.end, finishFactor: shape.finishFactor };
+    const payload = { ...reconciled, summary: result.summary, start: shape.start, end: shape.end, finishFactor: shape.finishFactor, inboxNotPlanned: inboxLeft };
     await pool.query(
       `INSERT INTO weekly_plans (user_id, week_start, payload)
        VALUES ($1, $2, $3)
