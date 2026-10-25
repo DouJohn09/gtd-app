@@ -62,10 +62,10 @@ export default function Login() {
 
             <div className="relative">
               <h1 className="font-display text-[34px] leading-tight mb-2">
-                Welcome back.
+                Clear your mind.
               </h1>
               <p className="font-display italic text-[15px] text-text-2 mb-7">
-                Sign in to clear your mind.
+                New here? Continuing with Google creates your free account.
               </p>
 
               <div className="flex justify-center">
