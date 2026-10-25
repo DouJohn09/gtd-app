@@ -279,10 +279,12 @@ nav .container {
   font-weight: 500;
 }
 
-/* Promo video right under the hero CTA, framed by a violet→mint glow. */
+/* Promo video, its own section below the features, framed by a violet→mint glow. */
+.tour { text-align: center; padding-top: 40px; }
+
 .hero-video {
   max-width: 960px;
-  margin: 48px auto 0;
+  margin: 0 auto;
 }
 
 .hero-video-label {
@@ -374,15 +376,13 @@ nav .container {
 }
 
 @media (max-width: 640px) {
-  .hero-video { margin-top: 36px; }
   .hero-video-play { gap: 10px; }
   .hero-video-play-icon { width: 56px; height: 56px; }
   .hero-video-play-icon svg { width: 22px; height: 22px; }
   .hero-video-play-text { font-size: 13px; padding: 5px 12px; }
 }
 
-/* Phones: keep the nav on one line, tighten the hero so the video is
-   reachable with one short scroll. */
+/* Phones: keep the nav on one line, tighten the hero. */
 @media (max-width: 480px) {
   nav { padding: 12px 0; }
   .container { padding: 0 16px; }
@@ -393,7 +393,6 @@ nav .container {
   .hero { padding-top: 96px; padding-bottom: 56px; }
   .hero h1 { font-size: clamp(30px, 9.2vw, 42px); margin-bottom: 16px; }
   .hero .subline { font-size: 15.5px; margin-bottom: 28px; }
-  .hero-video { margin-top: 32px; }
   .hero-video-label { margin-bottom: 10px; }
   .hero-video-play-text span { display: none; }
 }
