@@ -179,6 +179,11 @@ async function visitors() {
 }
 
 // ─── Journeys (PostHog: landing page → app → sign-in → first task) ────────
+const FUNNEL_STEPS = [
+  'Visited', 'Stayed', 'Clicked sign-up', 'Saw the sign-in page',
+  'Clicked Continue with Google', 'Signed in', 'Onboarded', 'Captured a task',
+];
+
 // Read-only personal API key (POSTHOG_PERSONAL_API_KEY, "query:read") +
 // POSTHOG_PROJECT_ID. Founder accounts (STATS_EXCLUDE_EMAILS) are dropped by
 // person, so their anonymous pre-sign-in pageviews are excluded too. The
@@ -215,34 +220,58 @@ async function journeys() {
       if (!r.ok) throw new Error(j.detail || `PostHog answered ${r.status}`);
       return j.results || [];
     };
+    // Sign-up funnel, one row per person: how far down the path they got.
+    // A step counts everyone who reached it or anything after it, so a lost
+    // event (a click beaconed away by the navigation, the Google button living
+    // in an iframe) can't make a later step bigger than an earlier one.
+    // "Stayed" weeds out one-hit bots and instant bounces: more than one
+    // pageview or click, or 10+ seconds between first and last event.
+    const funnelQuery = (days) => `SELECT
+        ${FUNNEL_STEPS.map((_, i) => `countIf(depth >= ${i + 1})`).join(', ')},
+        countIf(failed)
+      FROM (SELECT person_id,
+          multiIf(
+            max(event = 'task_captured'), 8,
+            max(event = 'onboarding_completed'), 7,
+            max(event = '$identify') OR any(person.properties.email) IS NOT NULL, 6,
+            max(event = 'signin_clicked'), 5,
+            max(event = '$pageview' AND properties.$pathname LIKE '/app%'), 4,
+            max(event = 'cta_clicked' OR (event = '$autocapture' AND elements_chain LIKE '%href="/app%')), 3,
+            countIf(event IN ('$pageview', '$autocapture')) > 1 OR dateDiff('second', min(timestamp), max(timestamp)) >= 10, 2,
+            1) AS depth,
+          max(event = 'signin_failed') AS failed
+        FROM events WHERE timestamp > now() - INTERVAL ${days} DAY AND ${notFounder}
+        GROUP BY person_id)`;
     try {
-      const [[funnel = []], sessions, replays] = await Promise.all([
-        run(`SELECT
-            uniqIf(person_id, event = '$pageview' AND NOT properties.$pathname LIKE '/app%'),
-            uniqIf(person_id, event = '$pageview' AND properties.$pathname LIKE '/app%'),
-            uniqIf(person_id, event = '$identify'),
-            uniqIf(person_id, event = 'onboarding_completed'),
-            uniqIf(person_id, event = 'task_captured')
-          FROM events WHERE timestamp > now() - INTERVAL 30 DAY AND ${notFounder}`),
+      const [[f7 = []], [f30 = []], sessions, replays] = await Promise.all([
+        run(funnelQuery(7)),
+        run(funnelQuery(30)),
         run(`SELECT $session_id, min(timestamp), dateDiff('second', min(timestamp), max(timestamp)),
             any(person.properties.email), any(properties.$geoip_country_code), any(properties.$device_type),
             argMin(properties.$pathname, timestamp), argMin(properties.$referring_domain, timestamp),
             countIf(event = '$pageview'), max(event = '$identify'), max(event = 'onboarding_completed'),
-            countIf(event = 'task_captured')
+            countIf(event = 'task_captured'),
+            max(event = 'cta_clicked' OR (event = '$autocapture' AND elements_chain LIKE '%href="/app%')),
+            max(event = '$pageview' AND properties.$pathname LIKE '/app%'),
+            max(event = 'signin_clicked')
           FROM events WHERE timestamp > now() - INTERVAL 7 DAY AND $session_id IS NOT NULL AND ${notFounder}
           GROUP BY $session_id ORDER BY min(timestamp) DESC LIMIT 30`),
         run(`SELECT session_id FROM session_replay_events WHERE start_time > now() - INTERVAL 8 DAY GROUP BY session_id`),
       ]);
       const recorded = new Set(replays.map(r => r[0]));
-      const [landing, app, signedIn, onboarded, captured] = funnel.map(Number);
+      const counts = (row) => ({
+        steps: FUNNEL_STEPS.map((label, i) => ({ label, people: Number(row[i]) || 0 })),
+        signInErrors: Number(row[FUNNEL_STEPS.length]) || 0,
+      });
       return {
-        funnel30: { landing, app, signedIn, onboarded, captured },
-        sessions: sessions.map(([id, at, secs, email, country, device, entry, ref, views, signed, onb, caps]) => ({
+        funnel: { last7: counts(f7), last30: counts(f30) },
+        sessions: sessions.map(([id, at, secs, email, country, device, entry, ref, views, signed, onb, caps, cta, app, google]) => ({
           at, seconds: Number(secs) || 0,
           who: email ? mask(email) : null,
           country: country || '?', device: device || '?',
           entry: entry || '/', referrer: ref && ref !== '$direct' ? ref : null,
           pageviews: Number(views) || 0, signedIn: !!signed, onboarded: !!onb, captured: Number(caps) || 0,
+          clickedSignUp: !!cta, openedApp: !!app, clickedGoogle: !!google,
           replayUrl: recorded.has(id) ? `${host}/project/${encodeURIComponent(project)}/replay/${encodeURIComponent(id)}` : null,
         })),
       };

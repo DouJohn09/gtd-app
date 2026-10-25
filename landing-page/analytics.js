@@ -34,4 +34,15 @@
     session_recording: { maskAllInputs: true },
   });
   posthog.register({ site: 'landing' });
+
+  /* Sign-up button clicks, for the Pulse funnel. Sent as a beacon so the
+     navigation to /app doesn't cancel it. */
+  document.addEventListener('click', function (e) {
+    var a = e.target.closest && e.target.closest('a[href^="/app"]');
+    if (!a) return;
+    posthog.capture('cta_clicked', {
+      label: (a.textContent || '').trim().slice(0, 40),
+      page: location.pathname,
+    }, { transport: 'sendBeacon' });
+  }, true);
 })();

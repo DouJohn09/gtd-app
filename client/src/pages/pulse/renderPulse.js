@@ -191,24 +191,30 @@ export function renderPulse(root, { data: d, error, fetchedAt }) {
 
   const jr = d.journeys;
   const dur = (s) => (s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${String(s % 60).padStart(2, '0')}s`);
-  const jf = jr?.funnel30 || {};
+  // Sign-up funnel: each step counts people who got at least that far.
+  // "of previous" is the share of the step above that made it here.
+  const fun = jr?.funnel;
+  const funnelTable = fun ? `<div class="table-wrap"><table>
+      <thead><tr><th>Step</th><th>7 days</th><th>of previous</th><th>30 days</th><th>of previous</th></tr></thead>
+      <tbody>${fun.last30.steps.map((s, i) => {
+        const share = (w) => {
+          const prev = fun[w].steps[i - 1]?.people;
+          return i === 0 || !prev ? '<span style="color:var(--faint)">—</span>' : pct(fun[w].steps[i].people / prev);
+        };
+        return `<tr><td>${esc(s.label)}</td><td class="m num">${fmt(fun.last7.steps[i].people)}</td><td class="m num">${share('last7')}</td><td class="m num">${fmt(s.people)}</td><td class="m num">${share('last30')}</td></tr>`;
+      }).join('')}</tbody>
+    </table></div>
+    <div class="hint">People, your own excluded. "Stayed" = more than one page or click, or 10+ seconds. Google sign-in errors: ${fmt(fun.last7.signInErrors)} in 7 days, ${fmt(fun.last30.signInErrors)} in 30.</div>` : '';
   const journeyPanel = !jr || jr.error
     ? `<div class="panel"><h2>Visitor journeys</h2><div class="hint">${!jr
         ? 'Needs <code>POSTHOG_PERSONAL_API_KEY</code> (read-only) and <code>POSTHOG_PROJECT_ID</code> on Railway.'
         : `PostHog answered: ${esc(jr.error)}`}</div></div>`
     : `<div class="panel span-2"><h2>Visitor journeys ${pill('PostHog · strangers only')}</h2>
-        <div class="funnel">
-          <span class="step"><b>${fmt(jf.landing)}</b> saw the site</span><span class="arrow">→</span>
-          <span class="step"><b>${fmt(jf.app)}</b> opened the app</span><span class="arrow">→</span>
-          <span class="step"><b>${fmt(jf.signedIn)}</b> signed in</span><span class="arrow">→</span>
-          <span class="step"><b>${fmt(jf.onboarded)}</b> onboarded</span><span class="arrow">→</span>
-          <span class="step"><b>${fmt(jf.captured)}</b> captured a task</span>
-          <span class="step" style="color:var(--faint)">people · 30 days</span>
-        </div>
+        ${funnelTable}
         ${(jr.sessions || []).length ? `<div class="table-wrap"><table>
           <thead><tr><th>When</th><th>Replay</th><th>Who</th><th>Country</th><th>Device</th><th>Source</th><th>Entry</th><th>Pages</th><th>Time</th><th>Got to</th></tr></thead>
           <tbody>${jr.sessions.map(s => {
-            const reached = s.captured ? `${s.captured} task${s.captured === 1 ? '' : 's'}` : s.onboarded ? 'onboarded' : s.signedIn ? 'signed in' : s.entry.startsWith('/app') ? 'app' : 'site';
+            const reached = s.captured ? `${s.captured} task${s.captured === 1 ? '' : 's'}` : s.onboarded ? 'onboarded' : s.signedIn ? 'signed in' : s.clickedGoogle ? 'clicked Google' : s.openedApp ? 'sign-in page' : s.clickedSignUp ? 'clicked sign-up' : 'site';
             const src = s.referrer ? esc(s.referrer) : '<span style="color:var(--faint)">direct</span>';
             const replay = s.replayUrl ? `<a href="${esc(s.replayUrl)}" target="_blank" rel="noopener noreferrer">watch</a>` : '<span style="color:var(--faint)">—</span>';
             return `<tr><td>${ago(s.at)}</td><td>${replay}</td><td class="m">${s.who ? esc(s.who) : '<span style="color:var(--faint)">anonymous</span>'}</td><td>${esc(s.country)}</td><td>${esc(s.device)}</td><td class="m" style="font-size:11.5px">${src}</td><td class="m" style="font-size:11.5px">${esc(s.entry)}</td><td class="m num">${fmt(s.pageviews)}</td><td class="m num">${dur(s.seconds)}</td><td>${reached}</td></tr>`;

@@ -3,6 +3,7 @@ import { GoogleLogin } from '@react-oauth/google';
 import { useAuth } from '../contexts/AuthContext';
 import { Navigate } from 'react-router-dom';
 import AuroraBackground from '../components/AuroraBackground';
+import { trackEvent } from '../lib/analytics';
 
 export default function Login() {
   const { user, login } = useAuth();
@@ -17,6 +18,7 @@ export default function Login() {
     try {
       await login(credentialResponse.credential);
     } catch {
+      trackEvent('signin_failed', { stage: 'server' });
       setError("We couldn't sign you in. Please try again — if it keeps happening, email support@cleartable.app and we'll sort it out.");
     } finally {
       setSigningIn(false);
@@ -69,7 +71,11 @@ export default function Login() {
               <div className="flex justify-center">
                 <GoogleLogin
                   onSuccess={handleSuccess}
-                  onError={() => setError("Google sign-in didn't complete. Please try again.")}
+                  onError={() => {
+                    trackEvent('signin_failed', { stage: 'google' });
+                    setError("Google sign-in didn't complete. Please try again.");
+                  }}
+                  click_listener={() => trackEvent('signin_clicked')}
                   theme="filled_black"
                   shape="pill"
                   size="large"
