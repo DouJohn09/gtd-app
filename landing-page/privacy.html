@@ -33,7 +33,7 @@
   <main class="legal">
     <div class="eyebrow">privacy</div>
     <h1>Privacy Policy</h1>
-    <div class="updated">Last updated: 24 October 2026</div>
+    <div class="updated">Last updated: 25 October 2026</div>
     <p class="intro">
       This policy explains what personal data Cleartable collects, why, who we share it with, and the rights you
       have over it. Cleartable is operated by an individual entrepreneur established in the Czech Republic, and this
@@ -51,6 +51,7 @@
     <h3>Account data</h3>
     <ul>
       <li>If you sign in with Google: your email address, name, and profile picture, provided by Google OAuth. We never receive or store your Google password.</li>
+      <li>If you sign in with email: your email address, and a one-time sign-in code we email to it. The code expires after 15 minutes; we keep only a one-way hash of it and clear it out after it expires.</li>
       <li>Your time zone (sent by your browser so dates and daily limits line up with your day) and your in-app preferences (AI mode, onboarding progress).</li>
     </ul>
     <h3>Content you create</h3>
@@ -126,7 +127,7 @@
       <tr><td>OpenAI</td><td>AI processing (primary)</td><td>US</td></tr>
       <tr><td>Groq</td><td>AI processing (backup when OpenAI is unavailable)</td><td>US</td></tr>
       <tr><td>Paddle</td><td>Payments &amp; subscription management (Merchant of Record)</td><td>EU / US</td></tr>
-      <tr><td>Resend</td><td>Transactional email (account and service notices) — receives your email address and the message</td><td>EU (Ireland) / US</td></tr>
+      <tr><td>Resend</td><td>Transactional email (sign-in codes, account and service notices) — receives your email address and the message</td><td>EU (Ireland) / US</td></tr>
     </table>
 
     <h2>7. International transfers</h2>
@@ -162,7 +163,7 @@
 
     <h2>10. Security</h2>
     <p>
-      Data is encrypted in transit (HTTPS). We never receive your Google password — sign-in is delegated to Google. We restrict access
+      Data is encrypted in transit (HTTPS). We never receive your Google password — Google sign-in is delegated to Google, and email sign-in uses single-use codes, so there is no Cleartable password to steal. We restrict access
       to production data to what is necessary to operate the service. No online service can guarantee absolute security,
       but we take reasonable measures appropriate to the data we hold.
     </p>

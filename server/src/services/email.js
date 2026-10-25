@@ -81,6 +81,28 @@ export async function sendWelcome(to, name) {
   return send({ to, subject, html, text });
 }
 
+// Email sign-in: the 6-digit code to type, plus a link that does the same.
+// The code is for the installed app, where a tapped link opens the browser
+// instead.
+export async function sendLoginCode(to, code, link) {
+  const subject = `Your Cleartable code: ${code}`;
+  const text = [
+    `Your Cleartable sign-in code is ${code}`,
+    '',
+    `Or open this link to sign in: ${link}`,
+    '',
+    "Both work once and expire in 15 minutes. If you didn't ask for this, ignore this email — nobody can sign in without the code.",
+  ].join('\n');
+  const html = `
+  <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;max-width:520px;margin:0 auto;color:#1a1a22;line-height:1.6;">
+    <p style="margin:0 0 12px;">Your Cleartable sign-in code:</p>
+    <p style="margin:0 0 20px;font-family:ui-monospace,Menlo,monospace;font-size:32px;letter-spacing:6px;font-weight:600;">${escapeHtml(code)}</p>
+    <p style="margin:0 0 20px;"><a href="${escapeHtml(link)}" style="display:inline-block;background:#7c6cff;color:#fff;text-decoration:none;padding:10px 16px;border-radius:8px;">Sign in to Cleartable</a></p>
+    <p style="margin:0;color:#6b6b75;font-size:13px;">Both work once and expire in 15 minutes. If you didn't ask for this, ignore this email — nobody can sign in without the code.</p>
+  </div>`;
+  return send({ to, subject, html, text });
+}
+
 // One line to the founder per new account, so arrivals are noticed the hour
 // they happen. Off unless FOUNDER_NOTIFY_EMAIL is set.
 export async function notifyFounderSignup({ email, name, id, source }) {

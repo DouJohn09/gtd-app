@@ -181,7 +181,7 @@ async function visitors() {
 // ─── Journeys (PostHog: landing page → app → sign-in → first task) ────────
 const FUNNEL_STEPS = [
   'Visited', 'Stayed', 'Clicked sign-up', 'Saw the sign-in page',
-  'Clicked Continue with Google', 'Signed in', 'Onboarded', 'Captured a task',
+  'Started sign-in (Google or email)', 'Signed in', 'Onboarded', 'Captured a task',
 ];
 
 // Read-only personal API key (POSTHOG_PERSONAL_API_KEY, "query:read") +
@@ -234,12 +234,12 @@ async function journeys() {
             max(event = 'task_captured'), 8,
             max(event = 'onboarding_completed'), 7,
             max(event = '$identify') OR any(person.properties.email) IS NOT NULL, 6,
-            max(event = 'signin_clicked'), 5,
+            max(event IN ('signin_clicked', 'email_code_requested')), 5,
             max(event = '$pageview' AND properties.$pathname LIKE '/app%'), 4,
             max(event = 'cta_clicked' OR (event = '$autocapture' AND elements_chain LIKE '%href="/app%')), 3,
             countIf(event IN ('$pageview', '$autocapture')) > 1 OR dateDiff('second', min(timestamp), max(timestamp)) >= 10, 2,
             1) AS depth,
-          max(event = 'signin_failed') AS failed
+          max(event IN ('signin_failed', 'email_code_failed')) AS failed
         FROM events WHERE timestamp > now() - INTERVAL ${days} DAY AND ${notFounder}
         GROUP BY person_id)`;
     try {
@@ -253,7 +253,7 @@ async function journeys() {
             countIf(event = 'task_captured'),
             max(event = 'cta_clicked' OR (event = '$autocapture' AND elements_chain LIKE '%href="/app%')),
             max(event = '$pageview' AND properties.$pathname LIKE '/app%'),
-            max(event = 'signin_clicked')
+            max(event IN ('signin_clicked', 'email_code_requested'))
           FROM events WHERE timestamp > now() - INTERVAL 7 DAY AND $session_id IS NOT NULL AND ${notFounder}
           GROUP BY $session_id ORDER BY min(timestamp) DESC LIMIT 30`),
         run(`SELECT session_id FROM session_replay_events WHERE start_time > now() - INTERVAL 8 DAY GROUP BY session_id`),

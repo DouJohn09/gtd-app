@@ -204,7 +204,7 @@ export function renderPulse(root, { data: d, error, fetchedAt }) {
         return `<tr><td>${esc(s.label)}</td><td class="m num">${fmt(fun.last7.steps[i].people)}</td><td class="m num">${share('last7')}</td><td class="m num">${fmt(s.people)}</td><td class="m num">${share('last30')}</td></tr>`;
       }).join('')}</tbody>
     </table></div>
-    <div class="hint">People, your own excluded. "Stayed" = more than one page or click, or 10+ seconds. Google sign-in errors: ${fmt(fun.last7.signInErrors)} in 7 days, ${fmt(fun.last30.signInErrors)} in 30.</div>` : '';
+    <div class="hint">People, your own excluded. "Stayed" = more than one page or click, or 10+ seconds. Sign-in errors (Google or code): ${fmt(fun.last7.signInErrors)} in 7 days, ${fmt(fun.last30.signInErrors)} in 30.</div>` : '';
   const journeyPanel = !jr || jr.error
     ? `<div class="panel"><h2>Visitor journeys</h2><div class="hint">${!jr
         ? 'Needs <code>POSTHOG_PERSONAL_API_KEY</code> (read-only) and <code>POSTHOG_PROJECT_ID</code> on Railway.'
@@ -214,7 +214,7 @@ export function renderPulse(root, { data: d, error, fetchedAt }) {
         ${(jr.sessions || []).length ? `<div class="table-wrap"><table>
           <thead><tr><th>When</th><th>Replay</th><th>Who</th><th>Country</th><th>Device</th><th>Source</th><th>Entry</th><th>Pages</th><th>Time</th><th>Got to</th></tr></thead>
           <tbody>${jr.sessions.map(s => {
-            const reached = s.captured ? `${s.captured} task${s.captured === 1 ? '' : 's'}` : s.onboarded ? 'onboarded' : s.signedIn ? 'signed in' : s.clickedGoogle ? 'clicked Google' : s.openedApp ? 'sign-in page' : s.clickedSignUp ? 'clicked sign-up' : 'site';
+            const reached = s.captured ? `${s.captured} task${s.captured === 1 ? '' : 's'}` : s.onboarded ? 'onboarded' : s.signedIn ? 'signed in' : s.clickedGoogle ? 'started sign-in' : s.openedApp ? 'sign-in page' : s.clickedSignUp ? 'clicked sign-up' : 'site';
             const src = s.referrer ? esc(s.referrer) : '<span style="color:var(--faint)">direct</span>';
             const replay = s.replayUrl ? `<a href="${esc(s.replayUrl)}" target="_blank" rel="noopener noreferrer">watch</a>` : '<span style="color:var(--faint)">—</span>';
             return `<tr><td>${ago(s.at)}</td><td>${replay}</td><td class="m">${s.who ? esc(s.who) : '<span style="color:var(--faint)">anonymous</span>'}</td><td>${esc(s.country)}</td><td>${esc(s.device)}</td><td class="m" style="font-size:11.5px">${src}</td><td class="m" style="font-size:11.5px">${esc(s.entry)}</td><td class="m num">${fmt(s.pageviews)}</td><td class="m num">${dur(s.seconds)}</td><td>${reached}</td></tr>`;

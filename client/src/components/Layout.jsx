@@ -314,11 +314,11 @@ export default function Layout() {
               className="w-9 h-9 rounded-full grid place-items-center text-[11px] font-semibold text-bg"
               style={{ background: 'linear-gradient(135deg, rgb(var(--amber)), rgb(var(--rose)))' }}
             >
-              {initialsOf(user?.name)}
+              {initialsOf(user?.name || user?.email || undefined)}
             </div>
           )}
           <div className="flex-1 min-w-0">
-            <div className="text-[12.5px] truncate">{user?.name || 'Signed in'}</div>
+            <div className="text-[12.5px] truncate">{user?.name || user?.email || 'Signed in'}</div>
             <div className="font-mono text-[10.5px] flex items-center gap-1.5 mt-0.5">
               <span className="w-1.5 h-1.5 rounded-full bg-mint shadow-glow-mint" />
               <span className="text-mint-glow">focused</span>

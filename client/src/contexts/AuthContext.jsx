@@ -47,7 +47,9 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
-  const login = async (googleCredential) => {
+  // Both sign-in routes take the same extras (timezone, where the visitor came
+  // from) and answer with the same { token, user }.
+  const signIn = async (path, body) => {
     let tz = '';
     try { tz = Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch { /* ignore */ }
 
@@ -64,24 +66,29 @@ export function AuthProvider({ children }) {
       }
     } catch { /* ignore */ }
 
-    const res = await fetch('/api/auth/google', {
+    const res = await fetch(path, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         ...(tz ? { 'X-Client-Timezone': tz } : {}),
       },
       body: JSON.stringify({
-        credential: googleCredential,
+        ...body,
         ...(referrer ? { referrer } : {}),
         ...(Object.keys(utm).length ? { utm } : {}),
       }),
     });
-    if (!res.ok) throw new Error('Login failed');
-    const data = await res.json();
+    const data = await res.json().catch(() => ({}));
+    // The email routes explain themselves ("That code isn't right…"); pass that on.
+    if (!res.ok) throw new Error(data.error || 'Login failed');
     localStorage.setItem('token', data.token);
     setUser(data.user);
     identifyUser(data.user);
   };
+
+  const login = (googleCredential) => signIn('/api/auth/google', { credential: googleCredential });
+  // { email, code } or { token } from the emailed link.
+  const loginWithEmail = (payload) => signIn('/api/auth/email/verify', payload);
 
   const logout = () => {
     localStorage.removeItem('token');
@@ -110,7 +117,7 @@ export function AuthProvider({ children }) {
   const patchUser = (patch) => setUser(prev => (prev ? { ...prev, ...patch } : prev));
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, refreshUser, patchUser }}>
+    <AuthContext.Provider value={{ user, loading, login, loginWithEmail, logout, refreshUser, patchUser }}>
       {children}
     </AuthContext.Provider>
   );
