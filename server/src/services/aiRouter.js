@@ -47,7 +47,7 @@ const NANO = { provider: 'openai', model: 'gpt-4o-mini' };
 const HEAVY = [MINI, NANO, G];
 const LIGHT = [NANO, MINI, G];
 const DEFAULT_ROUTING = {
-  'smart-capture':     LIGHT,
+  'smart-capture':     [MINI, NANO, G], // 4.1-mini splits multi-task rambles reliably (eval 105/105 vs 4o-mini 96/102)
   'url-extract':       LIGHT,
   'process-inbox':     HEAVY,
   'import-notes':      HEAVY,
@@ -92,7 +92,7 @@ const ROUTING = { ...DEFAULT_ROUTING, ...parseRoutingOverride(process.env.AI_ROU
 // a runaway response is cut (and caught via finish_reason) instead of hanging
 // or blowing the parse on a 100-item ramble.
 const TASK_PARAMS = {
-  'smart-capture':     { temperature: 0,   max_tokens: 1024 },
+  'smart-capture':     { temperature: 0,   max_tokens: 2500 }, // up to 8 tasks per capture
   'process-inbox':     { temperature: 0,   max_tokens: 6000 },
   'import-notes':      { temperature: 0,   max_tokens: 8192 },
   'find-duplicates':   { temperature: 0,   max_tokens: 2048 },

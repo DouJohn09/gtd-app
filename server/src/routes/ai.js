@@ -77,6 +77,95 @@ const router = Router();
 const MAX_CAPTURE_CHARS = 2_000;   // a captured thought, not a document
 const MAX_NOTES_CHARS = 20_000;    // import-notes: a long meeting note / brain dump
 
+// One task from one smart-capture item. `source` is the text it came from
+// (the whole capture, or its own slice after a split; null if the model
+// didn't say), used for the relative-date check and the notes.
+async function createCapturedTask(req, ai, { source, projects, aiMode }) {
+  if (source && !ai.recurrence_rule) {
+    const resolved = resolveRelativeDate(source, req.today);
+    if (resolved) ai.due_date = resolved;
+  }
+  const urls = source?.match(/https?:\/\/[^\s]+/gi) || [];
+  // Confidence-gated routing: trust AI's list when confident, fall back to
+  // inbox when ambiguous (or always, in assisted mode). All other AI parsing
+  // (context, due date, project, etc.) is preserved regardless — the inbox
+  // becomes a triage holding bay with metadata pre-filled, not a re-do from
+  // scratch.
+  let routedToInbox = false;
+  if (aiMode === 'assisted' && ai.list !== 'inbox') {
+    ai.list = 'inbox';
+    routedToInbox = true;
+  } else if (aiMode !== 'assisted' && ai.list_confidence === 'low' && ai.list !== 'inbox') {
+    ai.list = 'inbox';
+    routedToInbox = true;
+  }
+
+  // Resolve project_id from AI's project_name suggestion: exact, then whole-word
+  // containment either direction. The pad-with-spaces trick keeps a short project
+  // name ("AI", "Tax") from matching any phrase that merely contains those letters
+  // ("mAIntain the garden") — the old bare substring match silently misfiled tasks.
+  let projectId = null;
+  if (ai.project_name) {
+    const norm = s => ` ${s.toLowerCase().trim().replace(/\s+/g, ' ')} `;
+    const aiName = norm(ai.project_name);
+    const match = projects.find(p => norm(p.name) === aiName)
+      || projects.find(p => { const n = norm(p.name); return aiName.includes(n) || n.includes(aiName); });
+    if (match) projectId = match.id;
+    else console.warn(`Smart capture: AI suggested project "${ai.project_name}" but no match found. Available: ${projects.map(p => p.name).join(', ')}`);
+  }
+
+  // Preserve the raw transcript in notes when the input is detailed enough
+  // that title compression is likely lossy. Short captures ("buy milk") would
+  // just duplicate the title, so skip those. URLs are already inside the source
+  // when it's long, so only fall back to a URL-only notes value for shorts.
+  const rawWordCount = (source || '').split(/\s+/).filter(Boolean).length;
+  let notes = null;
+  if (rawWordCount > 8 || (source || '').length > 60) notes = source;
+  else if (urls.length) notes = urls.join('\n');
+
+  // AI-assisted scheduling: find a free slot if requested
+  let bookedSlot = null;
+  let slotSearchFailed = false;
+  if (ai.find_free_slot && ai.due_date && !ai.scheduled_time) {
+    const duration = ai.duration || 30;
+    try {
+      const slot = await findFreeSlot(req.user.id, ai.due_date, duration, req.clientTimezone);
+      if (slot) {
+        ai.scheduled_time = slot;
+        ai.duration = duration;
+        bookedSlot = { date: ai.due_date, time: slot, duration };
+      } else {
+        slotSearchFailed = true;
+      }
+    } catch (err) {
+      console.error('findFreeSlot error:', err);
+      slotSearchFailed = true;
+    }
+  }
+
+  const taskData = {
+    title: ai.title || source,
+    notes,
+    list: ai.list || 'inbox',
+    context: ai.context || null,
+    project_id: projectId,
+    priority: ai.priority || 3,
+    energy_level: ai.energy_level || 'medium',
+    time_estimate: ai.time_estimate_minutes || null,
+    due_date: ai.due_date || null,
+    start_date: ai.start_date || null,
+    scheduled_time: ai.scheduled_time || null,
+    duration: ai.duration || null,
+    is_daily_focus: !!ai.is_daily_focus,
+    waiting_for_person: ai.waiting_for_person || null,
+    recurrence_rule: ai.recurrence_rule || null,
+    recurrence_interval: ai.recurrence_interval || null,
+    recurrence_days: ai.recurrence_days || null,
+  };
+  const task = await TaskModel.create(taskData, req.user.id);
+  return { task, ai, bookedSlot, slotSearchFailed, routedToInbox };
+}
+
 router.post('/smart-capture', async (req, res) => {
   try {
     const { text } = req.body;
@@ -117,10 +206,6 @@ router.post('/smart-capture', async (req, res) => {
         // No provider configured → same graceful raw-capture fallback as the
         // budget path, not an error. The capture must never fail.
         if (ai?.error) ai = null;
-        if (ai && !ai.recurrence_rule) {
-          const resolved = resolveRelativeDate(rawText, today);
-          if (resolved) ai.due_date = resolved;
-        }
         // Charge only for enrichment we actually delivered — a throttle or a
         // provider failure (raw-capture fallback) doesn't consume budget.
         if (ai) await charge(req.user.id, 1, req.today);
@@ -134,85 +219,26 @@ router.post('/smart-capture', async (req, res) => {
       return res.json({ task, ai: null, fallback: aiMode !== 'off', aiOff: aiMode === 'off', throttled });
     }
 
-    // Confidence-gated routing: trust AI's list when confident, fall back to
-    // inbox when ambiguous (or always, in assisted mode). All other AI parsing
-    // (context, due date, project, etc.) is preserved regardless — the inbox
-    // becomes a triage holding bay with metadata pre-filled, not a re-do from
-    // scratch.
-    let routedToInbox = false;
-    if (aiMode === 'assisted' && ai.list !== 'inbox') {
-      ai.list = 'inbox';
-      routedToInbox = true;
-    } else if (aiMode !== 'assisted' && ai.list_confidence === 'low' && ai.list !== 'inbox') {
-      ai.list = 'inbox';
-      routedToInbox = true;
+    // One capture can name several separate actions ("call the dentist, and
+    // finish the Q4 deck"); each becomes its own task. With a split, dates and
+    // notes come from that task's own slice of the text, so a "Friday" said
+    // about one can't land on another.
+    const multi = ai.tasks.length > 1;
+    const results = [];
+    for (const item of ai.tasks) {
+      const source = multi ? (item.source_text?.trim() || null) : rawText;
+      results.push(await createCapturedTask(req, item, { source, projects, aiMode }));
     }
-
-    // Resolve project_id from AI's project_name suggestion: exact, then whole-word
-    // containment either direction. The pad-with-spaces trick keeps a short project
-    // name ("AI", "Tax") from matching any phrase that merely contains those letters
-    // ("mAIntain the garden") — the old bare substring match silently misfiled tasks.
-    let projectId = null;
-    if (ai.project_name) {
-      const norm = s => ` ${s.toLowerCase().trim().replace(/\s+/g, ' ')} `;
-      const aiName = norm(ai.project_name);
-      const match = projects.find(p => norm(p.name) === aiName)
-        || projects.find(p => { const n = norm(p.name); return aiName.includes(n) || n.includes(aiName); });
-      if (match) projectId = match.id;
-      else console.warn(`Smart capture: AI suggested project "${ai.project_name}" but no match found. Available: ${projects.map(p => p.name).join(', ')}`);
+    const [first] = results;
+    res.json({
+      task: first.task, ai: first.ai, bookedSlot: first.bookedSlot,
+      slotSearchFailed: results.some(r => r.slotSearchFailed),
+      routedToInbox: first.routedToInbox,
+      tasks: results.map(r => ({ task: r.task, ai: r.ai, bookedSlot: r.bookedSlot, routedToInbox: r.routedToInbox })),
+    });
+    for (const r of results) {
+      syncTaskToCalendar(req.user.id, r.task, req.clientTimezone).catch(err => console.error('syncTaskToCalendar (smart-capture):', err));
     }
-
-    // Preserve the raw transcript in notes when the input is detailed enough
-    // that title compression is likely lossy. Short captures ("buy milk") would
-    // just duplicate the title, so skip those. URLs are already inside rawText
-    // when it's long, so only fall back to a URL-only notes value for shorts.
-    const rawWordCount = rawText.split(/\s+/).filter(Boolean).length;
-    let notes = null;
-    if (rawWordCount > 8 || rawText.length > 60) notes = rawText;
-    else if (urls.length) notes = urls.join('\n');
-
-    // AI-assisted scheduling: find a free slot if requested
-    let bookedSlot = null;
-    let slotSearchFailed = false;
-    if (ai.find_free_slot && ai.due_date && !ai.scheduled_time) {
-      const duration = ai.duration || 30;
-      try {
-        const slot = await findFreeSlot(req.user.id, ai.due_date, duration, req.clientTimezone);
-        if (slot) {
-          ai.scheduled_time = slot;
-          ai.duration = duration;
-          bookedSlot = { date: ai.due_date, time: slot, duration };
-        } else {
-          slotSearchFailed = true;
-        }
-      } catch (err) {
-        console.error('findFreeSlot error:', err);
-        slotSearchFailed = true;
-      }
-    }
-
-    const taskData = {
-      title: ai.title || rawText,
-      notes,
-      list: ai.list || 'inbox',
-      context: ai.context || null,
-      project_id: projectId,
-      priority: ai.priority || 3,
-      energy_level: ai.energy_level || 'medium',
-      time_estimate: ai.time_estimate_minutes || null,
-      due_date: ai.due_date || null,
-      start_date: ai.start_date || null,
-      scheduled_time: ai.scheduled_time || null,
-      duration: ai.duration || null,
-      is_daily_focus: !!ai.is_daily_focus,
-      waiting_for_person: ai.waiting_for_person || null,
-      recurrence_rule: ai.recurrence_rule || null,
-      recurrence_interval: ai.recurrence_interval || null,
-      recurrence_days: ai.recurrence_days || null,
-    };
-    const task = await TaskModel.create(taskData, req.user.id);
-    res.json({ task, ai, bookedSlot, slotSearchFailed, routedToInbox });
-    syncTaskToCalendar(req.user.id, task, req.clientTimezone).catch(err => console.error('syncTaskToCalendar (smart-capture):', err));
   } catch (error) {
     console.error('Smart capture error:', error);
     serverError(req, res, error);

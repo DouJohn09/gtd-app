@@ -6,14 +6,16 @@ const ToastContext = createContext(null);
 export function ToastProvider({ children }) {
   const [toasts, setToasts] = useState([]);
 
-  const addToast = (message, type = 'success') => {
+  // options.action = { label, onClick } adds a button (e.g. an undo) and keeps
+  // the toast up longer so there's time to reach it.
+  const addToast = (message, type = 'success', options = {}) => {
     // An empty message means "say nothing" — used when another surface (e.g. the
     // upgrade modal) has already handled the event. Without this an empty toast
     // box would render for 4s.
     if (!message) return;
     const id = Date.now() + Math.random();
-    setToasts(prev => [...prev, { id, message, type }]);
-    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 4000);
+    setToasts(prev => [...prev, { id, message, type, action: options.action }]);
+    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), options.action ? 8000 : 4000);
   };
 
   const removeToast = (id) => setToasts(prev => prev.filter(t => t.id !== id));
@@ -68,6 +70,15 @@ function Toast({ toast, onClose }) {
         <Icon className="w-3.5 h-3.5" style={{ color: `rgb(var(--${tone}-glow))` }} />
       </div>
       <span className="text-[13px] text-text-1 leading-snug">{toast.message}</span>
+      {toast.action && (
+        <button
+          onClick={() => { toast.action.onClick(); onClose(); }}
+          className="flex-shrink-0 px-2 py-1 rounded-lg text-[12.5px] font-medium hover:bg-white/5 transition-colors"
+          style={{ color: `rgb(var(--${tone}-glow))` }}
+        >
+          {toast.action.label}
+        </button>
+      )}
       <button
         onClick={onClose}
         className="grid place-items-center w-6 h-6 rounded-lg text-text-3 hover:text-text-1 hover:bg-white/5 transition-colors flex-shrink-0"

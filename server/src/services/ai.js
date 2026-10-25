@@ -2,7 +2,7 @@ import { upcomingDaysTable } from '../lib/relativeDate.js';
 import { lookup } from 'node:dns/promises';
 import net from 'node:net';
 import {
-  validateSmartCapture, validateProcessInbox, validateImportNotes,
+  validateSmartCaptureTasks, validateProcessInbox, validateImportNotes,
   validateDailyPriorities, validateFindDuplicates, validateWeeklyReview,
   validateAnalyzeTask, validateProjectBreakdown, validatePlanDay, validatePlanWeek } from './aiSchema.js';
 import { packPlan, timeToMinutes, minutesToTime } from './scheduling.js';
@@ -88,7 +88,7 @@ export function buildSmartCaptureMessages(rawText, userContexts, projects, today
     ? `
 DUPLICATE CHECK — the user's current open tasks include:
 ${existingTitles.map(t => `- "${t}"`).join('\n')}
-If this input describes the SAME action as one of these (not merely a related one), set possible_duplicate_of to that task's exact title and mention it in reasoning. Otherwise set it to null. Still parse and return the task either way.
+If a task you return describes the SAME action as one of these (not merely a related one), set possible_duplicate_of to that task's exact title and mention it in reasoning. Otherwise set it to null. Still parse and return the task either way.
 `
     : '';
   return [
@@ -97,9 +97,18 @@ If this input describes the SAME action as one of these (not merely a related on
       role: 'user',
       content: `You are a smart task capture assistant. Today is ${dayName}, ${today}.
 
-Parse this raw input into a structured GTD task. Extract any dates, people, contexts, and classify it.
+Parse this raw input into one or more structured GTD tasks. Extract any dates, people, contexts, and classify each one.
 
 Raw input: "${rawText}"
+
+SPLITTING RULES (decide this first — usually the answer is ONE task):
+- Return ONE task unless the input clearly names separate, independent actions — things the user would tick off at different times ("call the dentist today, and finish the Q4 deck" → 2 tasks).
+- Signals of separate tasks: different verbs acting on different things, joined by commas, "and also", "oh and", "then", new sentences or lines, list markers, or spoken pauses ("…").
+- Keep ONE task for: one action on several objects ("buy milk, eggs and bread"), an action plus its purpose or detail ("email Sarah and ask about Q3", "call the bank to dispute the charge"), or the steps of a single errand ("go to the store and buy batteries", "finish the report and send it to Mark"). If you can't tell whether two phrases are one action or two, keep them as ONE task.
+- COVERAGE (critical): when you do split, EVERY separate action must come back as its own task. Never return just one of them — a dropped action is lost to the user.
+- Never break a task into its sub-steps, and never invent tasks that aren't in the input. At most 8 tasks.
+- Classify each task on its OWN words: a date, person, context or project mentioned for one part never carries over to another ("call the dentist today and finish the deck by Friday" → only the deck is due Friday).
+- source_text: the exact slice of the raw input a task came from, copied verbatim. With a single task, the whole input.
 
 DATE RULES (critical — get this right):
 - Today is ${dayName}, ${today}
@@ -210,8 +219,13 @@ EXAMPLES (these decide list_confidence):
 - "groceries"         → LOW (single noun)
 - "remember to back up the laptop someday" → high (clear someday_maybe signal)
 
-Respond with JSON:
-{
+Example of a split (fields abbreviated): "call the plumber tomorrow, and someday learn Spanish" →
+{ "tasks": [ { "source_text": "call the plumber tomorrow", "title": "Call the plumber", "list": "next_actions", "due_date": "<tomorrow's date>", … },
+             { "source_text": "someday learn Spanish", "title": "Learn Spanish", "list": "someday_maybe", "due_date": null, … } ] }
+
+Respond with JSON — an object with a "tasks" array holding one entry per task (usually exactly one):
+{ "tasks": [ {
+  "source_text": "the exact slice of the raw input this task came from",
   "title": "clear action-oriented title preserving user intent (typically 5–15 words). Strip only parsed dates/times/recurrence and filler.",
   "list": "inbox|next_actions|waiting_for|someday_maybe",
   "list_confidence": "high|medium|low",
@@ -232,7 +246,7 @@ Respond with JSON:
   "recurrence_interval": number or null,
   "recurrence_days": "mon,wed,fri or null",
   "reasoning": "brief plain-language explanation of what was detected and why"
-}`
+} ] }`
     }
   ];
 }
@@ -240,7 +254,7 @@ Respond with JSON:
 export async function smartCapture(rawText, userContexts, projects, today, dayName, history = [], existingTitles = []) {
   if (!aiConfigured()) return null;
   const messages = buildSmartCaptureMessages(rawText, userContexts, projects, today, dayName, history, existingTitles);
-  return complete('smart-capture', { messages, response_format: { type: 'json_object' } }, validateSmartCapture);
+  return complete('smart-capture', { messages, response_format: { type: 'json_object' } }, validateSmartCaptureTasks);
 }
 
 export async function analyzeTask(task, userContexts, projects = [], today = null, dayName = null, history = []) {

@@ -40,6 +40,17 @@ assert.deepEqual(v.validateDailyPriorities(2)(r), []); assert.equal(r.suggested_
 r = { title: 'x', list: 'next_actions', energy_level: 'huge', scheduled_time: '9', list_confidence: 'eh' };
 assert.deepEqual(v.validateSmartCapture(r), []); assert.equal(r.energy_level, null); assert.equal(r.scheduled_time, null); assert.equal(r.list_confidence, 'low');
 assert.ok(v.validateSmartCapture({ title: 'x', list: 'bogus' }).length > 0);
+// smart capture, list shape: old single shape wrapped, bad list → inbox, untitled dropped, capped at 8
+r = { title: 'x', list: 'next_actions' };
+assert.deepEqual(v.validateSmartCaptureTasks(r), []); assert.equal(r.tasks.length, 1); assert.equal(r.tasks[0].title, 'x'); assert.equal(r.title, undefined);
+r = { tasks: [{ title: 'a', list: 'bogus', source_text: 'a' }, { title: '' , list: 'inbox' }, { title: 'b', list: 'waiting_for', source_text: 5 }] };
+assert.deepEqual(v.validateSmartCaptureTasks(r), []); assert.equal(r.tasks.length, 2);
+assert.equal(r.tasks[0].list, 'inbox'); assert.equal(r.tasks[0].list_confidence, 'low'); assert.equal(r.tasks[1].source_text, null);
+r = { tasks: Array.from({ length: 11 }, (_, i) => ({ title: `t${i}`, list: 'inbox' })) };
+assert.deepEqual(v.validateSmartCaptureTasks(r), []); assert.equal(r.tasks.length, 8);
+assert.ok(v.validateSmartCaptureTasks({ tasks: [] }).length > 0);
+assert.ok(v.validateSmartCaptureTasks({ tasks: [{ title: ' ' }] }).length > 0);
+assert.ok(v.validateSmartCaptureTasks({ nope: 1 }).length > 0);
 // project breakdown
 r = { next_actions: [{ title: 'a', energy_level: 'x' }, { title: ' ' }] };
 assert.deepEqual(v.validateProjectBreakdown(r), []); assert.equal(r.next_actions.length, 1);

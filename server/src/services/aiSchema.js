@@ -123,6 +123,31 @@ export function validateSmartCapture(r) {
   return problems;
 }
 
+// Smart capture answers { tasks: [...] } — one entry per separate action in
+// the capture (usually one). A bare single task (the old shape) is wrapped.
+// An item with a bad list is kept as a low-confidence inbox item rather than
+// dropped: the user typed it, so it must land somewhere.
+export const MAX_CAPTURE_TASKS = 8;
+export function validateSmartCaptureTasks(r) {
+  if (!Array.isArray(r.tasks) && typeof r.title === 'string') {
+    const single = { ...r };
+    for (const k of Object.keys(r)) delete r[k];
+    r.tasks = [single];
+  }
+  const problems = salvageItems(r, 'tasks', (item) => {
+    const why = validateSmartCapture(item);
+    if (typeof item.title !== 'string' || !item.title.trim()) return 'title must be a non-empty string';
+    if (why.length) { item.list = 'inbox'; item.list_confidence = 'low'; }
+    coerce(item, 'source_text');
+    if (typeof item.source_text !== 'string') item.source_text = null;
+    return null;
+  });
+  if (problems.length) return problems;
+  if (r.tasks.length === 0) return ['tasks must hold at least one task'];
+  if (r.tasks.length > MAX_CAPTURE_TASKS) r.tasks = r.tasks.slice(0, MAX_CAPTURE_TASKS);
+  return [];
+}
+
 export function validateProcessInbox(taskCount) {
   return (r) => {
     const seen = new Set();

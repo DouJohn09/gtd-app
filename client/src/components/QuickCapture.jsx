@@ -27,6 +27,12 @@ function formatAiToast(ai) {
   return `Added to ${parts.join(' · ')}`;
 }
 
+// "3 tasks · Next Actions, Waiting For" — one capture that named several things.
+function formatSplitToast(tasks) {
+  const lists = [...new Set(tasks.map(t => LIST_LABELS[t.task.list] || t.task.list))];
+  return `Added ${tasks.length} tasks · ${lists.join(', ')}`;
+}
+
 function formatBookedToast(bookedSlot) {
   const d = new Date(bookedSlot.date + 'T00:00:00');
   const dayLabel = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
@@ -59,6 +65,19 @@ export default function QuickCapture({ onCapture, placeholder = "Quick capture �
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const keepAsOne = async (ids, text) => {
+    try {
+      await Promise.all(ids.map(id => api.tasks.delete(id)));
+      await api.tasks.create({ title: text });
+      trackEvent('capture_split_undone', { tasks: ids.length });
+      addToast('Kept as one task in Inbox', 'success');
+      window.dispatchEvent(new Event('task-captured'));
+      onCapture?.();
+    } catch {
+      addToast("Couldn't merge them — the separate tasks are still there", 'error');
+    }
+  };
+
   // Fire-and-forget capture: clear the input the moment the user submits so
   // they can keep typing the next idea while the AI classifies in the
   // background. The toast lands when classification finishes; on failure we
@@ -72,14 +91,20 @@ export default function QuickCapture({ onCapture, placeholder = "Quick capture �
 
     (async () => {
       try {
+        let count = 1;
         if (useAi) {
-          const { ai, fallback, throttled, bookedSlot, slotSearchFailed, routedToInbox } = await api.ai.smartCapture(text);
+          const { ai, fallback, throttled, bookedSlot, slotSearchFailed, routedToInbox, tasks } = await api.ai.smartCapture(text);
           // Over the daily budget is not the same as AI being down, and saying
           // "unavailable" for it sends people looking for an outage that isn't
           // there. No upgrade modal here on purpose — capture is fire-and-forget,
           // and interrupting someone mid-thought to sell them is the opposite of
           // what this app is for.
-          if (throttled) addToast("Captured to inbox — today's AI actions are used up (resets at midnight)", 'info');
+          count = tasks?.length || 1;
+          if (count > 1) addToast(formatSplitToast(tasks), 'success', {
+            // Undo the split: drop the new tasks, keep the capture as one inbox item.
+            action: { label: 'Keep as one', onClick: () => keepAsOne(tasks.map(t => t.task.id), text) },
+          });
+          else if (throttled) addToast("Captured to inbox — today's AI actions are used up (resets at midnight)", 'info');
           else if (fallback || !ai) addToast('Captured to inbox (AI unavailable)', 'info');
           else if (bookedSlot) addToast(formatBookedToast(bookedSlot), 'success');
           else if (slotSearchFailed) addToast('No free slot found — captured without booking', 'info');
@@ -90,7 +115,7 @@ export default function QuickCapture({ onCapture, placeholder = "Quick capture �
           await api.tasks.create({ title: text });
           addToast('Captured to inbox', 'success');
         }
-        trackEvent('task_captured', { ai: useAi });
+        trackEvent('task_captured', { ai: useAi, tasks: count });
         window.dispatchEvent(new Event('task-captured'));
         onCapture?.();
       } catch (error) {

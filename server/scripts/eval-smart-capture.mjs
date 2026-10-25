@@ -10,14 +10,19 @@
 import '../src/env.js';
 import OpenAI from 'openai';
 import { buildSmartCaptureMessages } from '../src/services/ai.js';
+import { validateSmartCaptureTasks } from '../src/services/aiSchema.js';
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const groq = new OpenAI({ apiKey: process.env.GROQ_API_KEY, baseURL: 'https://api.groq.com/openai/v1' });
 
+// The smart-capture chain's OpenAI models (services/aiRouter.js LIGHT).
+// Groq's gpt-oss-20b is last in that chain and failed 12/49 here (2026-09-21);
+// add { label: 'gpt-oss-20b (groq)', client: groq, model: 'openai/gpt-oss-20b' } to re-check it.
 const MODELS = [
-  { label: 'gpt-4o-mini (baseline)', client: openai, model: 'gpt-4o-mini' },
-  { label: 'gpt-oss-20b (groq)',      client: groq,   model: 'openai/gpt-oss-20b' },
+  { label: 'gpt-4o-mini (primary)',  client: openai, model: 'gpt-4o-mini' },
+  { label: 'gpt-4.1-mini (fallback)', client: openai, model: 'gpt-4.1-mini' },
 ];
+void groq;
 
 // Fixed "today" so date assertions are deterministic. 2026-06-01 is a Monday.
 const TODAY = '2026-06-01';
@@ -75,6 +80,37 @@ const CASES = [
   { input: 'renew the car insurance', existingTitles: ['Renew car insurance before it lapses', 'Draft Q3 planning doc'], expect: { dup: 'insurance' } },
   { input: 'wash the car this weekend', existingTitles: ['Renew car insurance before it lapses', 'Draft Q3 planning doc'], expect: { dup: 'null' } },
 ];
+// Every case above must come back as exactly ONE task; each is checked for that too.
+
+// Splitting: one capture naming several separate actions → several tasks, each
+// classified on its own words. `tasks` entries are matched by a title keyword.
+const SPLIT_CASES = [
+  { input: "Call the dentist today… Anna's sending the budget on Friday… and I need to finish the Q4 deck for work.", count: 3, tasks: [
+    { match: 'dentist', due: d(0) },
+    { match: 'budget', list: 'waiting_for', waiting_for_person: 'Anna', due: d(4) },
+    { match: 'deck', due: 'null', context: ['Work'] },
+  ] },
+  { input: 'pick up the dry cleaning, then book flights for the conference, oh and renew the car insurance by Friday', count: 3, tasks: [
+    { match: 'clean', due: 'null' },
+    { match: 'flight', due: 'null' },
+    { match: 'insurance', due: d(4) },
+  ] },
+  { input: 'book a table for Saturday and remind Tom about the slides', count: 2, tasks: [
+    { match: 'table', due: d(5) },
+    { match: 'tom', due: 'null' },
+  ] },
+  { input: '1. fix the login bug\n2. write the release notes\n3. ping design about the icons', count: 3 },
+  { input: 'water the plants every 3 days and call grandma on Sunday', count: 2, tasks: [
+    { match: 'plant', recurrence: 'any' },
+    { match: 'grandma', due: d(6), recurrence: 'none' },
+  ] },
+  // must stay ONE task
+  { input: 'buy milk, eggs and bread', count: 1 },
+  { input: 'email Sarah and ask whether the Q3 forecast assumes the new pricing', count: 1 },
+  { input: 'call the bank to dispute the charge', count: 1 },
+  { input: 'go to the store and buy batteries', count: 1 },
+  { input: 'finish the report and send it to Mark', count: 1 },
+];
 
 function check(expect, ai) {
   const out = [];
@@ -120,27 +156,59 @@ async function runModel({ label, client, model }) {
     let ai = null;
     const t0 = Date.now();
     try {
-      const res = await client.chat.completions.create({ model, messages, response_format: { type: 'json_object' }, temperature: 0, max_tokens: 1024 });
+      const res = await client.chat.completions.create({ model, messages, response_format: { type: 'json_object' }, temperature: 0, max_tokens: 2500 });
       latencies.push(Date.now() - t0);
       ai = JSON.parse(res.choices[0].message.content);
+      const problems = validateSmartCaptureTasks(ai);
+      if (problems.length) throw new Error(problems.join('; '));
     } catch (e) {
       parseFails++;
       failures.push(`  ✗ "${c.input}" → ERROR/parse-fail: ${e.message}`);
       total += check(c.expect, {}).length; // count expected checks as failed
       continue;
     }
-    const checks = check(c.expect, ai);
+    const checks = [{ f: 'count', ok: ai.tasks.length === 1, got: ai.tasks.length, want: 1 }, ...check(c.expect, ai.tasks[0])];
     for (const ch of checks) {
       total++;
       if (ch.ok) pass++;
       else failures.push(`  ✗ "${c.input}" [${ch.f}] got=${JSON.stringify(ch.got)} want=${ch.want}`);
     }
   }
+  for (const c of SPLIT_CASES) {
+    const messages = buildSmartCaptureMessages(c.input, CONTEXTS, PROJECTS, TODAY, dayName, [], []);
+    let ai;
+    try {
+      const t0 = Date.now();
+      const res = await client.chat.completions.create({ model, messages, response_format: { type: 'json_object' }, temperature: 0, max_tokens: 2500 });
+      latencies.push(Date.now() - t0);
+      ai = JSON.parse(res.choices[0].message.content);
+      const problems = validateSmartCaptureTasks(ai);
+      if (problems.length) throw new Error(problems.join('; '));
+    } catch (e) {
+      parseFails++;
+      total += 1 + (c.tasks || []).length;
+      failures.push(`  ✗ "${c.input}" → ERROR/parse-fail: ${e.message}`);
+      continue;
+    }
+    const titles = ai.tasks.map(t => t.title);
+    const checks = [{ f: 'count', ok: ai.tasks.length === c.count, got: titles, want: c.count }];
+    for (const want of c.tasks || []) {
+      const { match, ...expect } = want;
+      const task = ai.tasks.find(t => t.title.toLowerCase().includes(match));
+      if (!task) { checks.push({ f: `find "${match}"`, ok: false, got: titles, want: match }); continue; }
+      checks.push(...check(expect, task).map(ch => ({ ...ch, f: `${match}.${ch.f}` })));
+    }
+    for (const ch of checks) {
+      total++;
+      if (ch.ok) pass++;
+      else failures.push(`  ✗ "${c.input.slice(0, 60)}" [${ch.f}] got=${JSON.stringify(ch.got)} want=${ch.want}`);
+    }
+  }
   const avg = latencies.length ? Math.round(latencies.reduce((a, b) => a + b, 0) / latencies.length) : 0;
   return { label, pass, total, parseFails, avg, failures };
 }
 
-console.log(`Eval: Smart Capture — ${CASES.length} cases, today=${TODAY} (${dayName})\n`);
+console.log(`Eval: Smart Capture — ${CASES.length} single + ${SPLIT_CASES.length} split cases, today=${TODAY} (${dayName})\n`);
 for (const m of MODELS) {
   const r = await runModel(m);
   console.log(`### ${r.label}`);
