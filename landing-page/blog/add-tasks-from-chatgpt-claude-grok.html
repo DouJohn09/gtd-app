@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Add Tasks to Your To-Do List from ChatGPT, Claude or Grok | Cleartable</title>
+  <meta name="description" content="Connect ChatGPT, Claude or Grok to Cleartable once, then say "put this in Cleartable" in any chat. Tasks land sorted, and one tap plans them into your calendar." />
+  <link rel="canonical" href="https://cleartable.app/blog/add-tasks-from-chatgpt-claude-grok" />
+
+  <meta property="og:type" content="article" />
+  <meta property="og:site_name" content="Cleartable" />
+  <meta property="og:url" content="https://cleartable.app/blog/add-tasks-from-chatgpt-claude-grok" />
+  <meta property="og:title" content="Add Tasks to Your To-Do List from ChatGPT, Claude or Grok" />
+  <meta property="og:description" content="Say \"put this in Cleartable\" in ChatGPT, Claude or Grok — the tasks land sorted, and one tap plans them into your calendar." />
+  <meta property="og:image" content="https://cleartable.app/og-image.png" />
+  <meta property="article:published_time" content="2026-10-26" />
+  <meta property="article:author" content="Cleartable" />
+
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Add Tasks to Your To-Do List from ChatGPT, Claude or Grok" />
+  <meta name="twitter:description" content="Say \"put this in Cleartable\" in ChatGPT, Claude or Grok — the tasks land sorted, and one tap plans them into your calendar." />
+  <meta name="twitter:image" content="https://cleartable.app/og-image.png" />
+
+  <meta name="theme-color" content="#15151E" />
+
+  <link rel="preconnect" href="https://api.fontshare.com" crossorigin />
+  <!-- Fonts loaded non-render-blocking; noscript fallback preserves them without JS -->
+  <link rel="stylesheet" href="https://api.fontshare.com/v2/css?f[]=instrument-serif@400i,400&f[]=geist-mono@400,500&f[]=satoshi@400,500,700&display=swap" media="print" onload="this.media='all'" />
+  <noscript><link rel="stylesheet" href="https://api.fontshare.com/v2/css?f[]=instrument-serif@400i,400&f[]=geist-mono@400,500&f[]=satoshi@400,500,700&display=swap" /></noscript>
+  <link rel="stylesheet" href="/style.css" />
+  <link rel="stylesheet" href="/blog.css" />
+
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='%23A78BFA'/><stop offset='1' stop-color='%235EEAD4'/></linearGradient></defs><rect width='64' height='64' rx='14' fill='url(%23g)'/><path d='M29 14 C32.78 31.22 32.78 31.22 50 35 C32.78 38.78 32.78 38.78 29 56 C25.22 38.78 25.22 38.78 8 35 C25.22 31.22 25.22 31.22 29 14Z' fill='%23fff'/><path d='M48 7.5 C49.35 13.65 49.35 13.65 55.5 15 C49.35 16.35 49.35 16.35 48 22.5 C46.65 16.35 46.65 16.35 40.5 15 C46.65 13.65 46.65 13.65 48 7.5Z' fill='%23fff' fill-opacity='0.92'/></svg>" />
+
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "BlogPosting",
+      "@id": "https://cleartable.app/blog/add-tasks-from-chatgpt-claude-grok#article",
+      "headline": "Add Tasks to Your To-Do List from ChatGPT, Claude or Grok",
+      "description": "Connect ChatGPT, Claude or Grok to Cleartable once, then say \"put this in Cleartable\" in any chat. Tasks land sorted, and one tap plans them into your calendar.",
+      "datePublished": "2026-10-26",
+      "dateModified": "2026-10-26",
+      "url": "https://cleartable.app/blog/add-tasks-from-chatgpt-claude-grok",
+      "mainEntityOfPage": "https://cleartable.app/blog/add-tasks-from-chatgpt-claude-grok",
+      "image": "https://cleartable.app/og-image.png",
+      "author": {
+        "@type": "Organization",
+        "name": "Cleartable",
+        "url": "https://cleartable.app/"
+      },
+      "publisher": {
+        "@type": "Organization",
+        "name": "Cleartable",
+        "url": "https://cleartable.app/"
+      },
+      "keywords": "chatgpt to-do list, claude tasks, grok tasks, mcp task manager, ai assistant to-do list, add tasks from chatgpt"
+    },
+    {
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Home",
+          "item": "https://cleartable.app/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "Blog",
+          "item": "https://cleartable.app/blog/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "Add Tasks to Your To-Do List from ChatGPT, Claude or Grok"
+        }
+      ]
+    },
+    {
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "Which AI assistants can I connect to Cleartable?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "ChatGPT, Claude and Grok. Cleartable runs a standard MCP server at https://cleartable.app/mcp, so any assistant that supports custom MCP connectors with sign-in can use it. In Cleartable, Settings → AI apps has the address and the steps for each one."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Can the assistant delete or mess up my tasks?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "No deleting — the connection can add, read, update and complete tasks, but there is no delete at all. You approve the connection on a Cleartable page that lists exactly what it can do, and you can disconnect any app in Settings → AI apps at any time."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Do I need a paid plan?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Not on Cleartable: connecting an assistant works on the free plan, and tasks the assistant sends through Cleartable's sorting count toward your normal daily AI allowance. On the assistant's side it depends on the app: at the time of writing, Claude allows custom connectors on its free plan, while ChatGPT's developer mode and Grok's custom connectors need a paid plan."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Is my data shared with ChatGPT, Claude or Grok?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Only what you ask for in that chat. The assistant reads tasks when you ask it to (for example \"what's on today?\"), and that reply becomes part of your conversation with it, under that assistant's own privacy terms. Cleartable never sends your tasks anywhere on its own, and disconnecting stops all access immediately."
+          }
+        }
+      ]
+    }
+  ]
+}
+  </script>
+</head>
+<body>
+  <div class="ambient" aria-hidden="true">
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+    <div class="orb orb-3"></div>
+    <div class="orb orb-4"></div>
+    <div class="orb orb-5"></div>
+  </div>
+
+  <nav id="nav">
+    <div class="container">
+      <a href="/" class="logo">clear<span>table</span></a>
+      <div class="nav-right">
+        <a href="/#ai-apps" class="nav-link nav-ai">Works with AI</a>
+        <a href="/blog/" class="nav-link">Blog</a>
+        <a href="/app" class="nav-link">Sign in</a>
+        <a href="/app" class="nav-cta">Start free</a>
+      </div>
+    </div>
+  </nav>
+
+  <main class="blog-main">
+    <article class="article reading">
+      <a href="/blog/" class="back-link">← All articles</a>
+      <div class="article-eyebrow">AI &middot; How-to</div>
+      <h1>Add Tasks to Your To-Do List from ChatGPT, Claude or Grok</h1>
+      <div class="article-meta">
+        <span>October 26, 2026</span> &middot; 5 min read &middot; by the Cleartable team
+      </div>
+
+      <div class="article-body">
+        <p>
+          A lot of planning already happens in an AI chat. You talk a messy week through with ChatGPT,
+          ask Claude to break a project into steps, or brainstorm a weekend with Grok — and at the end
+          there's a handful of real to-dos sitting in the conversation. Then comes the boring part:
+          copying them into your task app one by one. Or, more honestly, not copying them, and losing
+          half of them by Thursday.
+        </p>
+        <p>
+          Cleartable now closes that gap. Connect your assistant once, and from then on you can say
+          <strong>"put this in Cleartable"</strong> in any chat. The tasks land in your Cleartable
+          inbox, already sorted, and one tap plans them into your calendar.
+        </p>
+
+        <h2>What it looks like</h2>
+        <p>Say you're in ChatGPT and type:</p>
+        <blockquote>"Put these in Cleartable: book the car service, buy a gift for Mia's party on Saturday, and plan the hike with Tom."</blockquote>
+        <p>
+          The assistant calls Cleartable, and a few seconds later it replies that three tasks were
+          added. In Cleartable you find three separate tasks — not one long note — each sorted the same
+          way as anything you capture yourself: the right list and context, "by Saturday" read as a
+          due date, a sensible time estimate. Press <strong>Plan my week</strong> and they're placed
+          into free time around what's already in your calendar — the gift before Saturday, the hike
+          planning on Sunday after your run.
+        </p>
+        <p>
+          It works the other way too. Ask <em>"what's on my plate today in Cleartable?"</em> and the
+          assistant reads your day — tasks, calendar events and habits — so you can talk it through,
+          reschedule something, or tick off what you just finished.
+        </p>
+
+        <h2>What the assistant can and can't do</h2>
+        <ul>
+          <li><strong>Add tasks</strong> — one at a time, or a whole messy paragraph that Cleartable's AI splits into separate, sorted tasks.</li>
+          <li><strong>Read</strong> your tasks, projects and today's plan.</li>
+          <li><strong>Update</strong> tasks (dates, deadlines, lists, notes) and <strong>complete</strong> them.</li>
+          <li><strong>Never delete</strong> anything, and never touch your account or billing.</li>
+        </ul>
+        <p>
+          You approve the connection on a Cleartable page that says exactly this before anything is
+          shared, and Settings &rarr; AI apps lists every connected app with a Disconnect button.
+        </p>
+
+        <div class="cta-box">
+          <h3>Try it with your assistant</h3>
+          <p>
+            Cleartable is a calm, AI-powered app for your tasks, habits and calendar. Connecting
+            ChatGPT, Claude or Grok works on the free plan.
+          </p>
+          <a href="/app" class="nav-cta">Start free</a>
+        </div>
+
+        <h2>How to connect it</h2>
+        <p>
+          Every assistant asks for the same address: <code>https://cleartable.app/mcp</code>. You'll
+          also find it, with a copy button, in Cleartable under <strong>Settings &rarr; AI apps</strong>.
+          After you add it, the assistant sends you to a Cleartable sign-in and an Allow page — that's
+          the whole setup. Menus move around, so if a label differs slightly, look for "connectors".
+        </p>
+        <h3>Claude</h3>
+        <ol>
+          <li>In Claude, open <strong>Settings &rarr; Connectors</strong> and choose <strong>Add custom connector</strong>.</li>
+          <li>Name it Cleartable, paste the address, and connect.</li>
+          <li>Sign in to Cleartable and press <strong>Allow</strong>.</li>
+        </ol>
+        <h3>ChatGPT</h3>
+        <ol>
+          <li>On chatgpt.com, open <strong>Settings &rarr; Apps &amp; Connectors &rarr; Advanced settings</strong> and turn on <strong>Developer mode</strong>.</li>
+          <li>Create a new app: name it Cleartable, paste the address, choose OAuth, and confirm.</li>
+          <li>Sign in to Cleartable and press <strong>Allow</strong>. In a chat, switch Cleartable on from the <strong>+</strong> menu. ChatGPT asks you to confirm each change it makes — that's expected.</li>
+        </ol>
+        <h3>Grok</h3>
+        <ol>
+          <li>Go to <strong>grok.com/connectors</strong> and choose <strong>New connector &rarr; Custom</strong>.</li>
+          <li>Paste the address and connect.</li>
+          <li>Sign in to Cleartable and press <strong>Allow</strong>.</li>
+        </ol>
+
+        <h2>Why a connection, not a copy-paste</h2>
+        <p>
+          The connection uses MCP (Model Context Protocol), the open standard AI assistants use to talk
+          to other apps. For you that means two things. First, nothing is pasted around: the assistant
+          asks Cleartable directly, using a sign-in you approved, and that access can be revoked in one
+          click. Second, Cleartable stays the place where your tasks are organized. The assistant is a
+          great place to <em>think</em>; Cleartable is where those thoughts become a sorted list, a
+          planned day and a calendar you can trust.
+        </p>
+
+        <h2>A few ways people use it</h2>
+        <ul>
+          <li><strong>After a planning chat:</strong> "Add the action items from this conversation to Cleartable."</li>
+          <li><strong>From a long email or document:</strong> paste it in and ask for the to-dos to go to Cleartable.</li>
+          <li><strong>Morning check-in:</strong> "What's on today in Cleartable, and what should I do first?"</li>
+          <li><strong>End of day:</strong> "Mark the dentist call done and move the deck to tomorrow."</li>
+        </ul>
+      </div>
+
+      <section class="article-faq">
+        <h2>Frequently asked questions</h2>
+        <p class="q">Which AI assistants can I connect to Cleartable?</p>
+        <p class="a">
+          ChatGPT, Claude and Grok. Cleartable runs a standard MCP server at https://cleartable.app/mcp, so any assistant that supports custom MCP connectors with sign-in can use it. In Cleartable, Settings → AI apps has the address and the steps for each one.
+        </p>
+        <p class="q">Can the assistant delete or mess up my tasks?</p>
+        <p class="a">
+          No deleting — the connection can add, read, update and complete tasks, but there is no delete at all. You approve the connection on a Cleartable page that lists exactly what it can do, and you can disconnect any app in Settings → AI apps at any time.
+        </p>
+        <p class="q">Do I need a paid plan?</p>
+        <p class="a">
+          Not on Cleartable: connecting an assistant works on the free plan, and tasks the assistant sends through Cleartable's sorting count toward your normal daily AI allowance. On the assistant's side it depends on the app: at the time of writing, Claude allows custom connectors on its free plan, while ChatGPT's developer mode and Grok's custom connectors need a paid plan.
+        </p>
+        <p class="q">Is my data shared with ChatGPT, Claude or Grok?</p>
+        <p class="a">
+          Only what you ask for in that chat. The assistant reads tasks when you ask it to (for example "what's on today?"), and that reply becomes part of your conversation with it, under that assistant's own privacy terms. Cleartable never sends your tasks anywhere on its own, and disconnecting stops all access immediately.
+        </p>
+      </section>
+
+      <div class="article-footer">
+        Cleartable is a calm, AI-powered app for organizing your tasks, habits, and calendar across work
+        and personal life — and it works with ChatGPT, Claude and Grok. <a href="/#ai-apps" style="color: var(--violet);">See how it works →</a>
+      </div>
+    </article>
+  </main>
+
+  <footer>
+    <div class="container">
+      <div class="left">
+        &copy; 2026 Cleartable ·
+        <a href="/">Home</a> ·
+        <a href="/blog/">Blog</a> ·
+        <a href="/privacy.html">Privacy</a> ·
+        <a href="/terms.html">Terms</a> ·
+        <a href="/refund.html">Refunds</a>
+      </div>
+      <div class="right">
+        Getting Things Done&reg; is a registered trademark of the David Allen Company.<br />
+        Cleartable is not affiliated with or endorsed by the David Allen Company.
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    document.getElementById('nav').classList.add('scrolled');
+  </script>
+  <script src="/consent.js" defer></script>
+  <script src="/track.js" defer></script>
+  <script src="/analytics.js" defer></script>
+</body>
+</html>
