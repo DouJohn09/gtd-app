@@ -6,6 +6,8 @@
 // to /app/connect, where the user (signed in the normal way) sees which app
 // is asking and clicks Allow. That mints a one-time code bound to the user.
 import { createHash, randomBytes } from 'crypto';
+import dns from 'dns/promises';
+import net from 'net';
 import { pool } from '../db/pool.js';
 import { InvalidGrantError, InvalidRequestError, InvalidTokenError } from '@modelcontextprotocol/sdk/server/auth/errors.js';
 
@@ -24,10 +26,76 @@ const REFRESH_TTL_DAYS = 60;       // renewed on every refresh, so active use ne
 const hash = (s) => createHash('sha256').update(s).digest('hex');
 const secret = (prefix) => `${prefix}_${randomBytes(32).toString('base64url')}`;
 
+// Client ID Metadata Documents: a client may skip /register and use an https
+// URL as its client_id; the JSON at that URL describes it (Smithery works
+// this way, Claude prefers it). The document is fetched with guards against
+// internal addresses, then kept in oauth_clients like a registered client
+// (grants reference that table) and refetched once a day.
+const CIMD_MAX_BYTES = 10_000;
+const CIMD_TTL_MS = 24 * 60 * 60_000;
+
+const isPrivateAddress = (ip) => {
+  if (net.isIPv4(ip)) {
+    const [a, b] = ip.split('.').map(Number);
+    return a === 10 || a === 127 || a === 0 || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || (a === 100 && b >= 64 && b <= 127) || a >= 224;
+  }
+  const v6 = ip.toLowerCase();
+  if (v6.startsWith('::ffff:')) return isPrivateAddress(v6.slice(7));
+  return v6 === '::1' || v6 === '::' || v6.startsWith('fc') || v6.startsWith('fd') || v6.startsWith('fe80');
+};
+
+const isMetadataUrl = (clientId) => {
+  try {
+    const u = new URL(clientId);
+    return u.protocol === 'https:' && u.pathname !== '/' && !u.hash && !u.username && !u.password;
+  } catch { return false; }
+};
+
+async function fetchClientMetadata(clientId) {
+  const url = new URL(clientId);
+  const addresses = await dns.lookup(url.hostname, { all: true });
+  if (!addresses.length || addresses.some(a => isPrivateAddress(a.address))) return null;
+  const res = await fetch(url, { redirect: 'error', signal: AbortSignal.timeout(5000), headers: { Accept: 'application/json' } });
+  if (!res.ok) return null;
+  const text = await res.text();
+  if (text.length > CIMD_MAX_BYTES) return null;
+  const doc = JSON.parse(text);
+  const redirects = Array.isArray(doc.redirect_uris) ? doc.redirect_uris.filter(u => typeof u === 'string') : [];
+  const method = doc.token_endpoint_auth_method || 'none';
+  // Public clients only: we hold no keys to check private_key_jwt with.
+  if (doc.client_id !== clientId || !redirects.length || method !== 'none') return null;
+  return {
+    client_id: clientId,
+    client_name: typeof doc.client_name === 'string' ? doc.client_name.slice(0, 100) : url.hostname,
+    client_uri: typeof doc.client_uri === 'string' ? doc.client_uri : undefined,
+    redirect_uris: redirects,
+    grant_types: ['authorization_code', 'refresh_token'],
+    response_types: ['code'],
+    token_endpoint_auth_method: 'none',
+    metadata_document: true,
+    fetched_at: Date.now(),
+  };
+}
+
 const clientsStore = {
   async getClient(clientId) {
     const { rows } = await pool.query('SELECT info FROM oauth_clients WHERE client_id = $1', [clientId]);
-    return rows[0]?.info;
+    const known = rows[0]?.info;
+    if (!isMetadataUrl(clientId)) return known;
+    if (known && Date.now() - (known.fetched_at || 0) < CIMD_TTL_MS) return known;
+    try {
+      const info = await fetchClientMetadata(clientId);
+      if (!info) return known;
+      await pool.query(
+        `INSERT INTO oauth_clients (client_id, info) VALUES ($1, $2)
+         ON CONFLICT (client_id) DO UPDATE SET info = EXCLUDED.info`,
+        [clientId, info]
+      );
+      return info;
+    } catch (err) {
+      console.error('[oauth] client metadata fetch failed:', clientId, err.message);
+      return known;
+    }
   },
   async registerClient(client) {
     await pool.query('INSERT INTO oauth_clients (client_id, info) VALUES ($1, $2)', [client.client_id, client]);

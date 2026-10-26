@@ -1,0 +1,11 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "app.cleartable/cleartable",
+  "title": "Cleartable",
+  "description": "Add, read and plan tasks in Cleartable, a calm AI task manager with calendar and habits.",
+  "version": "1.0.0",
+  "websiteUrl": "https://cleartable.app",
+  "remotes": [
+    { "type": "streamable-http", "url": "https://cleartable.app/mcp" }
+  ]
+}

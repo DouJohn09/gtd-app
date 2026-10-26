@@ -34,6 +34,7 @@ const oauthMetadata = {
   ...createOAuthMetadata({ provider: oauthProvider, issuerUrl: new URL(PUBLIC_URL), scopesSupported: SCOPES }),
   token_endpoint_auth_methods_supported: ['none', 'client_secret_post', 'client_secret_basic'],
   authorization_response_iss_parameter_supported: true,
+  client_id_metadata_document_supported: true,
 };
 
 // Some clients send client credentials as HTTP Basic; the SDK reads them from
@@ -61,6 +62,13 @@ router.use('/register', clientRegistrationHandler({
   rateLimit: limit(60, 60 * 60_000),
 }));
 router.use('/revoke', revocationHandler({ provider: oauthProvider, rateLimit: limit(100, 15 * 60_000) }));
+
+// Proves to the official MCP Registry that we own cleartable.app, so the
+// server can be listed as app.cleartable/cleartable. Public key only; the
+// private half stays with the person who publishes.
+router.get('/.well-known/mcp-registry-auth', (_req, res) => {
+  res.type('text/plain').send('v=MCPv1; k=ed25519; p=FIMz3uiC8+d0asUpoJ+/rZewPOwp5R5LxrRQi3F/Jes=');
+});
 
 // ---- The MCP endpoint ----
 

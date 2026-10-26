@@ -173,6 +173,14 @@ const codeSendLimiter = rateLimit({
   keyGenerator: clientIpKey,
 });
 
+// App-directory reviewers (Claude, ChatGPT) need a sign-in that works
+// without reading our email. REVIEW_LOGIN="address:123456" makes that one
+// address accept a fixed code, and nothing is sent. Use it for a demo
+// account only; the usual limits (5 tries per code, codes per hour) apply.
+const [REVIEW_EMAIL, REVIEW_CODE] = (process.env.REVIEW_LOGIN || '').split(':');
+const reviewCodeFor = (email) =>
+  REVIEW_EMAIL && /^\d{6}$/.test(REVIEW_CODE || '') && email === normalEmail(REVIEW_EMAIL) ? REVIEW_CODE : null;
+
 router.post('/email/start', codeSendLimiter, async (req, res) => {
   const email = normalEmail(req.body?.email);
   if (!EMAIL_RE.test(email) || email.length > 254) {
@@ -187,7 +195,8 @@ router.post('/email/start', codeSendLimiter, async (req, res) => {
     if (recent.n >= CODES_PER_EMAIL_HOUR) {
       return res.status(429).json({ error: 'Too many codes for this address. Use the last one we sent, or try again in an hour.' });
     }
-    const code = String(crypto.randomInt(0, 1_000_000)).padStart(6, '0');
+    const reviewCode = reviewCodeFor(email);
+    const code = reviewCode || String(crypto.randomInt(0, 1_000_000)).padStart(6, '0');
     const token = crypto.randomBytes(32).toString('base64url');
     await pool.query(
       `INSERT INTO login_codes (email, code_hash, token_hash, expires_at)
@@ -195,7 +204,7 @@ router.post('/email/start', codeSendLimiter, async (req, res) => {
       [email, hashSecret(`${email}:${code}`), hashSecret(token), CODE_TTL_MIN]
     );
     const appUrl = (process.env.APP_URL || 'https://cleartable.app/app').replace(/\/$/, '');
-    const sent = await sendLoginCode(email, code, `${appUrl}/login?token=${token}`);
+    const sent = reviewCode ? { skipped: true } : await sendLoginCode(email, code, `${appUrl}/login?token=${token}`);
     // Local dev without Resend: no mail goes out, so show the code here.
     if (sent?.skipped && process.env.NODE_ENV !== 'production') {
       console.log(`[email] dev sign-in code for ${email}: ${code}`);
