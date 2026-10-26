@@ -5,8 +5,8 @@ import { useToast } from './Toast';
 import MonoLabel from './ui/MonoLabel';
 
 const HOW_TO = [
-  { app: 'Claude', steps: 'Settings → Connectors → Add custom connector, paste the address.' },
-  { app: 'ChatGPT', steps: 'Settings → Apps → Advanced settings → turn on Developer mode, then create an app with the address.' },
+  { app: 'Claude', steps: 'Customize → Connectors → + Add → Add custom connector, paste the address.' },
+  { app: 'ChatGPT', steps: 'Settings → Apps → Advanced settings → turn on Developer mode (Plus or higher), then Create app with the address.' },
   { app: 'Grok', steps: 'grok.com/connectors → New connector → Custom, paste the address.' },
 ];
 
