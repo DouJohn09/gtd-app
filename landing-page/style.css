@@ -1626,3 +1626,107 @@ footer .footer-badges a:hover img { opacity: 1; }
   .loop-grid { --hour: 72px; }
   .loop-event { left: 48px; }
 }
+
+/* ========== Works with your AI: chat → inbox → weekend ==========
+   Reuses the hero loop's frame, scenes and pieces; mcp-loop.js drives it. */
+.ai-apps { text-align: center; padding-top: 40px; }
+.ai-apps .section-sub { color: var(--text-2); font-size: 16px; max-width: 560px; margin: 0 auto; }
+.ai-apps-pills { display: flex; justify-content: center; gap: 10px; margin-top: 18px; }
+.ai-apps-pills span {
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  color: var(--text-2);
+}
+.ai-apps-note { margin-top: 18px; font-size: 13px; color: var(--text-3); }
+.mcp-loop { margin-top: 36px; }
+
+.loop-stage[data-scene="chat"] .mcp-chat,
+.loop-stage[data-scene="inbox"] .mcp-inbox,
+.loop-stage[data-scene="weekend"] .mcp-weekend { opacity: 1; transform: none; }
+
+/* Scene 1 — the AI chat */
+.mcp-chat { justify-content: flex-end; gap: 14px; }
+.chat-thread { width: 100%; max-width: 560px; display: flex; flex-direction: column; gap: 14px; }
+.chat-msg { display: flex; gap: 10px; }
+.chat-user { justify-content: flex-end; }
+.chat-typed {
+  max-width: 84%;
+  padding: 11px 15px;
+  border-radius: 16px 16px 4px 16px;
+  background: rgba(255, 255, 255, 0.08);
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--text-1);
+}
+.chat-typed:empty { display: none; }
+.chat-avatar {
+  display: grid; place-items: center;
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  background: rgba(167, 139, 250, 0.16);
+  color: var(--violet-glow);
+  flex: none;
+}
+.chat-avatar svg { width: 14px; height: 14px; }
+.chat-ai-body { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+.chat-tool {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 6px 11px;
+  border-radius: 9px;
+  border: 1px solid rgba(94, 234, 212, 0.35);
+  background: rgba(20, 184, 166, 0.10);
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--mint-glow);
+}
+.chat-tool-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--mint-glow); }
+.chat-tool.working .chat-tool-dot { animation: loop-blink 0.8s ease-in-out infinite; }
+.chat-reply { font-size: 15px; line-height: 1.5; color: var(--text-1); }
+.chat-input {
+  position: relative;
+  width: 100%; max-width: 560px;
+  padding: 13px 16px;
+  border-radius: 14px;
+  border: 1px solid var(--border-strong);
+  background: rgba(255, 255, 255, 0.04);
+  font-size: 14px;
+  color: var(--text-3);
+}
+.chat-placeholder b { font-weight: 500; }
+.chat-send { width: 30px; height: 30px; right: 8px; bottom: 8px; border-radius: 9px; }
+.chat-send svg { width: 15px; height: 15px; }
+
+.loop-stage.animated .chat-ai,
+.loop-stage.animated .chat-reply { opacity: 0; transform: translateY(8px); transition: opacity 0.4s ease, transform 0.4s ease; }
+.loop-stage.animated .chat-ai.in,
+.loop-stage.animated .chat-reply.in { opacity: 1; transform: none; }
+
+/* Scene 3 — the weekend, two day columns */
+.wk-grid { --hour: 62px; --gutter: 56px; position: relative; width: 100%; max-width: 560px; height: calc(var(--hour) * 3.2 + 26px); padding-top: 26px; }
+.wk-grid .loop-hour { top: calc(26px + var(--at) * var(--hour)); }
+.wk-day {
+  position: absolute; top: 0;
+  left: calc(var(--gutter) + var(--col) * (100% - var(--gutter)) / 2);
+  width: calc((100% - var(--gutter)) / 2);
+  text-align: center;
+  font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-2);
+}
+.wk-grid .loop-event {
+  left: calc(var(--gutter) + var(--col) * (100% - var(--gutter)) / 2 + 3px);
+  right: auto;
+  width: calc((100% - var(--gutter)) / 2 - 6px);
+  top: calc(26px + var(--from) * var(--hour) + 2px);
+}
+
+@media (max-width: 640px) {
+  .chat-typed { font-size: 14px; max-width: 92%; }
+  .wk-grid { --gutter: 44px; --hour: 66px; }
+  .wk-grid .loop-event { font-size: 11.5px; padding: 0 7px; }
+}
+.wk-grid .loop-event.meeting { background: #1E1E29; }
+.ai-apps h2 { font-size: clamp(28px, 4.5vw, 44px); margin-bottom: 14px; }
