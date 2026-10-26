@@ -11,7 +11,7 @@ Copy from here; adjust the voice where it doesn't sound like you.
 |---|---|---|---|
 | **Official MCP Registry** (registry.modelcontextprotocol.io) | Feeds many other directories and clients automatically | `marketing/server.json` + domain proof | ✅ Published 2026-10-26 as app.cleartable/cleartable 1.0.0 |
 | ~~Smithery~~ | — | Skip: Smithery shuts down accounts and its proxy on 31 Oct 2026 and stays only as a read-only public registry (run by Arcade.dev). Listings made through an account now may not survive. | — |
-| **PulseMCP** (pulsemcp.com/submit) | Popular MCP news + directory | Submit form: URL + short description | You |
+| **PulseMCP** | Popular MCP news + directory | Submissions paused (since Sep 2026); they import from the official MCP Registry when back | ✅ Nothing to do, covered by the registry |
 | **mcp.so** (mcp.so/submit) | Large community list | Submit form or GitHub issue | You |
 | **Glama** (glama.ai/mcp/servers) | Curated, does quality checks | "Add server" form for remote servers | You |
 | **Claude Connectors Directory** (claude.ai/directory/manage) | Shown inside Claude to every user | Paid Claude plan, listing copy below, icon, reviewer test account | You (Claude prepares everything) |
