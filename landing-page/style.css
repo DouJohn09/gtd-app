@@ -1730,3 +1730,77 @@ footer .footer-badges a:hover img { opacity: 1; }
 }
 .wk-grid .loop-event.meeting { background: #1E1E29; }
 .ai-apps h2 { font-size: clamp(28px, 4.5vw, 44px); margin-bottom: 14px; }
+
+/* Where are we: the assistant's chat (neutral grey, its own address) or
+   Cleartable (violet, cleartable.app). #mcp-loop-wrap[data-where] switches. */
+.mcp-loop .loop-bar { position: relative; }
+.mcp-addr {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  font-family: var(--font-mono); font-size: 11.5px; color: var(--text-2);
+}
+.mcp-addr > span {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 4px 14px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.06);
+}
+.mcp-addr-dot { width: 8px; height: 8px; border-radius: 50%; background: rgba(255, 255, 255, 0.45); }
+.mcp-addr-mark { width: 10px; height: 10px; border-radius: 3px; background: linear-gradient(135deg, var(--violet-glow), var(--mint-glow)); }
+.mcp-where { margin-left: auto; font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.04em; }
+.mcp-where > span { padding: 3px 10px; border-radius: 999px; }
+.mcp-where b { font-weight: 600; }
+.mcp-where-chat { background: rgba(255, 255, 255, 0.10); color: #E5E5E5; }
+.mcp-where-app { background: rgba(167, 139, 250, 0.18); color: var(--violet-glow); }
+.mcp-loop[data-where="chat"] .mcp-addr-app,
+.mcp-loop[data-where="chat"] .mcp-where-app,
+.mcp-loop[data-where="app"] .mcp-addr-chat,
+.mcp-loop[data-where="app"] .mcp-where-chat { display: none; }
+
+.mcp-loop .loop-frame,
+.mcp-loop .loop-bar,
+.mcp-loop .loop-stage { transition: background 0.45s ease, box-shadow 0.45s ease, opacity 0.45s ease; }
+.mcp-loop[data-where="chat"] .loop-frame {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.06));
+  box-shadow: 0 30px 80px -24px rgba(0, 0, 0, 0.8);
+}
+.mcp-loop[data-where="chat"] .loop-bar { background: #2A2A2A; }
+.mcp-loop[data-where="chat"] .loop-stage { background: #212121; }
+.mcp-loop[data-where="chat"][data-app="claude"] .loop-bar { background: #30302E; }
+.mcp-loop[data-where="chat"][data-app="claude"] .loop-stage { background: #262624; }
+.mcp-loop[data-where="chat"][data-app="grok"] .loop-bar { background: #1A1A1A; }
+.mcp-loop[data-where="chat"][data-app="grok"] .loop-stage { background: #0E0E0E; }
+
+/* The chat itself in plain assistant colors, nothing of Cleartable's. */
+.mcp-chat .chat-typed { background: #303030; }
+.mcp-loop[data-app="claude"] .mcp-chat .chat-typed { background: #3A3936; }
+.mcp-loop[data-app="grok"] .mcp-chat .chat-typed { background: #242424; }
+.mcp-chat .chat-avatar { background: rgba(255, 255, 255, 0.10); color: #E5E5E5; }
+.mcp-chat .chat-input { background: rgba(255, 255, 255, 0.05); border-color: rgba(255, 255, 255, 0.14); }
+.mcp-chat .chat-send { background: #ECECEC; color: #111; }
+
+/* Steps under the window */
+.mcp-steps {
+  list-style: none;
+  display: flex; justify-content: center; flex-wrap: wrap; gap: 8px 18px;
+  margin-top: 20px;
+}
+.mcp-steps li {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-size: 14px; color: var(--text-3);
+  transition: color 0.3s;
+}
+.mcp-steps li span {
+  display: grid; place-items: center;
+  width: 22px; height: 22px;
+  border-radius: 50%;
+  border: 1px solid var(--border-strong);
+  font-family: var(--font-mono); font-size: 11px;
+  transition: background 0.3s, color 0.3s, border-color 0.3s;
+}
+.mcp-steps li.on { color: var(--text-1); }
+.mcp-steps li.on span { background: var(--violet-deep); border-color: var(--violet-deep); color: #fff; }
+.mcp-steps li[data-step="chat"].on span { background: #ECECEC; border-color: #ECECEC; color: #111; }
+
+@media (max-width: 640px) {
+  .mcp-where { display: none; }
+}

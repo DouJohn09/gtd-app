@@ -377,10 +377,20 @@
       <!-- Looping demo: ask an AI assistant → tasks land in Cleartable → Plan
            my week fills the weekend. Coded (mcp-loop.js), same rules as the
            hero loop: plays only on screen, rests on the inbox without JS. -->
-      <div class="hero-loop mcp-loop" role="img"
+      <div class="hero-loop mcp-loop" id="mcp-loop-wrap" data-where="app" role="img"
            aria-label="Demo: in an AI chat you write 'Put these in Cleartable: book the car service, buy a gift for Mia's party on Saturday, plan the hike with Tom'. The assistant adds three tasks to Cleartable, they appear in the inbox, and Plan my week places them on Saturday and Sunday around your plans.">
         <div class="loop-frame" aria-hidden="true">
-          <div class="loop-bar"><i></i><i></i><i></i><span class="loop-bar-title" id="mcp-loop-title">chatgpt</span></div>
+          <div class="loop-bar">
+            <i></i><i></i><i></i>
+            <span class="mcp-addr">
+              <span class="mcp-addr-chat"><span class="mcp-addr-dot"></span><span id="mcp-loop-host">chatgpt.com</span></span>
+              <span class="mcp-addr-app"><span class="mcp-addr-mark"></span>cleartable.app</span>
+            </span>
+            <span class="mcp-where">
+              <span class="mcp-where-chat">in <b class="chat-app-name">ChatGPT</b></span>
+              <span class="mcp-where-app">in Cleartable</span>
+            </span>
+          </div>
           <div class="loop-stage" id="mcp-loop" data-scene="inbox">
             <div class="loop-scene mcp-chat">
               <div class="chat-thread">
@@ -427,6 +437,11 @@
           </div>
         </div>
       </div>
+      <ol class="mcp-steps" aria-hidden="true">
+        <li data-step="chat"><span>1</span>Ask your AI</li>
+        <li data-step="inbox" class="on"><span>2</span>It lands in Cleartable</li>
+        <li data-step="weekend"><span>3</span>Plan my week</li>
+      </ol>
       <p class="ai-apps-note">Set it up in Settings → AI apps. Your assistant can add, read and update tasks — never delete them.</p>
     </div>
   </section>
