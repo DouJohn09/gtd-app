@@ -9,8 +9,8 @@ Copy from here; adjust the voice where it doesn't sound like you.
 
 | Directory | Reach | What it needs | Who |
 |---|---|---|---|
-| **Official MCP Registry** (registry.modelcontextprotocol.io) | Feeds many other directories and clients automatically | `marketing/server.json` + domain proof (already live after deploy) | Claude can publish with the CLI once you say go |
-| **Smithery** (smithery.ai/new) | Big MCP marketplace | Account, paste `https://cleartable.app/mcp`, sign in once so it can read the tools | You (needs your account) |
+| **Official MCP Registry** (registry.modelcontextprotocol.io) | Feeds many other directories and clients automatically | `marketing/server.json` + domain proof | ✅ Published 2026-10-26 as app.cleartable/cleartable 1.0.0 |
+| ~~Smithery~~ | — | Skip: Smithery shuts down accounts and its proxy on 31 Oct 2026 and stays only as a read-only public registry (run by Arcade.dev). Listings made through an account now may not survive. | — |
 | **PulseMCP** (pulsemcp.com/submit) | Popular MCP news + directory | Submit form: URL + short description | You |
 | **mcp.so** (mcp.so/submit) | Large community list | Submit form or GitHub issue | You |
 | **Glama** (glama.ai/mcp/servers) | Curated, does quality checks | "Add server" form for remote servers | You |
