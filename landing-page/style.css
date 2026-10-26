@@ -1804,3 +1804,29 @@ footer .footer-badges a:hover img { opacity: 1; }
 @media (max-width: 640px) {
   .mcp-where { display: none; }
 }
+
+/* Hero: "works with ChatGPT · Claude · Grok" → the AI apps section */
+.works-with {
+  display: inline-flex; align-items: center; gap: 10px;
+  margin-top: 18px;
+  padding: 7px 16px;
+  border-radius: 999px;
+  border: 1px solid rgba(167, 139, 250, 0.35);
+  background: rgba(124, 58, 237, 0.10);
+  font-size: 13.5px;
+  color: var(--text-1);
+  text-decoration: none;
+  transition: border-color 0.2s, background 0.2s;
+}
+.works-with:hover { border-color: rgba(167, 139, 250, 0.7); background: rgba(124, 58, 237, 0.18); }
+.works-with-label { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--violet-glow); }
+.works-with i { width: 3px; height: 3px; border-radius: 50%; background: var(--text-3); }
+.works-with-arrow { color: var(--violet-glow); }
+
+.feature-wide { grid-column: 1 / -1; border-color: rgba(167, 139, 250, 0.35); }
+.feature-tag a { color: inherit; }
+
+@media (max-width: 480px) {
+  .nav-ai { display: none; }
+  .works-with { gap: 7px; padding: 7px 12px; font-size: 12.5px; }
+}

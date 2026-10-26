@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Cleartable — Calm, AI Task Manager for Work & Life</title>
-  <meta name="description" content="A calm, AI-powered app that brings your tasks, habits, and calendar together — sorts everything for you and plans your day, calmly. Clarity for work and life." />
+  <meta name="description" content="A calm, AI-powered app that brings your tasks, habits, and calendar together — sorts everything for you and plans your day, calmly. Add tasks straight from ChatGPT, Claude or Grok." />
   <link rel="canonical" href="https://cleartable.app/" />
 
   <!-- Open Graph -->
@@ -13,7 +13,7 @@
   <meta property="og:locale" content="en_US" />
   <meta property="og:url" content="https://cleartable.app" />
   <meta property="og:title" content="Cleartable — Clear your table. Clear your mind." />
-  <meta property="og:description" content="A calm, AI-powered app that brings your tasks, habits, and calendar together — sorts everything for you and plans your day, calmly. Clarity for work and life." />
+  <meta property="og:description" content="A calm, AI-powered app that brings your tasks, habits, and calendar together — sorts everything for you and plans your day, calmly. Add tasks straight from ChatGPT, Claude or Grok." />
   <meta property="og:image" content="https://cleartable.app/og-image.png" />
   <meta property="og:image:width" content="1200" />
   <meta property="og:image:height" content="630" />
@@ -22,7 +22,7 @@
   <!-- Twitter -->
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="Cleartable — Clear your table. Clear your mind." />
-  <meta name="twitter:description" content="A calm, AI-powered app for your tasks, habits, and calendar — clarity for work and life." />
+  <meta name="twitter:description" content="A calm, AI-powered app for your tasks, habits, and calendar — add tasks straight from ChatGPT, Claude or Grok." />
   <meta name="twitter:image" content="https://cleartable.app/og-image.png" />
 
   <meta name="theme-color" content="#15151E" />
@@ -57,7 +57,7 @@
         "@id": "https://cleartable.app/#app",
         "name": "Cleartable",
         "url": "https://cleartable.app/",
-        "description": "A calm, AI-powered app that brings your tasks, habits, and calendar together — sorts everything for you and plans your day into realistic time blocks. Clarity for work and life, structured on proven productivity principles.",
+        "description": "A calm, AI-powered app that brings your tasks, habits, and calendar together — sorts everything for you and plans your day into realistic time blocks. Works with ChatGPT, Claude and Grok: say \"put this in Cleartable\" in any chat. Clarity for work and life, structured on proven productivity principles.",
         "applicationCategory": "ProductivityApplication",
         "operatingSystem": "Web (PWA)",
         "browserRequirements": "Requires a modern web browser. Installable as a PWA.",
@@ -91,6 +91,14 @@
         "@type": "FAQPage",
         "@id": "https://cleartable.app/#faq",
         "mainEntity": [
+          {
+            "@type": "Question",
+            "name": "Can I add tasks from ChatGPT, Claude or Grok?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Yes. Connect your assistant once — in Cleartable, open Settings → AI apps and follow the steps for ChatGPT, Claude or Grok. Then say \"put this in Cleartable\" in any chat: tasks arrive in your inbox, sorted. Your assistant can add, read, update and complete tasks, but never delete them, and you can disconnect it any time."
+            }
+          },
           {
             "@type": "Question",
             "name": "Does it work on mobile?",
@@ -161,6 +169,7 @@
     <div class="container">
       <a href="#" class="logo">clear<span>table</span></a>
       <div class="nav-right">
+        <a href="#ai-apps" class="nav-link nav-ai">Works with AI</a>
         <a href="/blog/" class="nav-link">Blog</a>
         <a href="/app" class="nav-link">Sign in</a>
         <a href="/app" class="nav-cta">Start free</a>
@@ -177,11 +186,17 @@
       <p class="subline">
         The calm, AI-powered way to organize your <strong>tasks, habits, and calendar</strong> —
         at work and in life. Capture anything; Cleartable <strong>sorts it for you</strong> and
-        <strong>plans your day</strong> around your real calendar.
+        <strong>plans your day</strong> around your real calendar — even when you add tasks
+        straight from <strong>ChatGPT, Claude or Grok</strong>.
       </p>
       <div>
         <a href="/app" class="cta-button">Start free</a>
         <p class="capture-note">Free forever. No credit card.</p>
+        <a href="#ai-apps" class="works-with">
+          <span class="works-with-label">works with</span>
+          <span>ChatGPT</span><i></i><span>Claude</span><i></i><span>Grok</span>
+          <span class="works-with-arrow" aria-hidden="true">&rarr;</span>
+        </a>
       </div>
 
       <!-- Looping demo: speak a messy thought → AI sorts it → Plan my day.
@@ -273,6 +288,14 @@
         Capture, clarify, organize, review — with AI that reduces friction, not adds complexity.
       </p>
       <div class="feature-grid reveal-stagger">
+        <div class="feature-card feature-wide reveal">
+          <div class="feature-icon violet">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/><path d="M8 10h8M8 14h5"/></svg>
+          </div>
+          <h3>Add tasks from ChatGPT, Claude or Grok</h3>
+          <p>Already thinking out loud with an AI assistant? Say <em>"put this in Cleartable"</em> and the tasks land in your inbox, sorted like everything else. Your assistant can also read today's plan, update tasks and tick them off — it can never delete anything. Connect once in Settings; disconnect any time.</p>
+          <span class="feature-tag violet">works with your ai &middot; <a href="#ai-apps">see how</a></span>
+        </div>
         <div class="feature-card reveal">
           <div class="feature-icon violet">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.912 5.813a2 2 0 001.275 1.275L21 12l-5.813 1.912a2 2 0 00-1.275 1.275L12 21l-1.912-5.813a2 2 0 00-1.275-1.275L3 12l5.813-1.912a2 2 0 001.275-1.275L12 3z"/></svg>
@@ -494,6 +517,7 @@
             <li>Weekly Review, recurring tasks, defer dates, custom contexts</li>
             <li>AI Smart Capture &amp; inbox processing (daily limit)</li>
             <li>AI daily planning — 3 planned days per month</li>
+            <li>Connect ChatGPT, Claude or Grok to add tasks from any chat</li>
             <li>Up to 8 projects · 1 custom list · 3 habits</li>
           </ul>
           <a href="/app" class="plan-cta">Start free</a>
@@ -560,6 +584,15 @@
           </summary>
           <div class="faq-answer">
             It's open now — sign in with Google or your email and start free, no invite needed. Pro is live too: upgrade from Settings, and the first 30 buyers lock in the refundable $30/yr founder price before Pro settles at $36/yr.
+          </div>
+        </details>
+        <details class="faq-item">
+          <summary>
+            <span>Can I add tasks from ChatGPT, Claude or Grok?</span>
+            <span class="faq-icon" aria-hidden="true">+</span>
+          </summary>
+          <div class="faq-answer">
+            Yes. Connect your assistant once — in Cleartable, open Settings &rarr; AI apps and follow the steps for ChatGPT, Claude or Grok. Then say "put this in Cleartable" in any chat: tasks arrive in your inbox, sorted. Your assistant can add, read, update and complete tasks, but never delete them, and you can disconnect it any time.
           </div>
         </details>
         <details class="faq-item">
