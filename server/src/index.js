@@ -164,11 +164,20 @@ if (process.env.NODE_ENV === 'production') {
   // update). Force revalidation on those; the hashed assets keep default
   // (effectively immutable) caching.
   const noCacheFiles = /(?:sw\.js|workbox-[^/]+\.js|index\.html|manifest\.webmanifest|registerSW\.js)$/;
+  // Icons are loaded by other sites (Claude's connector directory, link
+  // previews), which helmet's same-origin CORP would block.
+  const iconFiles = /\.(?:png|svg|ico)$/;
   app.use('/app', express.static(clientDistPath, {
     setHeaders: (res, filePath) => {
       if (noCacheFiles.test(filePath)) res.setHeader('Cache-Control', 'no-cache');
+      if (iconFiles.test(filePath)) res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
     },
   }));
+  // AI apps show a connector's icon from the server's root favicon.
+  app.get(['/favicon.ico', '/favicon.png'], (req, res) => {
+    res.set('Cross-Origin-Resource-Policy', 'cross-origin');
+    res.type('png').sendFile(join(clientDistPath, 'icons/icon-192.png'));
+  });
   app.get('/app/*', (req, res) => {
     res.set('Cache-Control', 'no-cache');
     res.sendFile(join(clientDistPath, 'index.html'));
