@@ -193,6 +193,17 @@ export function renderPulse(root, { data: d, error, fetchedAt }) {
   const dur = (s) => (s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${String(s % 60).padStart(2, '0')}s`);
   // Sign-up funnel: each step counts people who got at least that far.
   // "of previous" is the share of the step above that made it here.
+  const sessionTable = (rows) => `<div class="table-wrap"><table>
+      <thead><tr><th>When</th><th>Replay</th><th>Who</th><th>Country</th><th>Device</th><th>Source</th><th>Entry</th><th>Pages</th><th>Time</th><th>Got to</th></tr></thead>
+      <tbody>${rows.map(s => {
+        const reached = s.captured ? `${s.captured} task${s.captured === 1 ? '' : 's'}` : s.onboarded ? 'onboarded' : s.signedIn ? 'signed in' : s.clickedGoogle ? 'started sign-in' : s.openedApp ? 'sign-in page' : s.clickedSignUp ? 'clicked sign-up' : 'site';
+        const src = s.referrer ? esc(s.referrer) : '<span style="color:var(--faint)">direct</span>';
+        const replay = s.replayUrl ? `<a href="${esc(s.replayUrl)}" target="_blank" rel="noopener noreferrer">watch</a>` : '<span style="color:var(--faint)">—</span>';
+        return `<tr><td>${ago(s.at)}</td><td>${replay}</td><td class="m">${s.who ? esc(s.who) : '<span style="color:var(--faint)">anonymous</span>'}</td><td>${esc(s.country)}</td><td>${esc(s.device)}</td><td class="m" style="font-size:11.5px">${src}</td><td class="m" style="font-size:11.5px">${esc(s.entry)}</td><td class="m num">${fmt(s.pageviews)}</td><td class="m num">${dur(s.seconds)}</td><td>${reached}</td></tr>`;
+      }).join('')}</tbody>
+    </table></div>`;
+  const humanSessions = (jr?.sessions || []).filter(s => !s.likelyBot);
+  const botSessions = (jr?.sessions || []).filter(s => s.likelyBot);
   const fun = jr?.funnel;
   const funnelTable = fun ? `<div class="table-wrap"><table>
       <thead><tr><th>Step</th><th>7 days</th><th>of previous</th><th>30 days</th><th>of previous</th></tr></thead>
@@ -211,15 +222,8 @@ export function renderPulse(root, { data: d, error, fetchedAt }) {
         : `PostHog answered: ${esc(jr.error)}`}</div></div>`
     : `<div class="panel span-2"><h2>Visitor journeys ${pill('PostHog · strangers only')}</h2>
         ${funnelTable}
-        ${(jr.sessions || []).length ? `<div class="table-wrap"><table>
-          <thead><tr><th>When</th><th>Replay</th><th>Who</th><th>Country</th><th>Device</th><th>Source</th><th>Entry</th><th>Pages</th><th>Time</th><th>Got to</th></tr></thead>
-          <tbody>${jr.sessions.map(s => {
-            const reached = s.captured ? `${s.captured} task${s.captured === 1 ? '' : 's'}` : s.onboarded ? 'onboarded' : s.signedIn ? 'signed in' : s.clickedGoogle ? 'started sign-in' : s.openedApp ? 'sign-in page' : s.clickedSignUp ? 'clicked sign-up' : 'site';
-            const src = s.referrer ? esc(s.referrer) : '<span style="color:var(--faint)">direct</span>';
-            const replay = s.replayUrl ? `<a href="${esc(s.replayUrl)}" target="_blank" rel="noopener noreferrer">watch</a>` : '<span style="color:var(--faint)">—</span>';
-            return `<tr><td>${ago(s.at)}</td><td>${replay}</td><td class="m">${s.who ? esc(s.who) : '<span style="color:var(--faint)">anonymous</span>'}</td><td>${esc(s.country)}</td><td>${esc(s.device)}</td><td class="m" style="font-size:11.5px">${src}</td><td class="m" style="font-size:11.5px">${esc(s.entry)}</td><td class="m num">${fmt(s.pageviews)}</td><td class="m num">${dur(s.seconds)}</td><td>${reached}</td></tr>`;
-          }).join('')}</tbody>
-        </table></div>` : '<div class="empty">No stranger sessions in the last 7 days.</div>'}
+        ${humanSessions.length ? sessionTable(humanSessions) : '<div class="empty">No stranger sessions in the last 7 days.</div>'}
+        ${botSessions.length ? `<details class="bots"><summary>${fmt(botSessions.length)} likely bot${botSessions.length === 1 ? '' : 's'} hidden: one page, under a second, no clicks</summary>${sessionTable(botSessions)}</details>` : ''}
       </div>`;
 
   const m = d.money || {};

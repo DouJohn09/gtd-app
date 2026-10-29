@@ -105,6 +105,9 @@
 .pulse .v .warn { color: var(--warn); }
 .pulse .empty { color: var(--faint); font-size: 12.5px; padding: 4px 0; }
 .pulse .hint { font-size: 12.5px; color: var(--muted); background: var(--surface-2); border-radius: 10px; padding: 10px 12px; }
+.pulse details.bots { margin-top: 10px; }
+.pulse details.bots summary { cursor: pointer; font-size: 12.5px; color: var(--faint); }
+.pulse details.bots[open] summary { margin-bottom: 8px; }
 .pulse .hint code { font-family: var(--mono); font-size: 11.5px; color: var(--text); }
 .pulse .table-wrap { overflow-x: auto; }
 .pulse table { border-collapse: collapse; width: 100%; font-size: 12.5px; }

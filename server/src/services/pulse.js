@@ -265,15 +265,22 @@ async function journeys() {
       });
       return {
         funnel: { last7: counts(f7), last30: counts(f30) },
-        sessions: sessions.map(([id, at, secs, email, country, device, entry, ref, views, signed, onb, caps, cta, app, google]) => ({
-          at, seconds: Number(secs) || 0,
-          who: email ? mask(email) : null,
-          country: country || '?', device: device || '?',
-          entry: entry || '/', referrer: ref && ref !== '$direct' ? ref : null,
-          pageviews: Number(views) || 0, signedIn: !!signed, onboarded: !!onb, captured: Number(caps) || 0,
-          clickedSignUp: !!cta, openedApp: !!app, clickedGoogle: !!google,
-          replayUrl: recorded.has(id) ? `${host}/project/${encodeURIComponent(project)}/replay/${encodeURIComponent(id)}` : null,
-        })),
+        sessions: sessions.map(([id, at, secs, email, country, device, entry, ref, views, signed, onb, caps, cta, app, google]) => {
+          const s = {
+            at, seconds: Number(secs) || 0,
+            who: email ? mask(email) : null,
+            country: country || '?', device: device || '?',
+            entry: entry || '/', referrer: ref && ref !== '$direct' ? ref : null,
+            pageviews: Number(views) || 0, signedIn: !!signed, onboarded: !!onb, captured: Number(caps) || 0,
+            clickedSignUp: !!cta, openedApp: !!app, clickedGoogle: !!google,
+            replayUrl: recorded.has(id) ? `${host}/project/${encodeURIComponent(project)}/replay/${encodeURIComponent(id)}` : null,
+          };
+          // One page, gone within a second, nothing clicked: crawlers that run
+          // JS look exactly like this, and PostHog keeps no replay that short.
+          s.likelyBot = s.pageviews <= 1 && s.seconds <= 1 && !s.who && !s.signedIn
+            && !s.clickedSignUp && !s.clickedGoogle && !s.captured;
+          return s;
+        }),
       };
     } catch (err) {
       return { error: err.message };
