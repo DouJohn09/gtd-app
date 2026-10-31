@@ -274,7 +274,7 @@ export default function Dashboard() {
             onClick={runPlanDay}
             disabled={planLoading}
             title="Plan my day (p)"
-            className="gtd-btn gtd-btn-primary sm:mt-5 shrink-0 inline-flex items-center gap-1.5 text-[12.5px] disabled:opacity-70"
+            className="gtd-btn gtd-btn-primary sm:mt-5 shrink-0 max-sm:hidden inline-flex items-center gap-1.5 text-[12.5px] disabled:opacity-70"
           >
             {planLoading
               ? <span className="w-3.5 h-3.5 rounded-full border-2 border-white/40 border-t-white animate-spin" />
@@ -334,12 +334,20 @@ export default function Dashboard() {
                     <FiltersMenu toggles={filterToggles} filters={filterFilters} />
                     <SortDropdown value={sortBy} onChange={setSortBy} compact />
                     {!aiOff && (
+                      <AiMenu
+                        onFocus={runAiSuggest}
+                        onPlan={!planResult ? runPlanDay : null}
+                        focusLoading={aiLoading}
+                        planLoading={planLoading}
+                      />
+                    )}
+                    {!aiOff && (
                       <button
                         onClick={runAiSuggest}
                         disabled={aiLoading}
                         title="AI — suggest what to focus on"
                         aria-label="AI suggest focus"
-                        className="gtd-btn gtd-btn-primary !px-2.5 !py-1.5 grid place-items-center disabled:opacity-70"
+                        className="gtd-btn gtd-btn-primary !px-2.5 !py-1.5 grid place-items-center disabled:opacity-70 max-sm:hidden"
                       >
                         {aiLoading
                           ? <span className="w-4 h-4 rounded-full border-2 border-white/40 border-t-white animate-spin" />
@@ -598,6 +606,53 @@ const CONFIDENCE_COLOR = {
   medium: 'rgb(var(--violet-glow))',
   low: 'rgb(var(--text-3))',
 };
+
+// Phones: one ✦ button for both AI actions, so "Plan my day" doesn't need
+// its own big button next to the summary. Desktop keeps both buttons.
+function AiMenu({ onFocus, onPlan, focusLoading, planLoading }) {
+  const [open, setOpen] = useState(false);
+  const busy = focusLoading || planLoading;
+  const pick = (fn) => { setOpen(false); fn?.(); };
+  return (
+    <div className="relative sm:hidden">
+      <button
+        onClick={() => setOpen(o => !o)}
+        disabled={busy}
+        aria-label="AI actions"
+        aria-expanded={open}
+        className="gtd-btn gtd-btn-primary !px-2.5 !py-1.5 grid place-items-center disabled:opacity-70"
+      >
+        {busy
+          ? <span className="w-4 h-4 rounded-full border-2 border-white/40 border-t-white animate-spin" />
+          : <Sparkles className="w-4 h-4" />}
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+          <div className="absolute right-0 top-full mt-2 z-50 w-64 glass shadow-glass-lg rounded-2xl p-1.5 animate-rise"
+               style={{ background: 'rgb(var(--bg-elevated))' }}>
+            <button onClick={() => pick(onFocus)} className="w-full flex items-start gap-3 px-3 py-2.5 rounded-xl text-left hover:bg-white/[0.05]">
+              <Sparkles className="w-4 h-4 mt-0.5 shrink-0 text-violet-glow" />
+              <span>
+                <span className="block text-[14px] text-text-1">Pick my focus</span>
+                <span className="block text-[12px] text-text-3">Which tasks matter now, and why</span>
+              </span>
+            </button>
+            {onPlan && (
+              <button onClick={() => pick(onPlan)} className="w-full flex items-start gap-3 px-3 py-2.5 rounded-xl text-left hover:bg-white/[0.05]">
+                <CalendarClock className="w-4 h-4 mt-0.5 shrink-0 text-mint-glow" />
+                <span>
+                  <span className="block text-[14px] text-text-1">Plan my day</span>
+                  <span className="block text-[12px] text-text-3">Fit tasks into your free time</span>
+                </span>
+              </button>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
 
 function FocusRow({ task, first, reason, confidence, onToggle, onEdit }) {
   const isDone = !!task.completed;
