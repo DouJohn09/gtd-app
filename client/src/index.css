@@ -156,7 +156,7 @@ input[type="number"] { -moz-appearance: textfield; }
   }
 
   .gtd-badge {
-    @apply inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-mono;
+    @apply inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-mono max-md:gap-1 max-md:px-1.5 max-md:py-0 max-md:text-[10px];
     border: 1px solid rgba(255,255,255,0.08);
     background: rgba(255,255,255,0.025);
     color: rgb(var(--text-2));

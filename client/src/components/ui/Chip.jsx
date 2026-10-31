@@ -10,7 +10,7 @@ export default function Chip({ tone = 'neutral', dot = false, className = '', ch
   const c = TONES[tone] || TONES.neutral;
   return (
     <span
-      className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-mono ${className}`}
+      className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-mono max-md:gap-1 max-md:px-1.5 max-md:py-0 max-md:text-[10px] ${className}`}
       style={{ background: c.bg, border: `1px solid ${c.border}`, color: c.text }}
       {...rest}
     >

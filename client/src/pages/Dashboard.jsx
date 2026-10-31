@@ -229,14 +229,15 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="px-6 lg:px-12 pt-10 pb-20 max-w-[1400px]">
-      {/* Headline */}
-      <div className="mb-10 fresh-stagger">
-        <MonoLabel className="mb-3">{formatToday()}</MonoLabel>
-        <h1 className="font-display text-[52px] md:text-[64px] leading-[1] tracking-tight">
+    <div className="px-4 sm:px-6 lg:px-12 pt-5 sm:pt-10 pb-20 max-w-[1400px]">
+      {/* Headline — on phones one compact line, so tasks start near the top */}
+      <div className="mb-5 sm:mb-10 fresh-stagger">
+        <MonoLabel className="mb-1.5 sm:mb-3">{formatToday()}</MonoLabel>
+        <h1 className="font-display text-[28px] sm:text-[52px] md:text-[64px] leading-[1.05] sm:leading-[1] tracking-tight">
           {greeting()}{user?.name ? `, ${firstName(user)}.` : '.'}
         </h1>
-        <p className="mt-4 text-[15px] max-w-xl text-text-2">
+        <div className="mt-2.5 sm:mt-0 flex items-center justify-between gap-3 sm:block">
+        <p className="sm:mt-4 text-[13.5px] sm:text-[15px] max-w-xl text-text-2 min-w-0">
           {focusTotal === 0 ? (
             aiOff ? (
               <>
@@ -256,9 +257,15 @@ export default function Dashboard() {
             </>
           ) : (
             <>
-              <span className="font-display italic text-mint-glow">{wordifyCount(remaining)}</span>{' '}
-              {remaining === 1 ? 'thing left' : 'things left'} on Today.
-              {stats?.completed_today > 0 && <> You've already completed <span className="font-mono text-text-1">{stats.completed_today}</span>.</>}
+              <span className="sm:hidden">
+                <span className="font-display italic text-mint-glow">{remaining}</span> left
+                {stats?.completed_today > 0 && <> · <span className="font-mono text-text-1">{stats.completed_today}</span> done</>}
+              </span>
+              <span className="hidden sm:inline">
+                <span className="font-display italic text-mint-glow">{wordifyCount(remaining)}</span>{' '}
+                {remaining === 1 ? 'thing left' : 'things left'} on Today.
+                {stats?.completed_today > 0 && <> You've already completed <span className="font-mono text-text-1">{stats.completed_today}</span>.</>}
+              </span>
             </>
           )}
         </p>
@@ -267,7 +274,7 @@ export default function Dashboard() {
             onClick={runPlanDay}
             disabled={planLoading}
             title="Plan my day (p)"
-            className="gtd-btn gtd-btn-primary mt-5 inline-flex items-center gap-1.5 text-[12.5px] disabled:opacity-70"
+            className="gtd-btn gtd-btn-primary sm:mt-5 shrink-0 inline-flex items-center gap-1.5 text-[12.5px] disabled:opacity-70"
           >
             {planLoading
               ? <span className="w-3.5 h-3.5 rounded-full border-2 border-white/40 border-t-white animate-spin" />
@@ -275,6 +282,7 @@ export default function Dashboard() {
             {planLoading ? 'Planning…' : 'Plan my day'}
           </button>
         )}
+        </div>
       </div>
 
       {!aiOff && (
@@ -310,13 +318,16 @@ export default function Dashboard() {
       {/* Bento */}
       <div className="grid grid-cols-12 gap-5 fresh-stagger">
         {/* Hero — Today's Focus */}
-        <GlassCard className="col-span-12 xl:col-span-8" padded={false}>
-          <div className="p-7">
-            <div className="mb-6">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-                <div>
-                  <MonoLabel className="mb-1.5">today</MonoLabel>
-                  <h2 className="font-display text-[28px] leading-none">What matters now</h2>
+        <GlassCard
+          className="col-span-12 xl:col-span-8 max-sm:![background:none] max-sm:!border-transparent max-sm:!shadow-none max-sm:![backdrop-filter:none] max-sm:![-webkit-backdrop-filter:none]"
+          padded={false}
+        >
+          <div className="p-7 max-sm:px-0 max-sm:py-1">
+            <div className="mb-6 max-sm:mb-1">
+              <div className="flex items-center justify-between gap-3 sm:items-end">
+                <div className="min-w-0">
+                  <MonoLabel className="mb-1.5 max-sm:hidden">today</MonoLabel>
+                  <h2 className="font-display text-[20px] sm:text-[28px] leading-none">What matters now</h2>
                 </div>
                 {focusTotal > 0 && (
                   <div className="flex items-center gap-2 shrink-0">
@@ -592,14 +603,14 @@ function FocusRow({ task, first, reason, confidence, onToggle, onEdit }) {
   const isDone = !!task.completed;
   return (
     <div
-      className={`group flex items-start gap-4 py-4 ${first ? '' : 'border-t border-white/[0.05]'}`}
+      className={`group flex items-start gap-3 sm:gap-4 py-3 sm:py-4 ${first ? '' : 'border-t border-white/[0.05]'}`}
     >
-      <FreshCheck checked={isDone} onChange={onToggle} className="mt-0.5" />
+      <FreshCheck checked={isDone} onChange={onToggle} size={20} className="mt-0.5" />
       <button onClick={onEdit} className="flex-1 min-w-0 text-left select-none [touch-action:manipulation]">
         <div className={`text-[14.5px] leading-snug [overflow-wrap:anywhere] ${isDone ? 'line-through opacity-50' : ''}`}>
           {linkify(task.title)}
         </div>
-        <div className="mt-2 flex flex-wrap items-center gap-2">
+        <div className="mt-1.5 sm:mt-2 flex flex-wrap items-center gap-1 sm:gap-2">
           {task.list && (
             <Chip tone={TONE_BY_LIST[task.list] || 'neutral'} dot>
               {listLabel(task.list)}
@@ -608,8 +619,9 @@ function FocusRow({ task, first, reason, confidence, onToggle, onEdit }) {
           {task.context && <Chip tone="violet">{contextLabel(task.context)}</Chip>}
           {task.due_date && (
             <Chip tone={isOverdue(task.due_date) ? 'rose' : 'neutral'}>
-              <Clock className="w-3 h-3" />
-              {isOverdue(task.due_date) && 'overdue · '}
+              <Clock className="w-3 h-3 max-sm:w-2.5 max-sm:h-2.5" />
+              {/* Red already says overdue; phones skip the word to save room. */}
+              {isOverdue(task.due_date) && <span className="max-sm:hidden">overdue · </span>}
               {new Date(task.due_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
             </Chip>
           )}

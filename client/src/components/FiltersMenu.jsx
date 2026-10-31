@@ -93,7 +93,7 @@ export default function FiltersMenu({ toggles = [], filters = [], align = 'right
       >
         <SlidersHorizontal className="w-3.5 h-3.5" style={{ color: active ? 'rgb(var(--violet-glow))' : 'rgb(var(--text-3))' }} />
         <span
-          className="font-mono text-[11px] uppercase tracking-wider"
+          className="font-mono text-[11px] uppercase tracking-wider max-md:sr-only"
           style={{ color: active ? 'rgb(var(--violet-glow))' : 'rgb(var(--text-2))' }}
         >
           Filters
