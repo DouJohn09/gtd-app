@@ -14,7 +14,7 @@ Copy from here; adjust the voice where it doesn't sound like you.
 | **PulseMCP** | Popular MCP news + directory | Submissions paused (since Sep 2026); they import from the official MCP Registry when back | ✅ Nothing to do, covered by the registry |
 | **mcp.so** (mcp.so/submit) | Large community list | Submit form or GitHub issue | You |
 | **Glama** (glama.ai/mcp/servers) | Curated, does quality checks | "Add server" form for remote servers | You |
-| **Claude Connectors Directory** (claude.ai/directory/manage) | Shown inside Claude to every user | Paid Claude plan, listing copy below, icon, reviewer test account | You (Claude prepares everything) |
+| **Claude Connectors Directory** (claude.ai/directory/manage) | Shown inside Claude to every user | Paid Claude plan, listing copy below, icon, reviewer test account | ✅ Approved (Community, automated review) + published 2026-10-31: https://claude.ai/directory/cleartable. Open: listing shows a placeholder icon instead of icon-512.png (re-save or ask the Directory team) |
 | **ChatGPT app directory** (platform.openai.com → Apps) | Shown inside ChatGPT | Verified developer org, reviewer test account, review | You, later |
 
 **Reviewer test account (Claude and ChatGPT directories).** Set on Railway:
@@ -91,20 +91,30 @@ Ground rules: post from your own account, one community per day, stay in the thr
 
 ### Show HN
 
-**Title:** Show HN: Cleartable – a task manager your AI assistant can write to (MCP)
+> TODO before posting: on a free Claude account, check whether connecting from the directory works without using the one custom-connector slot. If yes, the Show HN and r/ClaudeAI texts can say "works on Claude's free plan" again.
+
+**URL field:** https://cleartable.app/blog/add-tasks-from-chatgpt-claude-grok (the setup guide, so people land on the thing being shown rather than the generic homepage; the homepage link goes in the text)
+
+**Title (74 chars):** Show HN: Cleartable – a task manager your AI assistant can write to via MCP
 
 **Text:**
-Hi HN, I'm Jan. I build Cleartable on my own: a calm task manager with tasks, habits and calendar in one place, where AI does the sorting.
+Hi HN, I'm Jan. I build Cleartable on my own: tasks, habits and a Google Calendar view in one app, where a model does the sorting so the inbox doesn't turn into a second job.
 
-The newest part is a remote MCP server. You add https://cleartable.app/mcp to Claude, ChatGPT or Grok once, and then "put this in Cleartable" in any chat creates real tasks. A whole paragraph gets split into separate tasks, each sorted into a list with a context, a date and an estimate. "Plan my week" in the app then places them into free time around your Google Calendar.
+The part I'm showing today is a remote MCP server. In Claude it's in the connector directory (https://claude.ai/directory/cleartable, listed after passing Anthropic's automated review), so connecting is one click. In ChatGPT, add https://cleartable.app/mcp as a custom connector. Once connected, "put this in Cleartable" in any chat creates real tasks. A rambling paragraph becomes separate tasks, each with a list, context, date and time estimate. Back in the app, "Plan my week" places them into free time around your calendar.
 
-Some details that might interest people here:
-- Stateless Streamable HTTP on Express, one McpServer per request, so any instance can answer.
-- Own OAuth 2.1 server: dynamic client registration and client ID metadata documents, PKCE, single-use codes, rotating refresh tokens stored as hashes.
-- Seven tools, deliberately no delete. Read tools are marked read-only, so clients can skip confirmations for them.
-- The sorting is one model call that returns 1–8 tasks; it was evaluated on a fixed set before switching models.
+My own use case: I think out loud in a chat, and the action items used to stay buried in the chat log. Now they end up in the inbox.
 
-Free to try, no card: https://cleartable.app. I'd love feedback on the connector, and on whether the MCP tool design makes sense from the assistant's side.
+Technical details:
+- Stateless Streamable HTTP on Express: a new McpServer per request, no session IDs, so any instance can answer.
+- Self-hosted OAuth 2.1 authorization server built on the MCP SDK's handlers: dynamic client registration and client ID metadata documents, PKCE, single-use auth codes, refresh tokens rotated on every use, all tokens stored only as SHA-256 hashes. Reusing an old refresh token gets invalid_grant.
+- Seven tools and deliberately no delete. Read tools carry readOnlyHint and update_task is marked idempotent, so clients can skip confirmations where it's safe.
+- Capture is one gpt-4.1-mini call that returns 1–8 tasks. I switched to it after it scored 105/105 on a fixed eval set, against 96/102 for gpt-4o-mini. Task text is sent to OpenAI for this; the privacy policy says so.
+
+Honest limits: ChatGPT custom connectors need a paid plan (Plus or higher, developer mode). Grok's connector settings should work the same way, but I haven't tested Grok end to end yet.
+
+Free plan with no card: https://cleartable.app (sign in with Google or an emailed code). Pro is $4/month for higher limits and the Insights page.
+
+I'd especially like feedback on the tool design from the assistant's side: is "capture free text" plus "add one structured task" the right split, or should the assistant always send structured fields?
 
 ### r/ClaudeAI
 
@@ -113,7 +123,7 @@ Free to try, no card: https://cleartable.app. I'd love feedback on the connector
 **Text:**
 I kept ending planning chats with Claude holding a list of to-dos I then had to copy by hand. So I built a remote MCP server for my task app, Cleartable.
 
-Add `https://cleartable.app/mcp` as a custom connector (works on the free Claude plan; you get one custom connector there), sign in, press Allow. Then:
+It's in Claude's connector directory: open https://claude.ai/directory/cleartable, press Connect, sign in, press Allow. (Or add `https://cleartable.app/mcp` as a custom connector.) Then:
 - "Put these in Cleartable: …" → separate tasks, each sorted with a list, context, date and estimate
 - "What's on today?" → Claude reads tasks, calendar events and habits
 - "Mark X done, move Y to tomorrow" → done
