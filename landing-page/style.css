@@ -1643,6 +1643,7 @@ footer .footer-badges a:hover img { opacity: 1; }
   color: var(--text-2);
 }
 .ai-apps-note { margin-top: 18px; font-size: 13px; color: var(--text-3); }
+.ai-apps-note a { color: var(--violet); text-decoration: underline; text-underline-offset: 2px; }
 .mcp-loop { margin-top: 36px; }
 
 .loop-stage[data-scene="chat"] .mcp-chat,
