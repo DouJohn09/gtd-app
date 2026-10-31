@@ -23,7 +23,7 @@ export function ToastProvider({ children }) {
   return (
     <ToastContext.Provider value={{ addToast }}>
       {children}
-      <div className="fixed bottom-6 right-6 z-[100] space-y-2 pointer-events-none max-w-[calc(100vw-3rem)]">
+      <div className="fixed bottom-6 right-6 z-[110] space-y-2 pointer-events-none max-w-[calc(100vw-3rem)] max-md:bottom-auto max-md:top-[calc(12px+env(safe-area-inset-top))] max-md:left-3 max-md:right-3 max-md:max-w-none">
         {toasts.map(toast => (
           <Toast key={toast.id} toast={toast} onClose={() => removeToast(toast.id)} />
         ))}

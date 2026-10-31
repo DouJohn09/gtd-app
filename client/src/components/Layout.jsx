@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Inbox, FolderKanban, ListTodo, Clock, CloudSun,
@@ -59,8 +59,9 @@ const mobileTabs = [
   { to: '/',          icon: LayoutDashboard, label: 'Today' },
   { to: '/inbox',     icon: Inbox,           label: 'Inbox' },
   { to: '/calendar',  icon: CalendarDays,    label: 'Calendar' },
-  { to: '/projects',  icon: FolderKanban,    label: 'Projects' },
 ];
+// Phone tab bar: Today · Inbox · [+] · Calendar · More. Projects moved into
+// More so the capture button sits dead centre.
 
 function initialsOf(name = '') {
   const parts = name.trim().split(/\s+/).slice(0, 2);
@@ -215,15 +216,7 @@ export default function Layout() {
           </div>
           <div className="font-display text-[18px] leading-none">Cleartable</div>
         </div>
-        <div className="flex items-center gap-1.5">
-          <button
-            onClick={() => setCaptureOpen(true)}
-            className="glass glass-hover rounded-full px-3 py-1.5 flex items-center gap-2 text-[12px] text-text-2"
-          >
-            <Command className="w-3.5 h-3.5" /> capture
-          </button>
-          <VoiceCaptureButton onOpen={setCaptureOpen} className="glass glass-hover rounded-full w-8 h-8" />
-        </div>
+        {/* Adding a task lives in the big + of the bottom bar on phones. */}
       </header>
 
       {/* Sidebar (desktop) — sticky + viewport-height so the user card stays
@@ -343,7 +336,8 @@ export default function Layout() {
 
       {/* Mobile bottom tab bar */}
       <nav className="md:hidden fixed left-3 right-3 z-30 glass rounded-2xl flex items-center px-2 py-2" style={{ bottom: 'calc(12px + env(safe-area-inset-bottom))' }}>
-        {mobileTabs.map((t) => (
+        {mobileTabs.flatMap((t, i) => [
+          i === 2 && <CaptureFab key="capture" onOpen={setCaptureOpen} />,
           <NavLink
             key={t.to}
             to={t.to}
@@ -359,8 +353,8 @@ export default function Layout() {
                 {isActive && <span className="absolute bottom-0 w-1 h-1 rounded-full bg-violet shadow-glow-violet" />}
               </>
             )}
-          </NavLink>
-        ))}
+          </NavLink>,
+        ])}
         <button
           onClick={() => setMoreOpen(true)}
           className="flex-1 flex flex-col items-center gap-1 py-1.5 rounded-xl text-text-3"
@@ -448,6 +442,66 @@ export default function Layout() {
           onSave={refreshCustomLists}
         />
       )}
+    </div>
+  );
+}
+
+// The big + in the middle of the phone tab bar. Tap opens the capture sheet
+// with the keyboard up; press and hold starts dictating right away and
+// releasing stops (the text then waits in the sheet to be checked and sent).
+const FAB_HOLD_MS = 350;
+function CaptureFab({ onOpen }) {
+  const timer = useRef(null);
+  const held = useRef(false);
+
+  const clear = () => { clearTimeout(timer.current); timer.current = null; };
+  useEffect(() => clear, []);
+
+  const down = (e) => {
+    if (e.button && e.button !== 0) return;
+    held.current = false;
+    if (!speechSupported) return;
+    clear();
+    timer.current = setTimeout(() => {
+      timer.current = null;
+      held.current = true;
+      navigator.vibrate?.(15);
+      onOpen('hold');
+      // The sheet opens under the finger, so the release lands on it, not
+      // on this button: listen on the window.
+      const release = () => {
+        window.removeEventListener('pointerup', release);
+        window.removeEventListener('pointercancel', release);
+        window.dispatchEvent(new Event('dictate-hold-end'));
+      };
+      window.addEventListener('pointerup', release);
+      window.addEventListener('pointercancel', release);
+    }, FAB_HOLD_MS);
+  };
+  const up = () => {
+    if (held.current) return; // the hold already opened the sheet
+    clear();
+    onOpen(true);
+  };
+
+  return (
+    <div className="flex-1 flex justify-center">
+      <button
+        type="button"
+        onPointerDown={down}
+        onPointerUp={up}
+        onPointerLeave={clear}
+        onPointerCancel={clear}
+        onContextMenu={(e) => e.preventDefault()}
+        className="-mt-7 w-14 h-14 rounded-full grid place-items-center text-white select-none touch-none active:scale-95 transition-transform"
+        style={{
+          background: 'linear-gradient(135deg, rgb(var(--violet)), rgb(var(--mint)))',
+          boxShadow: '0 10px 28px -8px rgba(167,139,250,0.75), 0 0 0 4px rgb(var(--bg) / 0.9)',
+        }}
+        aria-label={speechSupported ? 'Add a task (hold to talk)' : 'Add a task'}
+      >
+        <Plus className="w-7 h-7" strokeWidth={2.4} />
+      </button>
     </div>
   );
 }

@@ -49,7 +49,7 @@ export default function MicButton({ speech, fieldRef, size = 'md', className = '
     if (Date.now() - pressedAt.current >= HOLD_MS) speech.stop();
   };
 
-  const dim = size === 'sm' ? 'w-7 h-7' : 'w-9 h-9';
+  const dim = size === 'sm' ? 'w-7 h-7 rounded-lg' : size === 'lg' ? 'w-12 h-12 rounded-full' : 'w-9 h-9 rounded-lg';
   return (
     <button
       type="button"
@@ -57,16 +57,18 @@ export default function MicButton({ speech, fieldRef, size = 'md', className = '
       onPointerUp={up}
       onPointerCancel={up}
       onContextMenu={(e) => e.preventDefault()}
-      className={`tap-expand grid place-items-center ${dim} rounded-lg transition-all shrink-0 select-none touch-none ${className}`}
+      className={`tap-expand grid place-items-center ${dim} transition-all shrink-0 select-none touch-none ${className}`}
       style={
         speech.listening
           ? { color: '#ef4444', background: 'rgba(239,68,68,0.12)', boxShadow: 'inset 0 0 0 1px rgba(239,68,68,0.3)' }
-          : { color: 'rgb(var(--text-3))' }
+          : size === 'lg'
+            ? { color: 'rgb(var(--text-1))', background: 'rgba(255,255,255,0.06)', boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.12)' }
+            : { color: 'rgb(var(--text-3))' }
       }
       title={speech.listening ? 'Listening — release or tap to stop' : 'Hold to talk, or tap to start (or hold ⌥ Option)'}
       aria-label={speech.listening ? 'Stop dictation' : 'Dictate'}
     >
-      <Mic className={size === 'sm' ? 'w-3.5 h-3.5' : 'w-4 h-4'} />
+      <Mic className={size === 'sm' ? 'w-3.5 h-3.5' : size === 'lg' ? 'w-5 h-5' : 'w-4 h-4'} />
     </button>
   );
 }

@@ -40,7 +40,7 @@ function formatBookedToast(bookedSlot) {
   return `Booked ${dayLabel} at ${timeLabel} (${bookedSlot.duration}m)`;
 }
 
-export default function QuickCapture({ onCapture, placeholder = "Quick capture — what's on your mind?", autoFocus = false, startListening = false }) {
+export default function QuickCapture({ onCapture, placeholder = "Quick capture — what's on your mind?", autoFocus = false, startListening = false, variant = 'inline' }) {
   const [title, setTitle] = useState('');
   const [smartMode, setSmartMode] = useState(true);
   const { mode, aiOff } = useAiMode();
@@ -127,6 +127,58 @@ export default function QuickCapture({ onCapture, placeholder = "Quick capture �
       }
     })();
   };
+
+  // Phone capture sheet: a roomy field on top, a big mic and a big send
+  // button underneath, so capturing is one thumb away. Return on the
+  // keyboard sends, like the inline field.
+  if (variant === 'sheet') {
+    return (
+      <form onSubmit={handleSubmit}>
+        <textarea
+          rows={3}
+          enterKeyHint="send"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) handleSubmit(e); }}
+          placeholder={useAi ? 'What\'s on your mind? Say or type it, even several things at once.' : placeholder}
+          className="gtd-input w-full px-3 py-2.5 text-[16px] leading-snug resize-none"
+          autoFocus={autoFocus}
+          ref={inputRef}
+          data-dictate
+        />
+        <InterimLine speech={speech} />
+        <div className="mt-3 flex items-center gap-3">
+          <MicButton speech={speech} fieldRef={inputRef} size="lg" />
+          <div className="flex-1 min-w-0 text-[11.5px] text-text-3 leading-tight">
+            {speech.listening ? 'Listening… tap to stop' : speechSupported ? 'Tap to talk, or hold and release' : null}
+          </div>
+          {!aiOff && (
+            <button
+              type="button"
+              onClick={() => setSmartMode(!smartMode)}
+              className="tap-expand grid place-items-center w-10 h-10 rounded-xl transition-all shrink-0"
+              style={
+                smartMode
+                  ? { color: 'rgb(var(--violet-glow))', background: 'rgb(var(--violet) / 0.10)', boxShadow: 'inset 0 0 0 1px rgb(var(--violet) / 0.22)' }
+                  : { color: 'rgb(var(--text-3))', boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.1)' }
+              }
+              aria-label={smartMode ? 'Smart Capture on, tap to turn off' : 'Smart Capture off, tap to turn on'}
+              aria-pressed={smartMode}
+            >
+              <Sparkles className="w-4 h-4" />
+            </button>
+          )}
+          <button
+            type="submit"
+            disabled={!title.trim()}
+            className="gtd-btn gtd-btn-primary h-12 px-5 inline-flex items-center gap-2 text-[14px] disabled:opacity-50 shrink-0"
+          >
+            Add <ArrowRight className="w-4 h-4" />
+          </button>
+        </div>
+      </form>
+    );
+  }
 
   return (
     <>
