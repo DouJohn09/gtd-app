@@ -161,7 +161,7 @@ export function renderPulse(root, { data: d, error, fetchedAt }) {
   const people = su.latest || [];
   const peoplePanel = `<div class="panel span-2"><h2>Latest people ${pill(`${fmt(people.length)} shown`)}</h2>${people.length ? `
     <div class="table-wrap"><table>
-      <thead><tr><th>Who</th><th>Signed up</th><th>Source</th><th>Onboarded</th><th>Tasks</th><th>AI app</th><th>Last seen</th><th>Plan</th></tr></thead>
+      <thead><tr><th>Who</th><th>Signed up</th><th>Source</th><th>Opened app</th><th>Onboarded</th><th>Tasks</th><th>AI app</th><th>Last seen</th><th>Plan</th></tr></thead>
       <tbody>${people.map(p => {
         const src = p.source ? esc(p.source.replace(/^https?:\/\//, '').replace(/\/$/, '')) : '<span style="color:var(--faint)">—</span>';
         // "Claude · 3 tool calls, last 2 h ago"; opened-but-unused shows when Claude last loaded it.
@@ -169,7 +169,7 @@ export function renderPulse(root, { data: d, error, fetchedAt }) {
           : `${esc(p.ai.apps)}${p.ai.disconnected ? ' <span style="color:var(--faint)">(disconnected)</span>' : ''}<br><span style="color:var(--faint);font-size:11.5px">${p.ai.calls
             ? `${fmt(p.ai.calls)} tool call${p.ai.calls === 1 ? '' : 's'}, last ${ago(p.ai.lastCall)}`
             : `no tool calls${p.ai.lastUsed ? ` · opened ${ago(p.ai.lastUsed)}` : ''}`}</span>`;
-        return `<tr><td class="m">${esc(p.who)}</td><td>${shortDate(p.at)}</td><td class="m" style="font-size:11.5px">${src}</td><td>${p.onboarded ? 'yes' : 'no'}</td><td class="m num">${fmt(p.tasks)}</td><td>${ai}</td><td>${ago(p.lastSeen)}</td><td>${p.paying ? pill('pro', 'good') : 'free'}</td></tr>`;
+        return `<tr><td class="m">${esc(p.who)}</td><td>${shortDate(p.at)}</td><td class="m" style="font-size:11.5px">${src}</td><td>${p.appOpenedAt ? `yes<br><span style="color:var(--faint);font-size:11.5px">last ${ago(p.appLastOpenAt || p.appOpenedAt)}</span>` : '<span style="color:var(--faint)">never</span>'}</td><td>${p.onboarded ? 'yes' : 'no'}</td><td class="m num">${fmt(p.tasks)}</td><td>${ai}</td><td>${ago(p.lastSeen)}</td><td>${p.paying ? pill('pro', 'good') : 'free'}</td></tr>`;
       }).join('')}</tbody>
     </table></div>` : '<div class="empty">No strangers yet.</div>'}</div>`;
 

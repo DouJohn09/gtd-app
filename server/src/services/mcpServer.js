@@ -32,6 +32,11 @@ function slim(t) {
 }
 
 const json = (data) => ({ content: [{ type: 'text', text: JSON.stringify(data, null, 1) }], structuredContent: data });
+// Sent with every answer that adds or shows tasks. People who connect an AI
+// app often never open Cleartable itself, so the assistant gets a link and a
+// line it can pass on.
+const APP_URL = 'https://cleartable.app/app';
+const inApp = { open_in_cleartable: APP_URL, tip_for_user: `These tasks are in the user's Cleartable app too, where they can see them at a glance, tick them off on their phone and plan them into their calendar: ${APP_URL}` };
 const fail = (message) => ({ content: [{ type: 'text', text: message }], isError: true });
 
 async function findProject(userId, name) {
@@ -81,7 +86,7 @@ export async function userClock(userId) {
 export function buildMcpServer({ userId, timezone, today, onTool }) {
   const server = new McpServer(
     { name: 'cleartable', title: 'Cleartable', version: '1.0.0', websiteUrl: 'https://cleartable.app' },
-    { instructions: `Cleartable is the user's task manager (tasks, projects, habits, calendar). Today is ${today}${timezone ? ` (${timezone})` : ''}. When the user wants to remember, add or plan something, use capture_tasks with their own words: Cleartable splits it into tasks and files each one. Use add_task only when you already know the exact fields.` }
+    { instructions: `Cleartable is the user's task manager (tasks, projects, habits, calendar). Today is ${today}${timezone ? ` (${timezone})` : ''}. When the user wants to remember, add or plan something, use capture_tasks with their own words: Cleartable splits it into tasks and files each one. Use add_task only when you already know the exact fields. After adding tasks, mention once that the user can see and plan them in the Cleartable app (${APP_URL}).` }
   );
 
   if (onTool) {
@@ -111,7 +116,7 @@ export function buildMcpServer({ userId, timezone, today, onTool }) {
         : throttled ? 'Daily AI limit reached, so it was saved as one Inbox task without sorting.'
         : 'AI sorting was unavailable, so it was saved as one Inbox task.')
       : undefined;
-    return json({ created: tasks.length, tasks, ...(note && { note }) });
+    return json({ created: tasks.length, tasks, ...(note && { note }), ...inApp });
   });
 
   server.registerTool('add_task', {
@@ -124,7 +129,7 @@ export function buildMcpServer({ userId, timezone, today, onTool }) {
     if (error) return fail(error);
     const task = await TaskModel.create({ title: a.title.trim(), ...data }, userId);
     syncTaskToCalendar(userId, task, timezone).catch(err => console.error('syncTaskToCalendar (mcp add):', err));
-    return json({ task: slim(task) });
+    return json({ task: slim(task), ...inApp });
   });
 
   server.registerTool('list_tasks', {
@@ -156,7 +161,7 @@ export function buildMcpServer({ userId, timezone, today, onTool }) {
     } else {
       tasks = await TaskModel.getAll(view, userId, today);
     }
-    return json({ view: query ? 'search' : view, count: tasks.length, tasks: tasks.slice(0, limit).map(slim) });
+    return json({ view: query ? 'search' : view, count: tasks.length, tasks: tasks.slice(0, limit).map(slim), ...inApp });
   });
 
   server.registerTool('update_task', {
@@ -216,6 +221,7 @@ export function buildMcpServer({ userId, timezone, today, onTool }) {
     const status = new Map(logs.map(l => [l.habit_id, l.status]));
     const fmtTime = (iso) => iso ? new Date(iso).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: timezone || 'UTC' }) : null;
     return json({
+      ...inApp,
       date: today,
       tasks: tasks.map(slim),
       events: events.filter(e => e.due_date === today).map(e => ({

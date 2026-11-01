@@ -193,6 +193,7 @@ export const api = {
     aiFeedback: (accepted, adjusted) => fetchApi('/preferences/ai-feedback', { method: 'POST', body: JSON.stringify({ accepted, adjusted }) }),
     aiNudgeSeen: (nudge) => fetchApi('/preferences/ai-nudge-seen', { method: 'POST', body: JSON.stringify({ nudge }) }),
     completeOnboarding: () => fetchApi('/preferences/onboarding-complete', { method: 'POST' }),
+    appOpened: () => fetchApi('/preferences/app-opened', { method: 'POST' }),
     getNotifications: () => fetchApi('/preferences/notifications'),
     setNotifications: (prefs) => fetchApi('/preferences/notifications', { method: 'PUT', body: JSON.stringify(prefs) }),
   },

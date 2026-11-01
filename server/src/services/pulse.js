@@ -291,7 +291,7 @@ async function journeys() {
 // ─── People: sign-ups, activity, funnel, gate, money ───────────────────────
 async function people() {
   const { rows: users } = await pool.query(
-    `SELECT id, email, created_at, last_login, onboarded_at, plan, subscription_status, current_period_end, paddle_price_id, signup_referrer, signup_utm
+    `SELECT id, email, created_at, last_login, onboarded_at, app_opened_at, app_last_open_at, plan, subscription_status, current_period_end, paddle_price_id, signup_referrer, signup_utm
        FROM users ORDER BY created_at`
   );
   const skip = excluded();
@@ -375,6 +375,8 @@ async function people() {
         who: mask(u.email),
         at: u.created_at,
         onboarded: !!u.onboarded_at,
+        appOpenedAt: u.app_opened_at,
+        appLastOpenAt: u.app_last_open_at,
         tasks: tasksOf.get(u.id) || 0,
         lastSeen: lastSeen(u) ? new Date(lastSeen(u)).toISOString() : null,
         paying: paying(u),

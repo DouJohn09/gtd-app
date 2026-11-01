@@ -122,6 +122,8 @@ export default function Layout() {
   }, []);
 
   useEffect(() => { refreshCustomLists(); }, [refreshCustomLists]);
+  // Tells Pulse this person found the app, not only an AI app's connect page.
+  useEffect(() => { api.preferences.appOpened().catch(() => {}); }, []);
 
   // Cmd/Ctrl + K opens capture (with Shift: and starts dictating);
   // 'open-capture' lets pages trigger it too (e.g. the Dashboard first-run

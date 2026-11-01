@@ -19,6 +19,21 @@ router.put('/ai-mode', async (req, res) => {
   }
 });
 
+// The app itself was opened (Layout mounts; the AI connect page doesn't).
+// First open is kept; last open moves at most once an hour.
+router.post('/app-opened', async (req, res) => {
+  try {
+    await pool.query(
+      `UPDATE users SET app_opened_at = COALESCE(app_opened_at, NOW()), app_last_open_at = NOW()
+        WHERE id = $1 AND (app_last_open_at IS NULL OR app_last_open_at < NOW() - INTERVAL '1 hour')`,
+      [req.user.id]
+    );
+    res.json({ ok: true });
+  } catch (error) {
+    serverError(req, res, error);
+  }
+});
+
 // Marks the welcome onboarding as done (completed or skipped — either way it
 // never shows again). COALESCE keeps the original timestamp on repeat calls.
 router.post('/onboarding-complete', async (req, res) => {
