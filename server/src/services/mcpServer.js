@@ -77,11 +77,26 @@ export async function userClock(userId) {
   return { timezone: tz, today: todayInTz(tz) };
 }
 
-export function buildMcpServer({ userId, timezone, today }) {
+// onTool(name, ok) is told how each tool call ended, for the mcp_calls log.
+export function buildMcpServer({ userId, timezone, today, onTool }) {
   const server = new McpServer(
     { name: 'cleartable', title: 'Cleartable', version: '1.0.0', websiteUrl: 'https://cleartable.app' },
     { instructions: `Cleartable is the user's task manager (tasks, projects, habits, calendar). Today is ${today}${timezone ? ` (${timezone})` : ''}. When the user wants to remember, add or plan something, use capture_tasks with their own words: Cleartable splits it into tasks and files each one. Use add_task only when you already know the exact fields.` }
   );
+
+  if (onTool) {
+    const register = server.registerTool.bind(server);
+    server.registerTool = (name, config, handler) => register(name, config, async (...args) => {
+      try {
+        const result = await handler(...args);
+        onTool(name, !result?.isError);
+        return result;
+      } catch (err) {
+        onTool(name, false);
+        throw err;
+      }
+    });
+  }
 
   server.registerTool('capture_tasks', {
     title: 'Capture tasks',

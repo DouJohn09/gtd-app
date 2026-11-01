@@ -19,6 +19,7 @@ import {
 } from '../services/oauth.js';
 import { buildMcpServer, userClock } from '../services/mcpServer.js';
 import { serverError } from '../lib/httpErrors.js';
+import { pool } from '../db/pool.js';
 
 const router = Router();
 
@@ -80,13 +81,38 @@ const mcpCors = cors({ origin: true, exposedHeaders: ['WWW-Authenticate', 'Mcp-S
 
 let lastPrune = 0;
 
+// One mcp_calls row per JSON-RPC message: method, tool name and outcome only,
+// never arguments. A 4xx also goes to the log with the headers that usually
+// explain it (the body stays out), so failed handshakes can be diagnosed.
+function logCalls(req, res, { userId, grantId, toolOk }) {
+  const messages = (Array.isArray(req.body) ? req.body : [req.body]).filter(m => m && typeof m === 'object');
+  const status = res.statusCode;
+  const rows = (messages.length ? messages : [{}]).map(m => {
+    const method = typeof m.method === 'string' ? m.method.slice(0, 80) : (m.result !== undefined || m.error !== undefined ? '(response)' : '(none)');
+    const tool = method === 'tools/call' && typeof m.params?.name === 'string' ? m.params.name.slice(0, 80) : null;
+    return { method, tool, ok: status < 400 && (tool ? toolOk[tool] !== false : true) };
+  });
+  if (status >= 400) {
+    console.warn('[mcp] %d for user %d: methods=%s accept=%s content-type=%s protocol=%s session=%s ua=%s',
+      status, userId, rows.map(r => r.method).join(','), req.get('accept'), req.get('content-type'),
+      req.get('mcp-protocol-version'), req.get('mcp-session-id') ? 'yes' : 'no', req.get('user-agent'));
+  }
+  pool.query(
+    `INSERT INTO mcp_calls (user_id, grant_id, method, tool, ok, http_status)
+     SELECT $1, $2, * FROM UNNEST($3::text[], $4::text[], $5::bool[], $6::smallint[])`,
+    [userId, grantId || null, rows.map(r => r.method), rows.map(r => r.tool), rows.map(r => r.ok), rows.map(() => status)]
+  ).catch(err => console.error('[mcp] call log failed:', err.message));
+}
+
 // Stateless: every POST builds a server for the token's user and answers it.
 // No sessions to keep, so any Railway instance can serve any call.
 router.post('/mcp', mcpCors, bearer, express.json({ limit: '1mb' }), async (req, res) => {
   try {
-    const { userId } = req.auth.extra;
+    const { userId, grantId } = req.auth.extra;
+    const toolOk = {};
+    res.on('finish', () => logCalls(req, res, { userId, grantId, toolOk }));
     const clock = await userClock(userId);
-    const server = buildMcpServer({ userId, ...clock });
+    const server = buildMcpServer({ userId, ...clock, onTool: (name, ok) => { toolOk[name] = ok; } });
     const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
     res.on('close', () => { transport.close(); server.close(); });
     await server.connect(transport);

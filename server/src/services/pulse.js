@@ -298,21 +298,43 @@ async function people() {
   const strangers = users.filter(u => !skip.includes(String(u.email).toLowerCase()));
   const ids = strangers.map(u => u.id);
 
-  const [{ rows: taskCounts }, { rows: act }] = await Promise.all([
+  const [{ rows: taskCounts }, { rows: act }, { rows: aiRows }] = await Promise.all([
     pool.query(`SELECT user_id, COUNT(*)::int AS created FROM tasks WHERE user_id = ANY($1) GROUP BY user_id`, [ids]),
     pool.query(
       `SELECT user_id, MAX(d) AS last_active, ARRAY_AGG(DISTINCT d::date) AS days FROM (
           SELECT user_id, created_at AS d FROM tasks WHERE user_id = ANY($1)
           UNION ALL SELECT user_id, completed_at FROM tasks WHERE user_id = ANY($1) AND completed_at IS NOT NULL
           UNION ALL SELECT user_id, created_at FROM habit_logs WHERE user_id = ANY($1)
+          UNION ALL SELECT user_id, created_at FROM mcp_calls WHERE user_id = ANY($1) AND method = 'tools/call' AND ok
         ) x GROUP BY user_id`,
       [ids]
     ),
+    // AI apps (Claude, ChatGPT, Grok) connected over MCP. last_used is the
+    // last time the app opened the connection, which happens whenever a chat
+    // has Cleartable switched on; calls are actual tool uses.
+    pool.query(
+      `SELECT g.user_id, STRING_AGG(DISTINCT c.info->>'client_name', ', ') AS apps,
+              MIN(g.created_at) AS connected_at, MAX(g.last_used_at) AS last_used,
+              BOOL_AND(g.revoked_at IS NOT NULL) AS all_revoked,
+              (SELECT COUNT(*)::int FROM mcp_calls m WHERE m.user_id = g.user_id AND m.method = 'tools/call') AS calls,
+              (SELECT MAX(created_at) FROM mcp_calls m WHERE m.user_id = g.user_id AND m.method = 'tools/call') AS last_call
+         FROM oauth_grants g JOIN oauth_clients c USING (client_id)
+        WHERE g.user_id = ANY($1) GROUP BY g.user_id`,
+      [ids]
+    ),
   ]);
+  const aiOf = new Map(aiRows.map(r => [r.user_id, r]));
   const tasksOf = new Map(taskCounts.map(r => [r.user_id, r.created]));
   const actOf = new Map(act.map(r => [r.user_id, r]));
   const now = Date.now();
-  const lastSeen = (u) => Math.max(u.last_login ? new Date(u.last_login).getTime() : 0, actOf.get(u.id)?.last_active ? new Date(actOf.get(u.id).last_active).getTime() : 0);
+  const ms = (d) => (d ? new Date(d).getTime() : 0);
+  const lastSeen = (u) => Math.max(ms(u.last_login), ms(actOf.get(u.id)?.last_active), ms(aiOf.get(u.id)?.last_used));
+  // Signed up on the connect page an AI app opened: the account and the
+  // app's connection were made within minutes of each other.
+  const viaApp = (u) => {
+    const ai = aiOf.get(u.id);
+    return ai && ms(ai.connected_at) - ms(u.created_at) < 10 * 60_000 ? `${ai.apps} connect` : null;
+  };
   const cameBack = (u) => {
     const start = new Date(u.created_at).getTime();
     return (actOf.get(u.id)?.days || []).some(d => new Date(d).getTime() - start >= 7 * DAY) || lastSeen(u) - start >= 7 * DAY;
@@ -356,7 +378,14 @@ async function people() {
         tasks: tasksOf.get(u.id) || 0,
         lastSeen: lastSeen(u) ? new Date(lastSeen(u)).toISOString() : null,
         paying: paying(u),
-        source: u.signup_referrer || (u.signup_utm ? JSON.parse(u.signup_utm).utm_source : null) || null,
+        source: u.signup_referrer || (u.signup_utm ? JSON.parse(u.signup_utm).utm_source : null) || viaApp(u) || null,
+        ai: aiOf.has(u.id) ? {
+          apps: aiOf.get(u.id).apps,
+          calls: aiOf.get(u.id).calls,
+          lastUsed: aiOf.get(u.id).last_used,
+          lastCall: aiOf.get(u.id).last_call,
+          disconnected: aiOf.get(u.id).all_revoked,
+        } : null,
         utm: u.signup_utm ? JSON.parse(u.signup_utm) : null,
       })),
     },
