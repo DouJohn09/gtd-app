@@ -1882,6 +1882,27 @@ footer .footer-badges a:hover img { opacity: 1; }
   align-items: flex-start;
   gap: 20px;
 }
+.pwa-note {
+  margin: 28px auto 0;
+  max-width: 520px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text-2);
+  text-align: left;
+}
+.pwa-note b { display: block; color: var(--text-1); font-weight: 500; margin-bottom: 4px; }
+.pwa-note em { color: var(--text-1); font-style: normal; }
+.pwa-how {
+  display: block;
+  margin-top: 8px;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--text-2);
+}
 .phone {
   margin: 0;
   width: min(42vw, 250px);
@@ -1904,6 +1925,7 @@ footer .footer-badges a:hover img { opacity: 1; }
   .mobile-copy { text-align: left; }
   .mobile-copy .body-text { margin: 0; }
   .mobile-points { margin-left: 0; }
+  .pwa-note { margin-left: 0; }
 }
 @media (max-width: 480px) {
   .mobile-phones { gap: 12px; }
