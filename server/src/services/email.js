@@ -81,6 +81,51 @@ export async function sendWelcome(to, name) {
   return send({ to, subject, html, text });
 }
 
+// Sent instead of the welcome above to someone who signed up on the connect
+// page of an AI app, once the app's connection is made. They may never open
+// the app itself, so it teaches what to say in the chat. `app` comes from a
+// fixed list (the caller maps anything else to a generic name), because a
+// client can register itself under any name it likes.
+export async function sendConnectedWelcome(to, name, app) {
+  const first = (name || '').trim().split(/\s+/)[0] || '';
+  const hi = first ? `Hi ${first},` : 'Hi,';
+  const subject = `Cleartable is connected to ${app}. Here's what to say`;
+  const prompts = [
+    ['"Put these in Cleartable: call the dentist tomorrow, send Anna the budget by Friday, and book the car service."', 'Each one becomes its own task, with a date, a list and a time estimate.'],
+    ['"What\'s on my plate today in Cleartable?"'],
+    ['"Add the action items from this conversation to Cleartable."'],
+  ];
+  const text = [
+    hi,
+    '',
+    `${app} can now add to and read your Cleartable. Try one of these in any ${app} chat:`,
+    '',
+    ...prompts.flatMap(([p, note]) => [`• ${p}`, ...(note ? [`  ${note}`] : [])]),
+    '',
+    `If ${app} doesn't use Cleartable, check that it's switched on for that chat in the tools menu under the message box.`,
+    '',
+    `Everything ${app} adds also shows up in the app, where "Plan my day" fits your tasks around your Google Calendar: ${APP_URL}`,
+    '',
+    "I'm building Cleartable on my own. If something doesn't work the way you expected, just reply. I read every email.",
+    '',
+    '— Jan',
+  ].join('\n');
+  const html = `
+  <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;max-width:520px;margin:0 auto;color:#1a1a22;line-height:1.6;">
+    <p style="margin:0 0 16px;">${escapeHtml(hi)}</p>
+    <p style="margin:0 0 12px;">${escapeHtml(app)} can now add to and read your Cleartable. Try one of these in any ${escapeHtml(app)} chat:</p>
+    <ul style="margin:0 0 16px;padding-left:20px;">
+      ${prompts.map(([p, note]) => `<li style="margin:0 0 8px;"><strong>${escapeHtml(p)}</strong>${note ? `<br><span style="color:#6b6b75;">${escapeHtml(note)}</span>` : ''}</li>`).join('')}
+    </ul>
+    <p style="margin:0 0 16px;">If ${escapeHtml(app)} doesn't use Cleartable, check that it's switched on for that chat in the tools menu under the message box.</p>
+    <p style="margin:0 0 16px;">Everything ${escapeHtml(app)} adds also shows up in the app, where <strong>Plan my day</strong> fits your tasks around your Google Calendar.</p>
+    <p style="margin:0 0 16px;"><a href="${APP_URL}" style="display:inline-block;background:#7c6cff;color:#fff;text-decoration:none;padding:10px 16px;border-radius:8px;">Open Cleartable</a></p>
+    <p style="margin:0 0 16px;">I'm building Cleartable on my own. If something doesn't work the way you expected, <strong>just reply</strong>. I read every email.</p>
+    <p style="margin:24px 0 0;color:#6b6b75;font-size:13px;">— Jan, <a href="https://cleartable.app" style="color:#7c6cff;">Cleartable</a></p>
+  </div>`;
+  return send({ to, subject, html, text });
+}
+
 // Email sign-in: the 6-digit code to type, plus a link that does the same.
 // The code is for the installed app, where a tapped link opens the browser
 // instead.

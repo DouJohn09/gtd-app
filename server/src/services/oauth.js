@@ -9,6 +9,7 @@ import { createHash, randomBytes } from 'crypto';
 import dns from 'dns/promises';
 import net from 'net';
 import { pool } from '../db/pool.js';
+import { sendConnectedWelcome } from './email.js';
 import { InvalidGrantError, InvalidRequestError, InvalidTokenError } from '@modelcontextprotocol/sdk/server/auth/errors.js';
 
 const isProd = process.env.NODE_ENV === 'production';
@@ -115,6 +116,22 @@ async function issueTokens(grantId, scopes) {
   return { access_token: access, token_type: 'Bearer', expires_in: ACCESS_TTL_SEC, refresh_token: refresh, scope: scopes.join(' ') };
 }
 
+// A brand-new account whose first connection this is signed up on the AI
+// app's connect page and got no app welcome (auth.js skips it for them), so
+// it gets the "here's what to say" mail instead. Older accounts get nothing.
+const KNOWN_APPS = ['Claude', 'ChatGPT', 'Grok'];
+async function welcomeIfNew(userId, clientName) {
+  const { rows: [u] } = await pool.query(
+    `SELECT email, name FROM users
+      WHERE id = $1 AND created_at > NOW() - INTERVAL '30 minutes'
+        AND (SELECT COUNT(*) FROM oauth_grants WHERE user_id = $1) = 1`,
+    [userId]
+  );
+  if (!u) return;
+  const app = KNOWN_APPS.find(a => String(clientName || '').toLowerCase().includes(a.toLowerCase())) || 'your AI assistant';
+  await sendConnectedWelcome(u.email, u.name, app);
+}
+
 export const oauthProvider = {
   clientsStore,
 
@@ -163,6 +180,7 @@ export const oauthProvider = {
        VALUES ($1, $2, $3, $4, NOW()) RETURNING id`,
       [req.user_id, client.client_id, scopes, req.params.resource || MCP_URL]
     );
+    welcomeIfNew(req.user_id, client.client_name).catch(err => console.error('[email] connected welcome failed:', err.message));
     return issueTokens(grant.id, scopes);
   },
 

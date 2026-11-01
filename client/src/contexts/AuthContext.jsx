@@ -66,6 +66,10 @@ export function AuthProvider({ children }) {
       }
     } catch { /* ignore */ }
 
+    // Signing in on the way to an AI app's connect page (?next=/connect…).
+    let via = '';
+    try { if ((new URLSearchParams(window.location.search).get('next') || '').startsWith('/connect')) via = 'connect'; } catch { /* ignore */ }
+
     const res = await fetch(path, {
       method: 'POST',
       headers: {
@@ -76,6 +80,7 @@ export function AuthProvider({ children }) {
         ...body,
         ...(referrer ? { referrer } : {}),
         ...(Object.keys(utm).length ? { utm } : {}),
+        ...(via ? { via } : {}),
       }),
     });
     const data = await res.json().catch(() => ({}));

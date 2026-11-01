@@ -53,7 +53,10 @@ async function seedContextsIfNone(userId) {
 
 // A brand-new account, from either sign-in method: default contexts, the
 // welcome mail and the founder's heads-up.
-async function createUser({ googleId = null, email, name = null, picture = null, tz, referrer, utm }) {
+// via === 'connect': signed up on an AI app's connect page. They get the
+// "here's what to say" mail once the connection is made (oauth.js) instead
+// of the app welcome, which would point them at an app they may never open.
+async function createUser({ googleId = null, email, name = null, picture = null, tz, referrer, utm, via }) {
   const safeReferrer = typeof referrer === 'string' ? referrer.slice(0, 2048) : null;
   const safeUtm = utm && typeof utm === 'object' && Object.keys(utm).length ? JSON.stringify(utm) : null;
   const { rows } = await pool.query(
@@ -63,7 +66,7 @@ async function createUser({ googleId = null, email, name = null, picture = null,
   const user = rows[0];
   await seedContextsIfNone(user.id);
   // Fire-and-forget: mail must never delay or fail a sign-in.
-  sendWelcome(email, name).catch(err => console.error('[email] welcome failed:', err.message));
+  if (via !== 'connect') sendWelcome(email, name).catch(err => console.error('[email] welcome failed:', err.message));
   notifyFounderSignup({ email, name, id: user.id, source: safeReferrer || (utm?.utm_source) || null }).catch(err => console.error('[email] founder notice failed:', err.message));
   return user;
 }
@@ -90,7 +93,7 @@ function signedIn(res, user) {
 
 router.post('/google', loginLimiter, async (req, res) => {
   try {
-    const { credential, referrer, utm } = req.body;
+    const { credential, referrer, utm, via } = req.body;
 
     const ticket = await googleClient.verifyIdToken({
       idToken: credential,
@@ -140,7 +143,7 @@ router.post('/google', loginLimiter, async (req, res) => {
       }
       await seedContextsIfNone(user.id);
     } else {
-      user = await createUser({ googleId, email, name, picture, tz, referrer, utm });
+      user = await createUser({ googleId, email, name, picture, tz, referrer, utm, via });
     }
 
     signedIn(res, user);
@@ -220,7 +223,7 @@ router.post('/email/start', codeSendLimiter, async (req, res) => {
 });
 
 router.post('/email/verify', loginLimiter, async (req, res) => {
-  const { code, token, referrer, utm } = req.body || {};
+  const { code, token, referrer, utm, via } = req.body || {};
   try {
     let row;
     if (typeof token === 'string' && token) {
@@ -263,7 +266,7 @@ router.post('/email/verify', loginLimiter, async (req, res) => {
       await pool.query('UPDATE users SET last_login = NOW(), timezone = COALESCE($1, timezone) WHERE id = $2', [tz, user.id]);
       await seedContextsIfNone(user.id);
     } else {
-      user = await createUser({ email: row.email, tz, referrer, utm });
+      user = await createUser({ email: row.email, tz, referrer, utm, via });
     }
     signedIn(res, user);
   } catch (error) {
