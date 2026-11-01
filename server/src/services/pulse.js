@@ -462,7 +462,25 @@ async function opsEvents() {
   const { rows: inquiries } = await pool.query(
     `SELECT label, created_at AS at FROM ops_events WHERE kind = 'inquiry' ORDER BY created_at DESC LIMIT 6`
   );
+  // Daily reminder emails (services/notifications.js). A failing user is
+  // retried every 5 min in their window, so count people, not attempts.
+  const { rows: [rem] } = await pool.query(
+    `SELECT COUNT(*) FILTER (WHERE kind = 'reminder_sent' AND created_at > NOW() - INTERVAL '24 hours')::int AS sent24,
+            COUNT(*) FILTER (WHERE kind = 'reminder_sent' AND created_at > NOW() - INTERVAL '7 days')::int AS sent7,
+            COUNT(DISTINCT split_part(label, ':', 1)) FILTER (WHERE kind = 'reminder_failed' AND created_at > NOW() - INTERVAL '24 hours')::int AS failed24,
+            COUNT(DISTINCT split_part(label, ':', 1) || created_at::date) FILTER (WHERE kind = 'reminder_failed' AND created_at > NOW() - INTERVAL '7 days')::int AS failed7,
+            MAX(created_at) FILTER (WHERE kind = 'reminder_failed') AS last_fail_at
+       FROM ops_events WHERE kind IN ('reminder_sent', 'reminder_failed')`
+  );
+  const { rows: [lastFail] } = await pool.query(
+    `SELECT label FROM ops_events WHERE kind = 'reminder_failed' ORDER BY created_at DESC LIMIT 1`
+  );
   return {
+    reminders: {
+      sent24h: rem.sent24, sent7: rem.sent7,
+      failed24h: rem.failed24, failed7: rem.failed7,
+      lastFailure: rem.last_fail_at ? { at: rem.last_fail_at, label: lastFail?.label || '' } : null,
+    },
     errors: {
       server: { last24h: count('server_error').last24h, last7: count('server_error').last7 },
       client: { last24h: count('client_error').last24h, last7: count('client_error').last7 },

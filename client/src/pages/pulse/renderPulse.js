@@ -251,7 +251,8 @@ export function renderPulse(root, { data: d, error, fetchedAt }) {
     ], '')}</div>`;
 
   const er = d.errors || {};
-  const errCount = (er.server?.last24h || 0) + (er.client?.last24h || 0);
+  const rem = d.reminders || null;
+  const errCount = (er.server?.last24h || 0) + (er.client?.last24h || 0) + (rem?.failed24h || 0);
   const relTone = monitorDown || checkFailed ? 'bad' : errCount > 0 ? 'warn' : 'good';
   const relPill = monitorDown || checkFailed ? 'down now' : errCount > 0 ? `${errCount} error${errCount === 1 ? '' : 's'} · 24 h` : 'quiet';
   const relPanel = `<div class="panel"><h2>Reliability ${pill(relPill, relTone)}</h2>
@@ -269,6 +270,11 @@ export function renderPulse(root, { data: d, error, fetchedAt }) {
     ${rows([
       ['Server 500s · 24 h / 7 d', `${fmt(er.server?.last24h)} / ${fmt(er.server?.last7)}`],
       ['App crashes · 24 h / 7 d', `${fmt(er.client?.last24h)} / ${fmt(er.client?.last7)}`],
+      ...(rem ? [
+        ['Reminder emails · 24 h', `${fmt(rem.sent24h)} sent · <span class="${rem.failed24h ? 'warn' : ''}">${fmt(rem.failed24h)} failed</span>`],
+        ['Reminder emails · 7 d', `${fmt(rem.sent7)} sent · ${fmt(rem.failed7)} failed (people × days)`],
+        ...(rem.lastFailure ? [['Last reminder failure', `${ago(rem.lastFailure.at)} · ${esc(rem.lastFailure.label)}`]] : []),
+      ] : []),
     ], '')}
     ${(er.top || []).length ? `<span class="label">Most frequent this week</span>${rows(er.top.map(t => [esc(t.label), `${fmt(t.n)}×`]), '')}` : ''}
   </div>`;

@@ -1,6 +1,7 @@
 import { pool } from '../db/pool.js';
 import { sendEmail } from './email.js';
 import { captureError } from '../lib/observability.js';
+import { recordOpsEvent } from '../lib/opsEvents.js';
 import { todayInTz } from '../lib/dateTime.js';
 import { getCalendarEvents } from './googleCalendar.js';
 import crypto from 'crypto';
@@ -136,9 +137,13 @@ export async function runNotificationCycle() {
         const { subject, html, text } = buildDailyEmail({ firstName, sections, unsubLink });
         await sendEmail({ to: user.email, subject, html, text });
         await pool.query('UPDATE users SET last_daily_email_at = $1 WHERE id = $2', [userToday, user.id]);
+        recordOpsEvent('reminder_sent', `user ${user.id}`);
         sent++;
       } catch (err) {
         console.error(`[notifications] failed for user ${user.id}:`, err.message);
+        // Pulse counts distinct labels, so a user retried every 5 min in their
+        // delivery window counts once.
+        recordOpsEvent('reminder_failed', `user ${user.id}: ${err.message}`);
         captureError(err, { userId: user.id, route: 'notifications' });
       }
     }
