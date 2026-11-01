@@ -71,6 +71,14 @@ router.get('/.well-known/mcp-registry-auth', (_req, res) => {
   res.type('text/plain').send('v=MCPv1; k=ed25519; p=FIMz3uiC8+d0asUpoJ+/rZewPOwp5R5LxrRQi3F/Jes=');
 });
 
+// Proves to OpenAI's plugin portal (ChatGPT app directory) that we own the MCP
+// host. The portal shows a token; set it as OPENAI_APPS_CHALLENGE on Railway.
+router.get('/.well-known/openai-apps-challenge', (_req, res) => {
+  const token = (process.env.OPENAI_APPS_CHALLENGE || '').trim();
+  if (!token) return res.status(404).type('text/plain').send('not set');
+  res.type('text/plain').send(token);
+});
+
 // ---- The MCP endpoint ----
 
 const bearer = requireBearerAuth({
