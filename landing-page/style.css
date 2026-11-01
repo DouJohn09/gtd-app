@@ -1911,3 +1911,148 @@ footer .footer-badges a:hover img { opacity: 1; }
   .phone img { border-radius: 21px; }
   .phone-back { margin-top: 32px; }
 }
+
+/* ========== Flow strip: Capture → Sort → Plan → Do → Review ==========
+   One 10 s cycle, 2 s per step. The dot (.flow::after) walks from step to
+   step; each step lights while the dot sits on it. Paused until .playing. */
+.flow {
+  --cycle: 10s;
+  list-style: none;
+  padding: 0;
+  margin: 40px 0 0;
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 16px;
+}
+.flow::before {
+  content: '';
+  position: absolute;
+  top: 23px;
+  left: 10%;
+  right: 10%;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(167, 139, 250, 0.1), rgba(167, 139, 250, 0.45), rgba(94, 234, 212, 0.45), rgba(94, 234, 212, 0.1));
+}
+.flow::after {
+  content: '';
+  position: absolute;
+  top: 19px;
+  left: 10%;
+  width: 9px;
+  height: 9px;
+  margin-left: -4.5px;
+  border-radius: 50%;
+  background: var(--violet-glow);
+  box-shadow: 0 0 12px 3px rgba(167, 139, 250, 0.7);
+  animation: flow-dot var(--cycle) infinite;
+  animation-play-state: paused;
+}
+.flow li {
+  position: relative;
+  text-align: center;
+  padding: 0 4px;
+}
+.flow-icon {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  margin: 0 auto 14px;
+  border-radius: 50%;
+  background: var(--bg);
+  border: 1px solid var(--border-strong);
+  color: var(--text-3);
+  animation: flow-icon var(--cycle) infinite;
+  animation-delay: calc(var(--i) * var(--cycle) / 5);
+  animation-play-state: paused;
+}
+.flow-icon svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.flow b {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-2);
+  margin-bottom: 6px;
+  animation: flow-label var(--cycle) infinite;
+  animation-delay: calc(var(--i) * var(--cycle) / 5);
+  animation-play-state: paused;
+}
+.flow p {
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--text-2);
+  margin: 0;
+}
+.flow.playing::after,
+.flow.playing .flow-icon,
+.flow.playing b { animation-play-state: running; }
+
+@keyframes flow-icon {
+  0%, 17% {
+    color: #fff;
+    background: var(--violet-deep);
+    border-color: var(--violet);
+    box-shadow: 0 0 24px rgba(124, 58, 237, 0.55);
+  }
+  21%, 100% {
+    color: var(--text-3);
+    background: var(--bg);
+    border-color: var(--border-strong);
+    box-shadow: none;
+  }
+}
+@keyframes flow-label {
+  0%, 17% { color: var(--text-1); }
+  21%, 100% { color: var(--text-2); }
+}
+@keyframes flow-dot {
+  0%, 14% { left: 10%; opacity: 1; }
+  20%, 34% { left: 30%; }
+  40%, 54% { left: 50%; }
+  60%, 74% { left: 70%; }
+  80%, 94% { left: 90%; opacity: 1; }
+  97% { left: 90%; opacity: 0; }
+  98% { left: 10%; opacity: 0; }
+  100% { left: 10%; opacity: 1; }
+}
+
+/* Phones: a vertical list, line on the left; steps still light in turn. */
+@media (max-width: 760px) {
+  .flow { grid-template-columns: 1fr; gap: 22px; }
+  .flow::before {
+    top: 23px; bottom: 23px; left: 23px; right: auto;
+    width: 1px; height: auto;
+    background: linear-gradient(180deg, rgba(167, 139, 250, 0.45), rgba(94, 234, 212, 0.45));
+  }
+  .flow::after { display: none; }
+  .flow li {
+    display: grid;
+    grid-template-columns: 46px 1fr;
+    column-gap: 16px;
+    text-align: left;
+    padding: 0;
+  }
+  .flow-icon { grid-row: span 2; margin: 0; }
+  .flow b { align-self: end; margin: 2px 0 2px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .flow::after { display: none; }
+  .flow-icon, .flow b { animation: none; }
+  .flow-icon { color: var(--violet-glow); border-color: rgba(167, 139, 250, 0.45); }
+  .flow b { color: var(--text-1); }
+}
