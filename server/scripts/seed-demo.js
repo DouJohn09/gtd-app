@@ -67,7 +67,7 @@ async function main() {
 
   // Next actions
   await T({ title: 'Draft Q3 planning doc', list: 'next_actions', context: '@work', project_id: proj['Q3 Product Launch'], position: 0, energy_level: 'high', time_estimate: 60, priority: 3, due_date: d(0), is_daily_focus: true });
-  await T({ title: 'Review pull request from Alex', list: 'next_actions', context: '@work', energy_level: 'medium', time_estimate: 30, priority: 2, due_date: d(0), is_daily_focus: true });
+  await T({ title: "Review Maya's pull request", list: 'next_actions', context: '@work', energy_level: 'medium', time_estimate: 30, priority: 2, due_date: d(0), is_daily_focus: true });
   await T({ title: 'Prep notes for Monday standup', list: 'next_actions', context: '@work', energy_level: 'low', time_estimate: 15, priority: 1 });
   await T({ title: 'Write blog post: “How to run a weekly review”', list: 'next_actions', context: '@work', project_id: proj['Marketing Site Refresh'], energy_level: 'high', time_estimate: 90, priority: 2, due_date: d(1) });
   await T({ title: 'Pick up dry cleaning', list: 'next_actions', context: '@errands', energy_level: 'low', time_estimate: 15 });
@@ -85,10 +85,10 @@ async function main() {
   await T({ title: 'Plan a trip to Japan', list: 'someday_maybe' });
 
   // Calendar — time-blocked today
-  await T({ title: 'Deep work: Q3 planning doc', list: 'next_actions', context: '@work', due_date: d(0), scheduled_time: '09:00', duration: 90, energy_level: 'high' });
+  await T({ title: 'Deep work: launch blog post', list: 'next_actions', context: '@work', due_date: d(0), scheduled_time: '09:00', duration: 90, energy_level: 'high' });
   await T({ title: 'Team sync', list: 'next_actions', context: '@work', due_date: d(0), scheduled_time: '11:00', duration: 30 });
   await T({ title: 'Lunch walk', list: 'next_actions', context: '@personal', due_date: d(0), scheduled_time: '13:00', duration: 45 });
-  await T({ title: 'Review PRs + inbox', list: 'next_actions', context: '@work', due_date: d(0), scheduled_time: '15:00', duration: 60 });
+  await T({ title: 'Clear the inbox', list: 'next_actions', context: '@work', due_date: d(0), scheduled_time: '15:00', duration: 60 });
   await T({ title: 'Evening run', list: 'next_actions', context: '@personal', due_date: d(0), scheduled_time: '18:30', duration: 45, energy_level: 'medium' });
 
   // Habits + logs (streaks / heatmap)
