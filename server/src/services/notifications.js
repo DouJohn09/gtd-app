@@ -62,7 +62,10 @@ export async function runNotificationCycle() {
         if (!isDeliveryWindow(user.timezone, prefs.delivery_hour)) continue;
 
         const userToday = todayInTz(user.timezone);
-        if (user.last_daily_email_at && user.last_daily_email_at.toISOString().slice(0, 10) >= userToday) continue;
+        // DATE columns come back as 'YYYY-MM-DD' strings (db/pool.js type
+        // parser), so compare text. Calling toISOString() here crashed every
+        // reminder after a user's first one.
+        if (user.last_daily_email_at && String(user.last_daily_email_at).slice(0, 10) >= userToday) continue;
 
         const sections = {};
 
