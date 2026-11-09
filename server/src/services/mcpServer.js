@@ -8,7 +8,7 @@ import { captureText, MAX_CAPTURE_CHARS } from './capture.js';
 import { syncTaskToCalendar, getCalendarEvents } from './googleCalendar.js';
 import { isDueOn } from '../routes/habits.js';
 import { todayInTz, isValidTimezone } from '../lib/dateTime.js';
-import { assertWithinLimit, LimitError } from './billing.js';
+import { withCapacity, LimitError } from './billing.js';
 
 const LISTS = ['inbox', 'next_actions', 'waiting_for', 'someday_maybe'];
 const LIST_NAMES = { inbox: 'Inbox', next_actions: 'Next Actions', waiting_for: 'Waiting For', someday_maybe: 'Someday/Maybe', completed: 'Completed' };
@@ -48,9 +48,9 @@ const APP_URL = 'https://cleartable.app/app';
 const inApp = { open_in_cleartable: APP_URL, tip_for_user: `These tasks are in the user's Cleartable app too, where they can see them at a glance, tick them off on their phone and plan them into their calendar: ${APP_URL}` };
 const fail = (message) => ({ content: [{ type: 'text', text: message }], isError: true });
 
-async function findProject(userId, name) {
+async function findProject(userId, name, { anyStatus = false } = {}) {
   if (!name) return null;
-  const projects = (await ProjectModel.getAll(userId)).filter(p => p.status === 'active');
+  const projects = (await ProjectModel.getAll(userId)).filter(p => anyStatus || p.status === 'active');
   const n = name.toLowerCase().trim();
   return projects.find(p => p.name.toLowerCase() === n)
     || projects.find(p => p.name.toLowerCase().includes(n) || n.includes(p.name.toLowerCase()))
@@ -181,22 +181,38 @@ export function buildMcpServer({ userId, timezone, today, onTool }) {
 
   server.registerTool('list_tasks', {
     title: 'List tasks',
-    description: 'Read the user\'s open tasks. view: today (due today, overdue, or picked as focus), inbox, next_actions, waiting_for, someday_maybe, upcoming (next 14 days), completed (recent). Or search titles and notes with query.',
+    description: 'Read the user\'s open tasks. view: today (due today, overdue, or picked as focus), inbox, next_actions, waiting_for, someday_maybe, upcoming (next 14 days), completed (recent). Or search titles and notes with query, or get one project\'s tasks with project.',
     inputSchema: {
       view: z.enum(['today', 'upcoming', ...LISTS, 'completed']).optional().describe('Default: today'),
       query: z.string().max(100).optional().describe('Search text; searches all open tasks, ignores view'),
+      project: z.string().max(200).optional().describe('Only this project\'s open tasks, in project order. Ignores view, except completed shows its finished tasks'),
       limit: z.number().int().min(1).max(100).optional().describe('Default 50'),
     },
     annotations: { readOnlyHint: true, openWorldHint: false },
-  }, async ({ view = 'today', query, limit = 50 }) => {
+  }, async ({ view = 'today', query, project, limit = 50 }) => {
     let tasks;
-    if (query) {
+    let inProject = null;
+    if (project) {
+      inProject = await findProject(userId, project, { anyStatus: true });
+      if (!inProject) return fail(`No project named "${project}". Use list_projects to see them.`);
+    }
+    if (query || inProject) {
+      const params = [userId, limit];
+      const where = [view === 'completed' && inProject ? `t.list = 'completed'` : `t.list != 'completed'`];
+      if (query) {
+        params.push(`%${query.replace(/[\\%_]/g, '\\$&')}%`);
+        where.push(`(t.title ILIKE $${params.length} OR t.notes ILIKE $${params.length})`);
+      }
+      if (inProject) {
+        params.push(inProject.id);
+        where.push(`t.project_id = $${params.length}`);
+      }
       const { rows } = await pool.query(
         `SELECT t.*, p.name AS project_name FROM tasks t
          LEFT JOIN projects p ON p.id = t.project_id AND p.user_id = t.user_id
-         WHERE t.user_id = $1 AND t.list != 'completed' AND (t.title ILIKE $2 OR t.notes ILIKE $2)
-         ORDER BY t.updated_at DESC LIMIT $3`,
-        [userId, `%${query.replace(/[\\%_]/g, '\\$&')}%`, limit]
+         WHERE t.user_id = $1 AND ${where.join(' AND ')}
+         ORDER BY ${inProject ? 't.position ASC, t.created_at ASC' : 't.updated_at DESC'} LIMIT $2`,
+        params
       );
       tasks = rows;
     } else if (view === 'today') {
@@ -208,7 +224,7 @@ export function buildMcpServer({ userId, timezone, today, onTool }) {
     } else {
       tasks = await TaskModel.getAll(view, userId, today);
     }
-    return json({ view: query ? 'search' : view, count: tasks.length, tasks: tasks.slice(0, limit).map(slim), ...inApp });
+    return json({ view: query ? 'search' : inProject ? 'project' : view, ...(inProject && { project: inProject.name }), count: tasks.length, tasks: tasks.slice(0, limit).map(slim), ...inApp });
   });
 
   server.registerTool('update_task', {
@@ -252,11 +268,18 @@ export function buildMcpServer({ userId, timezone, today, onTool }) {
   server.registerTool('list_projects', {
     title: 'List projects',
     description: 'The user\'s active projects, with how many open tasks each has.',
-    inputSchema: {},
+    inputSchema: { include_inactive: z.boolean().optional().describe('Also list completed and on-hold projects') },
     annotations: { readOnlyHint: true, openWorldHint: false },
-  }, async () => {
-    const projects = (await ProjectModel.getAll(userId)).filter(p => p.status === 'active');
-    return json({ projects: projects.map(p => ({ id: p.id, name: p.name, open_tasks: p.task_count ?? undefined })) });
+  }, async ({ include_inactive }) => {
+    const projects = (await ProjectModel.getAll(userId)).filter(p => include_inactive || p.status === 'active');
+    return json({ projects: projects.map(p => ({
+      id: p.id,
+      name: p.name,
+      status: p.status,
+      ...(p.outcome && { outcome: p.outcome }),
+      ...(p.execution_mode === 'sequential' && { execution: 'sequential' }),
+      open_tasks: p.task_count ?? undefined,
+    })) });
   });
 
   server.registerTool('create_project', {
@@ -270,17 +293,55 @@ export function buildMcpServer({ userId, timezone, today, onTool }) {
     },
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   }, async ({ name, description, outcome, execution }) => {
-    const projects = (await ProjectModel.getAll(userId)).filter(p => p.status === 'active');
-    const existing = projects.find(p => p.name.toLowerCase().trim() === name.toLowerCase());
-    if (existing) return json({ created: false, already_existed: true, project: { id: existing.id, name: existing.name, open_tasks: existing.task_count }, open_in_cleartable: APP_URL });
+    let outcomeOfCreate;
     try {
-      await assertWithinLimit(userId, 'projects');
+      // Duplicate check and limit check share the lock, so parallel calls can
+      // neither pass the plan's cap nor create the same project twice.
+      outcomeOfCreate = await withCapacity(userId, 'projects', async (db, assertRoom) => {
+        const { rows } = await db.query(
+          `SELECT id, name FROM projects WHERE user_id = $1 AND status = 'active' AND LOWER(TRIM(name)) = LOWER($2) LIMIT 1`,
+          [userId, name]
+        );
+        if (rows[0]) return { project: rows[0], created: false };
+        await assertRoom();
+        const id = await ProjectModel.insert({ name, description, outcome, execution_mode: execution }, userId, db);
+        return { project: { id, name }, created: true };
+      });
     } catch (err) {
       if (err instanceof LimitError) return fail(err.message);
       throw err;
     }
-    const project = await ProjectModel.create({ name, description, outcome, execution_mode: execution }, userId);
-    return json({ created: true, project: { id: project.id, name: project.name }, open_in_cleartable: APP_URL });
+    const { project, created } = outcomeOfCreate;
+    return json({ created, ...(!created && { already_existed: true }), project: { id: project.id, name: project.name }, open_in_cleartable: APP_URL });
+  });
+
+  server.registerTool('update_project', {
+    title: 'Update a project',
+    description: 'Rename a project, change its description, outcome or task order, or set its status. Only the given fields change. Completing a project does not complete its tasks. Get the id from list_projects.',
+    inputSchema: {
+      project_id: z.number().int(),
+      name: z.string().trim().min(1).max(200).optional(),
+      description: z.string().max(5000).optional().describe('Empty string removes it'),
+      outcome: z.string().max(500).optional().describe('Empty string removes it'),
+      execution: z.enum(['parallel', 'sequential']).optional(),
+      status: z.enum(['active', 'on_hold', 'completed']).optional(),
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  }, async ({ project_id, name, description, outcome, execution, status }) => {
+    const updates = { name, description, outcome, execution_mode: execution, status };
+    if (Object.values(updates).every(v => v === undefined)) return fail('Nothing to change: give at least one field.');
+    if (name) {
+      const projects = await ProjectModel.getAll(userId);
+      const taken = projects.find(p => p.id !== project_id && p.status === 'active' && p.name.toLowerCase().trim() === name.toLowerCase());
+      if (taken) return fail(`There is already an active project named "${taken.name}".`);
+    }
+    const project = await ProjectModel.update(project_id, updates, userId);
+    if (!project) return fail(`No project with id ${project_id}.`);
+    return json({
+      project: { id: project.id, name: project.name, status: project.status, ...(project.outcome && { outcome: project.outcome }), execution: project.execution_mode },
+      open_tasks: project.tasks.filter(t => t.list !== 'completed').length,
+      open_in_cleartable: APP_URL,
+    });
   });
 
   server.registerTool('get_today', {

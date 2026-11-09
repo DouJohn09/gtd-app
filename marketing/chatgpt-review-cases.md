@@ -4,7 +4,7 @@ Paste into the portal's Review Details. Run each one in ChatGPT, signed in as re
 
 Logo: `client/public/icons/icon-512.png`
 
-## Positive cases (6)
+## Positive cases (7)
 
 **1. Capture several tasks from a brain dump**
 - Scenario: the user thinks out loud and wants the to-dos saved and sorted.
@@ -41,6 +41,12 @@ Logo: `client/public/icons/icon-512.png`
 - Prompt: "Create a project called Website refresh in Cleartable, then add a task to it: 'Write the new homepage copy', next actions, 90 minute estimate, high energy, @computer."
 - Tools: `create_project`, `add_task`
 - Expected: a new project, "Website refresh", and one task in it, in Next actions, with a 90 minute estimate, high energy and the @computer context. ChatGPT confirms both and links to the app.
+
+**7. Review a project and put it on hold**
+- Scenario: the user pauses something they started. Depends on case 6.
+- Prompt: "Show me what's in my Website refresh project in Cleartable, then put that project on hold."
+- Tools: `list_tasks` (project "Website refresh"), `list_projects`, `update_project`
+- Expected: ChatGPT lists the project's task, then sets the project to on hold. The task itself stays open.
 
 ## Negative cases (3)
 

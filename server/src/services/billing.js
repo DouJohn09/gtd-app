@@ -61,6 +61,33 @@ export async function assertWithinLimit(userId, resource) {
   if (rows[0].cnt >= limit) throw new LimitError(resource, limit);
 }
 
+// Runs one creation under a per-user lock, so requests arriving together (an AI
+// app can send several at once) count each other and cannot pass the cap.
+// work(db, assertRoom) must write through db, and calls assertRoom() to enforce
+// the limit at the point it decides to create.
+export async function withCapacity(userId, resource, work) {
+  const plan = await getUserPlan(userId);
+  const limit = FREE_LIMITS[resource];
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query('SELECT pg_advisory_xact_lock(hashtext($1), $2)', [resource, userId]);
+    const assertRoom = async () => {
+      if (!limit || plan === 'pro') return;
+      const { rows } = await client.query(COUNT_SQL[resource], [userId]);
+      if (rows[0].cnt >= limit) throw new LimitError(resource, limit);
+    };
+    const result = await work(client, assertRoom);
+    await client.query('COMMIT');
+    return result;
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
 // How many more of `resource` a user may create right now — Infinity for Pro and
 // for uncapped resources. For bulk paths (import) that should create up to the
 // cap and skip the rest rather than throwing a 402 mid-batch.

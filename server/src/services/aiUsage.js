@@ -92,6 +92,31 @@ export async function charge(userId, weight = 1, day) {
   await increment(userId, weight, day);
 }
 
+// Takes one unit of today's budget in a single statement, so requests arriving
+// together cannot pass the cap. Give it back with release() if the AI work
+// produced nothing, so failures still cost the user nothing.
+export async function reserve(userId, day) {
+  const limit = await limitFor(userId);
+  const bucket = await bucketDay(userId, day);
+  const { rows } = await pool.query(
+    `INSERT INTO ai_usage (user_id, usage_date, count)
+     VALUES ($1, $2, 1)
+     ON CONFLICT (user_id, usage_date)
+     DO UPDATE SET count = ai_usage.count + 1
+     WHERE $3::int <= 0 OR ai_usage.count < $3::int
+     RETURNING count`,
+    [userId, bucket, limit]
+  );
+  return { allowed: rows.length > 0, userId, bucket };
+}
+
+export async function release({ userId, bucket }) {
+  await pool.query(
+    'UPDATE ai_usage SET count = GREATEST(count - 1, 0) WHERE user_id = $1 AND usage_date = $2',
+    [userId, bucket]
+  );
+}
+
 // Read-only snapshot for the client (usage meter / upgrade nudge). Does not consume.
 export async function getStatus(userId, day) {
   const limit = await limitFor(userId);

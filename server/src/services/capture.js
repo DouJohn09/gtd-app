@@ -5,7 +5,7 @@ import { pool } from '../db/pool.js';
 import { smartCapture } from './ai.js';
 import { syncTaskToCalendar } from './googleCalendar.js';
 import { findFreeSlot } from './scheduling.js';
-import { check, charge } from './aiUsage.js';
+import { reserve, release } from './aiUsage.js';
 import { getAiMode } from './userPrefs.js';
 import { resolveRelativeDate } from '../lib/relativeDate.js';
 
@@ -165,16 +165,21 @@ export async function captureText(ctx, rawText) {
   let ai = null;
   let throttled = false;
   if (aiMode !== 'off') {
-    const budget = await check(ctx.userId, ctx.today);
+    const budget = await reserve(ctx.userId, ctx.today);
     throttled = !budget.allowed;
     if (budget.allowed) {
-      ai = await smartCapture(rawText, contexts, projects, today, dayName, history, openTitles);
+      try {
+        ai = await smartCapture(rawText, contexts, projects, today, dayName, history, openTitles);
+      } catch (err) {
+        await release(budget).catch(() => {});
+        throw err;
+      }
       // No provider configured → same graceful raw-capture fallback as the
       // budget path, not an error. The capture must never fail.
       if (ai?.error) ai = null;
-      // Charge only for enrichment we actually delivered — a throttle or a
-      // provider failure (raw-capture fallback) doesn't consume budget.
-      if (ai) await charge(ctx.userId, 1, ctx.today);
+      // Only enrichment we actually delivered costs budget: a provider failure
+      // (raw-capture fallback) gives the reserved unit back.
+      if (!ai) await release(budget);
     }
   }
 

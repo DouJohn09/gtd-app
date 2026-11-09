@@ -3,7 +3,7 @@ import { ProjectModel, TaskModel } from '../db/models.js';
 import { pool } from '../db/pool.js';
 import { suggestProjectBreakdown } from '../services/ai.js';
 import { enforceAiLimit, requireAiEnabled, chargeAiUsage } from '../middleware/aiLimit.js';
-import { assertWithinLimit, LimitError } from '../services/billing.js';
+import { withCapacity, LimitError } from '../services/billing.js';
 import { serverError } from '../lib/httpErrors.js';
 
 const router = Router();
@@ -31,8 +31,11 @@ router.get('/:id', async (req, res) => {
 
 router.post('/', async (req, res) => {
   try {
-    await assertWithinLimit(req.user.id, 'projects');
-    const project = await ProjectModel.create(req.body, req.user.id);
+    const id = await withCapacity(req.user.id, 'projects', async (db, assertRoom) => {
+      await assertRoom();
+      return ProjectModel.insert(req.body, req.user.id, db);
+    });
+    const project = await ProjectModel.getById(id, req.user.id);
     res.status(201).json(project);
   } catch (error) {
     if (error instanceof LimitError) {

@@ -531,8 +531,9 @@ export const ProjectModel = {
     return project || null;
   },
 
-  async create(project, userId) {
-    const { rows } = await pool.query(
+  // Returns the new id. db is a transaction client when the caller holds a lock.
+  async insert(project, userId, db = pool) {
+    const { rows } = await db.query(
       'INSERT INTO projects (name, description, outcome, execution_mode, user_id) VALUES ($1,$2,$3,$4,$5) RETURNING id',
       [
         project.name,
@@ -542,7 +543,11 @@ export const ProjectModel = {
         userId,
       ]
     );
-    return this.getById(rows[0].id, userId);
+    return rows[0].id;
+  },
+
+  async create(project, userId) {
+    return this.getById(await this.insert(project, userId), userId);
   },
 
   async update(id, updates, userId) {
