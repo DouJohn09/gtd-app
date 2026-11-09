@@ -328,7 +328,9 @@ async function people() {
   const actOf = new Map(act.map(r => [r.user_id, r]));
   const now = Date.now();
   const ms = (d) => (d ? new Date(d).getTime() : 0);
-  const lastSeen = (u) => Math.max(ms(u.last_login), ms(actOf.get(u.id)?.last_active), ms(aiOf.get(u.id)?.last_used));
+  // Real activity only. An AI app connecting (grant last_used) is left out: it
+  // happens whenever a chat has Cleartable switched on, even if it is never used.
+  const lastSeen = (u) => Math.max(ms(u.last_login), ms(actOf.get(u.id)?.last_active), ms(u.app_last_open_at));
   // Signed up on the connect page an AI app opened: the account and the
   // app's connection were made within minutes of each other.
   const viaApp = (u) => {
