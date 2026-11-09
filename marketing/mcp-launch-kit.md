@@ -64,9 +64,10 @@ Works on Cleartable's free plan. Tasks sent through Cleartable's AI sorting coun
 | capture_tasks | write | Free text → one or more sorted tasks |
 | add_task | write | One task with explicit fields |
 | list_tasks | read | Today / upcoming / list / completed / search |
-| update_task | write (idempotent) | Change title, list, dates, deadline, notes… |
+| update_task | write (idempotent) | Change or clear any task field: dates, estimate, energy, context, priority, repeat, notes… |
 | complete_task | write | Mark a task done |
 | list_projects | read | Active projects |
+| create_project | write (idempotent) | New project; returns the existing one if the name is taken |
 | get_today | read | Today's tasks, events and habits |
 
 **Links**
@@ -107,7 +108,7 @@ My own use case: I think out loud in a chat, and the action items used to stay b
 Technical details:
 - Stateless Streamable HTTP on Express: a new McpServer per request, no session IDs, so any instance can answer.
 - Self-hosted OAuth 2.1 authorization server built on the MCP SDK's handlers: dynamic client registration and client ID metadata documents, PKCE, single-use auth codes, refresh tokens rotated on every use, all tokens stored only as SHA-256 hashes. Reusing an old refresh token gets invalid_grant.
-- Seven tools and deliberately no delete. Read tools carry readOnlyHint and update_task is marked idempotent, so clients can skip confirmations where it's safe.
+- Eight tools and deliberately no delete. Read tools carry readOnlyHint and update_task is marked idempotent, so clients can skip confirmations where it's safe.
 - Capture is one gpt-4.1-mini call that returns 1–8 tasks. I switched to it after it scored 105/105 on a fixed eval set, against 96/102 for gpt-4o-mini. Task text is sent to OpenAI for this; the privacy policy says so.
 
 Honest limits: ChatGPT custom connectors need a paid plan (Plus or higher, developer mode). Grok's connector settings should work the same way, but I haven't tested Grok end to end yet.

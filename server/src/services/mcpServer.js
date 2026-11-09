@@ -8,6 +8,7 @@ import { captureText, MAX_CAPTURE_CHARS } from './capture.js';
 import { syncTaskToCalendar, getCalendarEvents } from './googleCalendar.js';
 import { isDueOn } from '../routes/habits.js';
 import { todayInTz, isValidTimezone } from '../lib/dateTime.js';
+import { assertWithinLimit, LimitError } from './billing.js';
 
 const LISTS = ['inbox', 'next_actions', 'waiting_for', 'someday_maybe'];
 const LIST_NAMES = { inbox: 'Inbox', next_actions: 'Next Actions', waiting_for: 'Waiting For', someday_maybe: 'Someday/Maybe', completed: 'Completed' };
@@ -22,11 +23,19 @@ function slim(t) {
   if (t.due_date) out.due_date = String(t.due_date).slice(0, 10);
   if (t.deadline) out.deadline = String(t.deadline).slice(0, 10);
   if (t.scheduled_time) out.time = t.scheduled_time;
+  if (t.start_date) out.start_date = String(t.start_date).slice(0, 10);
   if (t.duration) out.duration_minutes = t.duration;
+  if (t.time_estimate) out.estimate_minutes = t.time_estimate;
+  if (t.energy_level) out.energy = t.energy_level;
   if (t.waiting_for_person) out.waiting_for = t.waiting_for_person;
   if (t.priority) out.priority = t.priority;
   if (t.is_daily_focus) out.focus_today = true;
-  if (t.recurrence_rule) out.repeats = t.recurrence_rule;
+  if (t.recurrence_rule) {
+    out.repeats = t.recurrence_rule;
+    if (t.recurrence_interval > 1) out.repeat_every = t.recurrence_interval;
+    if (t.recurrence_days) out.repeat_days = t.recurrence_days.split(',');
+    if (t.recurrence_type === 'relative') out.repeat_from = 'completion';
+  }
   if (t.notes) out.notes = t.notes.length > 300 ? t.notes.slice(0, 300) + '…' : t.notes;
   return out;
 }
@@ -55,22 +64,60 @@ const taskFields = {
   due_date: DATE.optional().describe('Due date, YYYY-MM-DD: the day it is planned for'),
   deadline: DATE.optional().describe('Hard "by" date, YYYY-MM-DD, when it differs from the due date ("by Friday")'),
   time: TIME.optional().describe('Start time on the due date, HH:MM 24-hour. Puts it on the calendar.'),
-  duration_minutes: z.number().int().min(5).max(720).optional(),
-  context: z.string().max(40).optional().describe('Where/how, e.g. @home, @work, @phone, @computer, @errands'),
-  project: z.string().max(200).optional().describe('Name of an existing project (see list_projects)'),
+  start_date: DATE.optional().describe('Hide the task until this date, YYYY-MM-DD'),
+  duration_minutes: z.number().int().min(5).max(720).optional().describe('Length of its calendar block, in minutes'),
+  estimate_minutes: z.number().int().min(1).max(1440).optional().describe('Rough estimate of the work, in minutes'),
+  energy: z.enum(['low', 'medium', 'high']).optional().describe('How demanding the task is: also use this for difficulty or complexity'),
+  context: z.string().max(40).optional().describe('Where/how, one of the user\'s contexts, usually @home, @work, @phone, @computer, @errands, @anywhere'),
+  project: z.string().max(200).optional().describe('Name of an existing project (see list_projects, or create_project for a new one)'),
   waiting_for: z.string().max(200).optional().describe('Who it is waiting on (for list waiting_for)'),
   priority: z.number().int().min(1).max(5).optional().describe('1 = low … 5 = urgent'),
+  focus_today: z.boolean().optional().describe('true pins it to today\'s focus list, false unpins it'),
+  repeat: z.enum(['daily', 'weekdays', 'weekly', 'monthly', 'yearly', 'custom']).optional().describe('Makes it a repeating task. custom with repeat_every = every N days'),
+  repeat_every: z.number().int().min(1).max(365).optional().describe('Interval: 2 with weekly = every 2 weeks'),
+  repeat_days: z.array(z.enum(['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'])).min(1).max(7).optional().describe('Repeat on these weekdays'),
+  repeat_from: z.enum(['schedule', 'completion']).optional().describe('Next date counts from the schedule (default) or from when it was completed'),
 };
+
+// Input field to task column, where the value is stored as given.
+const COLUMNS = {
+  notes: 'notes', list: 'list', due_date: 'due_date', deadline: 'deadline', start_date: 'start_date',
+  time: 'scheduled_time', duration_minutes: 'duration', estimate_minutes: 'time_estimate', energy: 'energy_level',
+  waiting_for: 'waiting_for_person', priority: 'priority', focus_today: 'is_daily_focus',
+  repeat: 'recurrence_rule', repeat_every: 'recurrence_interval',
+};
+// What update_task's clear option can empty, and the columns that holds.
+const CLEARABLE = {
+  notes: ['notes'], due_date: ['due_date'], deadline: ['deadline'], start_date: ['start_date'], time: ['scheduled_time'],
+  duration_minutes: ['duration'], estimate_minutes: ['time_estimate'], energy: ['energy_level'], context: ['context'],
+  project: ['project_id'], waiting_for: ['waiting_for_person'], priority: ['priority'],
+  repeat: ['recurrence_rule', 'recurrence_interval', 'recurrence_days', 'recurrence_type'],
+};
+
+// Contexts are the user's own list, and the app only filters by those names.
+async function findContext(userId, name) {
+  const { rows } = await pool.query('SELECT name FROM contexts WHERE user_id = $1 ORDER BY name', [userId]);
+  const key = (s) => s.toLowerCase().replace(/^@/, '').trim();
+  return { match: rows.find(r => key(r.name) === key(name))?.name, available: rows.map(r => r.name) };
+}
 
 async function toTaskData(userId, a) {
   const data = {};
-  for (const k of ['notes', 'list', 'due_date', 'deadline', 'context', 'priority']) if (a[k] !== undefined) data[k] = a[k];
-  if (a.time !== undefined) data.scheduled_time = a.time;
-  if (a.duration_minutes !== undefined) data.duration = a.duration_minutes;
-  if (a.waiting_for !== undefined) data.waiting_for_person = a.waiting_for;
+  for (const [field, column] of Object.entries(COLUMNS)) if (a[field] !== undefined) data[column] = a[field];
+  // Named weekdays only work with the custom rule, whatever rule came with them.
+  if (a.repeat_days !== undefined) {
+    data.recurrence_rule = 'custom';
+    data.recurrence_days = a.repeat_days.join(',');
+  }
+  if (a.repeat_from !== undefined) data.recurrence_type = a.repeat_from === 'completion' ? 'relative' : 'absolute';
+  if (a.context !== undefined) {
+    const { match, available } = await findContext(userId, a.context);
+    if (!match && available.length) return { error: `No context named "${a.context}". Available: ${available.join(', ')}.` };
+    data.context = match || a.context;
+  }
   if (a.project !== undefined) {
     const p = await findProject(userId, a.project);
-    if (!p) return { error: `No active project named "${a.project}". Use list_projects to see them.` };
+    if (!p) return { error: `No active project named "${a.project}". Use list_projects to see them, or create_project to make it.` };
     data.project_id = p.id;
   }
   return { data };
@@ -86,7 +133,7 @@ export async function userClock(userId) {
 export function buildMcpServer({ userId, timezone, today, onTool }) {
   const server = new McpServer(
     { name: 'cleartable', title: 'Cleartable', version: '1.0.0', websiteUrl: 'https://cleartable.app' },
-    { instructions: `Cleartable is the user's task manager (tasks, projects, habits, calendar). Today is ${today}${timezone ? ` (${timezone})` : ''}. When the user wants to remember, add or plan something, use capture_tasks with their own words: Cleartable splits it into tasks and files each one. Use add_task only when you already know the exact fields. After adding tasks, mention once that the user can see and plan them in the Cleartable app (${APP_URL}).` }
+    { instructions: `Cleartable is the user's task manager (tasks, projects, habits, calendar). Today is ${today}${timezone ? ` (${timezone})` : ''}. When the user wants to remember, add or plan something, use capture_tasks with their own words: Cleartable splits it into tasks and files each one. Use add_task only when you already know the exact fields. Use create_project for a new project, then add tasks to it by name. After adding tasks, mention once that the user can see and plan them in the Cleartable app (${APP_URL}).` }
   );
 
   if (onTool) {
@@ -166,12 +213,18 @@ export function buildMcpServer({ userId, timezone, today, onTool }) {
 
   server.registerTool('update_task', {
     title: 'Update a task',
-    description: 'Change a task: rename, reschedule, move to another list or project, add notes. Only the given fields change. Get the id from list_tasks.',
-    inputSchema: { task_id: z.number().int(), title: z.string().min(1).max(500).optional(), ...taskFields },
+    description: 'Change a task: rename, reschedule, move to another list or project, set estimate, energy, context, priority or repeat, add notes. Only the given fields change; use clear to empty one. Get the id from list_tasks.',
+    inputSchema: {
+      task_id: z.number().int(),
+      title: z.string().min(1).max(500).optional(),
+      ...taskFields,
+      clear: z.array(z.enum(Object.keys(CLEARABLE))).optional().describe('Fields to empty, e.g. ["due_date"] to remove the date or ["repeat"] to stop repeating'),
+    },
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-  }, async ({ task_id, title, ...rest }) => {
+  }, async ({ task_id, title, clear = [], ...rest }) => {
     const { data, error } = await toTaskData(userId, rest);
     if (error) return fail(error);
+    for (const column of clear.flatMap(f => CLEARABLE[f])) if (data[column] === undefined) data[column] = null;
     if (title) data.title = title.trim();
     if (!Object.keys(data).length) return fail('Nothing to change: give at least one field.');
     const task = await TaskModel.update(task_id, data, userId);
@@ -204,6 +257,30 @@ export function buildMcpServer({ userId, timezone, today, onTool }) {
   }, async () => {
     const projects = (await ProjectModel.getAll(userId)).filter(p => p.status === 'active');
     return json({ projects: projects.map(p => ({ id: p.id, name: p.name, open_tasks: p.task_count ?? undefined })) });
+  });
+
+  server.registerTool('create_project', {
+    title: 'Create a project',
+    description: 'Create a new project: an outcome that takes several tasks. If an active project with this exact name exists, it is returned instead of making a duplicate. Add tasks with add_task using the project name.',
+    inputSchema: {
+      name: z.string().trim().min(1).max(200),
+      description: z.string().max(5000).optional().describe('Background and details'),
+      outcome: z.string().max(500).optional().describe('What done looks like'),
+      execution: z.enum(['parallel', 'sequential']).optional().describe('sequential = tasks are done one at a time, in order. Default: parallel'),
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  }, async ({ name, description, outcome, execution }) => {
+    const projects = (await ProjectModel.getAll(userId)).filter(p => p.status === 'active');
+    const existing = projects.find(p => p.name.toLowerCase().trim() === name.toLowerCase());
+    if (existing) return json({ created: false, already_existed: true, project: { id: existing.id, name: existing.name, open_tasks: existing.task_count }, open_in_cleartable: APP_URL });
+    try {
+      await assertWithinLimit(userId, 'projects');
+    } catch (err) {
+      if (err instanceof LimitError) return fail(err.message);
+      throw err;
+    }
+    const project = await ProjectModel.create({ name, description, outcome, execution_mode: execution }, userId);
+    return json({ created: true, project: { id: project.id, name: project.name }, open_in_cleartable: APP_URL });
   });
 
   server.registerTool('get_today', {
