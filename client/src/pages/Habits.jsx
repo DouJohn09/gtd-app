@@ -109,7 +109,7 @@ export default function Habits() {
 
   if (loading) {
     return (
-      <div className="px-6 lg:px-12 pt-10 pb-20">
+      <div className="px-4 sm:px-6 lg:px-12 pt-5 sm:pt-10 pb-20">
         <div className="min-h-[40vh] flex items-center justify-center">
           <div className="w-6 h-6 rounded-full border-2 border-violet/30 border-t-violet animate-spin" />
         </div>
@@ -118,12 +118,12 @@ export default function Habits() {
   }
 
   return (
-    <div className="px-6 lg:px-12 pt-10 pb-20 max-w-[1500px]">
+    <div className="px-4 sm:px-6 lg:px-12 pt-5 sm:pt-10 pb-20 max-w-[1500px]">
       {/* Header */}
-      <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4 mb-8">
+      <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4 mb-5 sm:mb-8">
         <div>
-          <MonoLabel tone="mint" className="mb-3">rituals</MonoLabel>
-          <h1 className="font-display text-[52px] md:text-[60px] leading-[1] tracking-tight">
+          <MonoLabel tone="mint" className="mb-1.5 sm:mb-3">rituals</MonoLabel>
+          <h1 className="font-display text-[28px] sm:text-[52px] md:text-[60px] leading-[1.05] sm:leading-[1] tracking-tight">
             Habits
             {buildCount > 0 && (
               <span className="font-mono text-[14px] tracking-wider text-text-3 ml-3 align-middle">
@@ -132,7 +132,7 @@ export default function Habits() {
             )}
           </h1>
           {buildCount > 0 && (
-            <p className="font-display italic text-[18px] text-text-2 mt-2">
+            <p className="font-display italic text-[14px] sm:text-[18px] text-text-2 mt-1 sm:mt-2">
               {dayPct === 1 ? 'A perfect day. All done.' :
                 dayPct >= 0.5 ? 'Halfway through. Keep going.' :
                   'Build the day, one ritual at a time.'}

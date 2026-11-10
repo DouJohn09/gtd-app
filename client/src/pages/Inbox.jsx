@@ -205,18 +205,17 @@ export default function Inbox() {
   }, [tasks]);
 
   return (
-    <div className="px-6 lg:px-12 pt-10 pb-20 max-w-[1400px]">
+    <div className="px-4 sm:px-6 lg:px-12 pt-5 sm:pt-10 pb-20 max-w-[1400px]">
       {/* Headline */}
-      {/* Headline */}
-      <div className="mb-10 fresh-stagger">
-        <MonoLabel tone="amber" className="mb-3">capture</MonoLabel>
-        <h1 className="font-display text-[52px] md:text-[60px] leading-[1] tracking-tight">
+      <div className="mb-5 sm:mb-10 fresh-stagger">
+        <MonoLabel tone="amber" className="mb-1.5 sm:mb-3">capture</MonoLabel>
+        <h1 className="font-display text-[28px] sm:text-[52px] md:text-[60px] leading-[1.05] sm:leading-[1] tracking-tight">
           Inbox
           <span className="font-mono text-[14px] tracking-wider text-text-3 ml-3 align-middle">
             {tasks.length.toString().padStart(2, '0')}
           </span>
         </h1>
-        <p className="font-display italic text-[18px] text-text-2 mt-2">
+        <p className="font-display italic text-[14px] sm:text-[18px] text-text-2 mt-1 sm:mt-2">
           Get it out of your head. Process later.
         </p>
       </div>
@@ -224,8 +223,8 @@ export default function Inbox() {
       <div className="grid grid-cols-12 gap-5 fresh-stagger">
         {/* Left — capture + list */}
         <section className="col-span-12 xl:col-span-8 flex flex-col gap-5">
-          {/* Quick capture */}
-          <div className="rounded-2xl glass p-4">
+          {/* Quick capture — phones use the + in the tab bar instead */}
+          <div className="rounded-2xl glass p-4 max-md:hidden">
             <QuickCapture onCapture={fetchData} />
           </div>
 

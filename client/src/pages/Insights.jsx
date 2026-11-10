@@ -114,11 +114,11 @@ export default function Insights() {
   const reality = data?.reality;
 
   return (
-    <div className="px-6 lg:px-12 pt-10 pb-20 max-w-[1400px]">
-      <div className="mb-10 fresh-stagger">
-        <MonoLabel className="mb-3">patterns · last 8 weeks</MonoLabel>
-        <h1 className="font-display text-[52px] md:text-[60px] leading-[1] tracking-tight">Insights</h1>
-        <p className="mt-4 text-[15px] max-w-xl text-text-2">
+    <div className="px-4 sm:px-6 lg:px-12 pt-5 sm:pt-10 pb-20 max-w-[1400px]">
+      <div className="mb-5 sm:mb-10 fresh-stagger">
+        <MonoLabel className="mb-1.5 sm:mb-3">patterns · last 8 weeks</MonoLabel>
+        <h1 className="font-display text-[28px] sm:text-[52px] md:text-[60px] leading-[1.05] sm:leading-[1] tracking-tight">Insights</h1>
+        <p className="mt-2 sm:mt-4 text-[13.5px] sm:text-[15px] max-w-xl text-text-2">
           What your own history says. Nothing to set up — it reads the timestamps you already leave behind and
           gets more honest the longer you use Cleartable.
         </p>

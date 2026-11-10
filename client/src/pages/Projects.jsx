@@ -191,12 +191,12 @@ export default function Projects() {
   };
 
   return (
-    <div className="px-6 lg:px-12 pt-10 pb-20 max-w-[1200px]">
+    <div className="px-4 sm:px-6 lg:px-12 pt-5 sm:pt-10 pb-20 max-w-[1200px]">
       {/* Header */}
-      <div className="flex items-end justify-between mb-10 gap-4">
+      <div className="flex items-end justify-between mb-5 sm:mb-10 gap-4">
         <div>
-          <MonoLabel className="mb-3">multi-step outcomes</MonoLabel>
-          <h1 className="font-display text-[52px] md:text-[60px] leading-[1] tracking-tight">
+          <MonoLabel className="mb-1.5 sm:mb-3">multi-step outcomes</MonoLabel>
+          <h1 className="font-display text-[28px] sm:text-[52px] md:text-[60px] leading-[1.05] sm:leading-[1] tracking-tight">
             Projects
             {!loading && (
               <span className="ml-3 font-mono text-[18px] text-text-3 align-middle">
@@ -204,7 +204,7 @@ export default function Projects() {
               </span>
             )}
           </h1>
-          <p className="mt-3 text-[14.5px] text-text-2 max-w-md">
+          <p className="mt-3 text-[14.5px] text-text-2 max-w-md max-sm:hidden">
             Anything that takes more than one action. Sequential to enforce order, parallel to keep options open.
           </p>
         </div>
@@ -321,16 +321,16 @@ export default function Projects() {
                 {/* Header row */}
                 <button
                   onClick={() => handleExpand(project.id)}
-                  className="w-full text-left p-5 flex items-center gap-4"
+                  className="w-full text-left p-5 max-sm:p-3.5 flex items-center gap-4 max-sm:gap-3"
                 >
                   <div
-                    className="w-11 h-11 rounded-xl grid place-items-center shrink-0"
+                    className="w-11 h-11 max-sm:w-9 max-sm:h-9 rounded-xl grid place-items-center shrink-0"
                     style={{ background: tint(0.10), border: `1px solid ${tint(0.22)}` }}
                   >
                     <FolderKanban className="w-4 h-4" style={{ color: `rgb(var(--${tone}))` }} />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="font-display text-[20px] leading-tight truncate">{project.name}</div>
+                    <div className="font-display text-[20px] max-sm:text-[17px] leading-tight truncate">{project.name}</div>
                     {project.outcome && (
                       <div className="text-[12.5px] text-text-2 truncate mt-0.5">{project.outcome}</div>
                     )}

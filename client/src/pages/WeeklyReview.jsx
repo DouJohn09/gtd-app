@@ -237,7 +237,7 @@ export default function WeeklyReview() {
 
   if (loading) {
     return (
-      <div className="px-6 lg:px-12 pt-10 pb-20">
+      <div className="px-4 sm:px-6 lg:px-12 pt-5 sm:pt-10 pb-20">
         <div className="min-h-[40vh] flex flex-col items-center justify-center gap-3">
           <div className="w-6 h-6 rounded-full border-2 border-violet/30 border-t-violet animate-spin" />
           <p className="font-mono text-[11px] text-text-3 uppercase tracking-wider">analyzing_your_system</p>
@@ -248,7 +248,7 @@ export default function WeeklyReview() {
 
   if (!reviewData) {
     return (
-      <div className="px-6 lg:px-12 pt-10 pb-20">
+      <div className="px-4 sm:px-6 lg:px-12 pt-5 sm:pt-10 pb-20">
         <div className="rounded-2xl glass p-8 text-center text-text-2">Failed to load review data. Please try again.</div>
       </div>
     );
@@ -260,11 +260,11 @@ export default function WeeklyReview() {
   const aiIsOff = ai.error === 'ai_off';
 
   return (
-    <div className="px-6 lg:px-12 pt-10 pb-20 max-w-5xl">
+    <div className="px-4 sm:px-6 lg:px-12 pt-5 sm:pt-10 pb-20 max-w-5xl">
       {/* Header */}
-      <div className="mb-8">
-        <MonoLabel tone="violet" className="mb-3">ritual</MonoLabel>
-        <h1 className="font-display text-[52px] md:text-[60px] leading-[1] tracking-tight flex items-baseline gap-3 flex-wrap">
+      <div className="mb-5 sm:mb-8">
+        <MonoLabel tone="violet" className="mb-1.5 sm:mb-3">ritual</MonoLabel>
+        <h1 className="font-display text-[28px] sm:text-[52px] md:text-[60px] leading-[1.05] sm:leading-[1] tracking-tight flex items-baseline gap-3 flex-wrap">
           Weekly Review <span className="text-text-3">&amp;</span> Planning
           {reviewData.streak > 0 && (
             <span
@@ -275,7 +275,7 @@ export default function WeeklyReview() {
             </span>
           )}
         </h1>
-        <p className="font-display italic text-[18px] text-text-2 mt-2">
+        <p className="font-display italic text-[14px] sm:text-[18px] text-text-2 mt-1 sm:mt-2">
           {reviewData.lastReview
             ? `Last review · ${new Date(reviewData.lastReview.completed_at).toLocaleDateString()}`
             : 'Your first weekly review.'}

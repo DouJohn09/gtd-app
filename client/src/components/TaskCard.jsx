@@ -41,7 +41,7 @@ export default function TaskCard({ task, onComplete, onEdit, showList = false, q
   return (
     <div
       data-task-id={task.id}
-      className="relative rounded-2xl glass p-4 flex items-start gap-3 transition-all"
+      className="relative rounded-2xl glass p-4 max-sm:px-3 max-sm:py-2.5 flex items-start gap-3 max-sm:gap-2.5 transition-all"
       style={
         isCompleted
           ? { opacity: 0.6 }
@@ -83,10 +83,10 @@ export default function TaskCard({ task, onComplete, onEdit, showList = false, q
         </button>
 
         {notesText && (
-          <p className="text-[12px] text-text-3 mt-1 line-clamp-2 leading-relaxed [overflow-wrap:anywhere]">{notesText}</p>
+          <p className="text-[12px] text-text-3 mt-1 line-clamp-2 max-sm:line-clamp-1 leading-relaxed [overflow-wrap:anywhere]">{notesText}</p>
         )}
 
-        <div className="flex flex-wrap items-center gap-1.5 mt-2">
+        <div className="flex flex-wrap items-center gap-1.5 max-sm:gap-1 mt-2 max-sm:mt-1.5">
           {showList && (
             <span className={`gtd-badge list-${task.list}`}>{listLabel(task.list)}</span>
           )}

@@ -72,11 +72,11 @@ function Go({ to, children }) {
 
 export default function Guide() {
   return (
-    <div className="px-6 lg:px-12 pt-10 pb-20 max-w-[1100px]">
-      <div className="mb-10 fresh-stagger">
-        <MonoLabel className="mb-3">guide · how to get the most out of it</MonoLabel>
-        <h1 className="font-display text-[44px] md:text-[60px] leading-[1] tracking-tight">Make it yours</h1>
-        <p className="mt-4 text-[15px] max-w-xl text-text-2">
+    <div className="px-4 sm:px-6 lg:px-12 pt-5 sm:pt-10 pb-20 max-w-[1100px]">
+      <div className="mb-5 sm:mb-10 fresh-stagger">
+        <MonoLabel className="mb-1.5 sm:mb-3">guide · how to get the most out of it</MonoLabel>
+        <h1 className="font-display text-[28px] sm:text-[44px] md:text-[60px] leading-[1.05] sm:leading-[1] tracking-tight">Make it yours</h1>
+        <p className="mt-2 sm:mt-4 text-[13.5px] sm:text-[15px] max-w-xl text-text-2">
           You don’t need all of this on day one. Start with the first four steps; come back when you want more.
         </p>
       </div>

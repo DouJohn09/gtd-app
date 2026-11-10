@@ -121,7 +121,7 @@ export default function CompletedTasks() {
 
   if (loading) {
     return (
-      <div className="px-6 lg:px-12 pt-10 pb-20">
+      <div className="px-4 sm:px-6 lg:px-12 pt-5 sm:pt-10 pb-20">
         <div className="min-h-[40vh] flex items-center justify-center">
           <div className="w-6 h-6 rounded-full border-2 border-violet/30 border-t-violet animate-spin" />
         </div>
@@ -130,18 +130,18 @@ export default function CompletedTasks() {
   }
 
   return (
-    <div className="px-6 lg:px-12 pt-10 pb-20 max-w-5xl">
+    <div className="px-4 sm:px-6 lg:px-12 pt-5 sm:pt-10 pb-20 max-w-5xl">
       {/* Header */}
-      <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4 mb-8">
+      <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4 mb-5 sm:mb-8">
         <div>
-          <MonoLabel tone="mint" className="mb-3">archive</MonoLabel>
-          <h1 className="font-display text-[52px] md:text-[60px] leading-[1] tracking-tight">
+          <MonoLabel tone="mint" className="mb-1.5 sm:mb-3">archive</MonoLabel>
+          <h1 className="font-display text-[28px] sm:text-[52px] md:text-[60px] leading-[1.05] sm:leading-[1] tracking-tight">
             Completed
             <span className="font-mono text-[14px] tracking-wider text-text-3 ml-3 align-middle">
               {tasks.length.toString().padStart(2, '0')}
             </span>
           </h1>
-          <p className="font-display italic text-[18px] text-text-2 mt-2">
+          <p className="font-display italic text-[14px] sm:text-[18px] text-text-2 mt-1 sm:mt-2">
             {tasks.length === 0 ? 'Nothing finished yet — soon.' : 'A history of things done.'}
           </p>
         </div>

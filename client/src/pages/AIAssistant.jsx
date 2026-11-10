@@ -242,10 +242,10 @@ export default function AIAssistant() {
   // direct links and bookmarks.)
   if (aiOff) {
     return (
-      <div className="px-6 lg:px-12 pt-10 pb-20 max-w-3xl">
-        <div className="mb-8">
-          <MonoLabel tone="violet" className="mb-3">intelligence</MonoLabel>
-          <h1 className="font-display text-[52px] md:text-[60px] leading-[1] tracking-tight">AI Assistant</h1>
+      <div className="px-4 sm:px-6 lg:px-12 pt-5 sm:pt-10 pb-20 max-w-3xl">
+        <div className="mb-5 sm:mb-8">
+          <MonoLabel tone="violet" className="mb-1.5 sm:mb-3">intelligence</MonoLabel>
+          <h1 className="font-display text-[28px] sm:text-[52px] md:text-[60px] leading-[1.05] sm:leading-[1] tracking-tight">AI Assistant</h1>
         </div>
         <div className="rounded-2xl glass p-8">
           <div className="mono-label mb-3">ai_is_off</div>
@@ -265,15 +265,15 @@ export default function AIAssistant() {
   }
 
   return (
-    <div className="px-6 lg:px-12 pt-10 pb-20 max-w-5xl">
+    <div className="px-4 sm:px-6 lg:px-12 pt-5 sm:pt-10 pb-20 max-w-5xl">
       {/* Header */}
-      <div className="mb-8">
-        <MonoLabel tone="violet" className="mb-3">intelligence</MonoLabel>
-        <h1 className="font-display text-[52px] md:text-[60px] leading-[1] tracking-tight flex items-baseline gap-3">
+      <div className="mb-5 sm:mb-8">
+        <MonoLabel tone="violet" className="mb-1.5 sm:mb-3">intelligence</MonoLabel>
+        <h1 className="font-display text-[28px] sm:text-[52px] md:text-[60px] leading-[1.05] sm:leading-[1] tracking-tight flex items-baseline gap-3">
           AI Assistant
           <Sparkles className="w-6 h-6 self-center" style={{ color: 'rgb(var(--violet-glow))' }} />
         </h1>
-        <p className="font-display italic text-[18px] text-text-2 mt-2">
+        <p className="font-display italic text-[14px] sm:text-[18px] text-text-2 mt-1 sm:mt-2">
           Process, prioritize, dedupe — at the speed of thought.
         </p>
       </div>

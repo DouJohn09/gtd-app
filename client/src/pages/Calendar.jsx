@@ -358,12 +358,12 @@ export default function Calendar() {
   };
 
   return (
-    <div className="px-6 lg:px-12 pt-10 pb-20 max-w-[1500px]">
+    <div className="px-4 sm:px-6 lg:px-12 pt-5 sm:pt-10 pb-20 max-w-[1500px]">
       {/* Header */}
-      <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4 mb-8">
+      <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4 mb-5 sm:mb-8">
         <div>
-          <MonoLabel className="mb-3">schedule</MonoLabel>
-          <h1 className="font-display text-[52px] md:text-[60px] leading-[1] tracking-tight">Calendar</h1>
+          <MonoLabel className="mb-1.5 sm:mb-3">schedule</MonoLabel>
+          <h1 className="font-display text-[28px] sm:text-[52px] md:text-[60px] leading-[1.05] sm:leading-[1] tracking-tight">Calendar</h1>
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">

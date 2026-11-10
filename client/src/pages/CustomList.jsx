@@ -136,20 +136,20 @@ export default function CustomList() {
   const doneCount = items.filter(i => i.status === 'done').length;
 
   return (
-    <div className="px-6 lg:px-12 pt-10 pb-20 max-w-5xl">
+    <div className="px-4 sm:px-6 lg:px-12 pt-5 sm:pt-10 pb-20 max-w-5xl">
       {/* Header */}
-      <div className="mb-8">
+      <div className="mb-5 sm:mb-8">
         <div className="flex items-end justify-between gap-4 mb-2">
           <div>
-            <MonoLabel tone={color} className="mb-3">{list.icon}</MonoLabel>
-            <h1 className="font-display text-[46px] md:text-[56px] leading-[1] tracking-tight">
+            <MonoLabel tone={color} className="mb-1.5 sm:mb-3">{list.icon}</MonoLabel>
+            <h1 className="font-display text-[28px] sm:text-[46px] md:text-[56px] leading-[1.05] sm:leading-[1] tracking-tight">
               {list.name}
               <span className="font-mono text-[14px] tracking-wider text-text-3 ml-3 align-middle">
                 {items.length.toString().padStart(2, '0')}
               </span>
             </h1>
             {items.length > 0 && (
-              <p className="font-display italic text-[18px] text-text-2 mt-2">
+              <p className="font-display italic text-[14px] sm:text-[18px] text-text-2 mt-1 sm:mt-2">
                 {doneCount} of {items.length} done
               </p>
             )}
