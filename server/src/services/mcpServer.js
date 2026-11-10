@@ -133,7 +133,7 @@ export async function userClock(userId) {
 export function buildMcpServer({ userId, timezone, today, onTool }) {
   const server = new McpServer(
     { name: 'cleartable', title: 'Cleartable', version: '1.0.0', websiteUrl: 'https://cleartable.app' },
-    { instructions: `Cleartable is the user's task manager (tasks, projects, habits, calendar). Today is ${today}${timezone ? ` (${timezone})` : ''}. When the user wants to remember, add or plan something, use capture_tasks with their own words: Cleartable splits it into tasks and files each one. Use add_task only when you already know the exact fields. Use create_project for a new project, then add tasks to it by name. After adding tasks, mention once that the user can see and plan them in the Cleartable app (${APP_URL}).` }
+    { instructions: `Cleartable is the user's task manager (tasks, projects, habits, calendar). Today is ${today}${timezone ? ` (${timezone})` : ''}. When the user wants to remember, add or plan something, use capture_tasks with their own words: Cleartable splits it into tasks and files each one. For a list of more than 8 items, call capture_tasks several times with up to 8 items each. Use add_task only when you already know the exact fields. Use create_project for a new project, then add tasks to it by name. After adding tasks, mention once that the user can see and plan them in the Cleartable app (${APP_URL}).` }
   );
 
   if (onTool) {
@@ -152,7 +152,7 @@ export function buildMcpServer({ userId, timezone, today, onTool }) {
 
   server.registerTool('capture_tasks', {
     title: 'Capture tasks',
-    description: 'Add one or more tasks from plain language, the way the user said it ("call the dentist tomorrow, and remind me to send Anna the budget on Friday"). Cleartable\'s AI splits it into separate tasks and sorts each one: list, due date, context, project, calendar time. Best default for adding anything.',
+    description: 'Add one or more tasks from plain language, the way the user said it ("call the dentist tomorrow, and remind me to send Anna the budget on Friday"). Cleartable\'s AI splits it into separate tasks and sorts each one: list, due date, context, project, calendar time. Best default for adding anything. One call sorts at most 8 tasks, so split a longer list into several calls of up to 8 items each.',
     inputSchema: { text: z.string().min(1).max(MAX_CAPTURE_CHARS).describe('What to capture, in natural language') },
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
   }, async ({ text }) => {

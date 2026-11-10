@@ -218,7 +218,10 @@ export function __setForceRoute(r) { _forceRoute = r; }
 // the problem list); if the repair still fails validation, the next model is
 // tried. Validators should only report problems that make the whole answer
 // unusable — drop bad items instead of reporting them where the caller can.
-export async function complete(task, params, validate = null) {
+// opts.timeoutMs replaces the task's timeout for the first model only: a long
+// input needs longer to answer, while fallbacks are there for outages, where
+// failing fast is better.
+export async function complete(task, params, validate = null, opts = {}) {
   const chain = _forceRoute ? [_forceRoute] : (ROUTING[task] || HEAVY);
   const available = chain.filter((r) => PROVIDERS[r.provider]);
   if (!available.length) return null;
@@ -230,11 +233,12 @@ export async function complete(task, params, validate = null) {
   const tuning = TASK_PARAMS[task] || {};
   const taskTimeout = TASK_TIMEOUT_MS[task] || DEFAULT_TIMEOUT_MS;
   const errors = [];
-  for (const route of attempts) {
+  for (const [i, route] of attempts.entries()) {
     const { provider, model } = route;
     const key = keyOf(route);
     const client = PROVIDERS[provider];
-    const timeout = provider === 'groq' ? Math.min(taskTimeout, GROQ_TIMEOUT_MS) : taskTimeout;
+    const ownTimeout = i === 0 && opts.timeoutMs ? opts.timeoutMs : taskTimeout;
+    const timeout = provider === 'groq' ? Math.min(ownTimeout, GROQ_TIMEOUT_MS) : ownTimeout;
     try {
       let messages = params.messages;
       for (let round = 0; round < 2; round++) {

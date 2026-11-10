@@ -254,7 +254,15 @@ Respond with JSON — an object with a "tasks" array holding one entry per task 
 export async function smartCapture(rawText, userContexts, projects, today, dayName, history = [], existingTitles = []) {
   if (!aiConfigured()) return null;
   const messages = buildSmartCaptureMessages(rawText, userContexts, projects, today, dayName, history, existingTitles);
-  return complete('smart-capture', { messages, response_format: { type: 'json_object' } }, validateSmartCaptureTasks);
+  return complete('smart-capture', { messages, response_format: { type: 'json_object' } }, validateSmartCaptureTasks,
+    { timeoutMs: captureTimeoutMs(rawText) });
+}
+
+// A long brain dump means a long answer (up to 8 tasks): 15 s for a short
+// thought, then 1.5 s more per 100 characters past 300, at most 40 s.
+// On 2026-11-09 a long capture from Claude timed out on both OpenAI models at 15 s.
+export function captureTimeoutMs(rawText) {
+  return Math.min(40_000, 15_000 + Math.max(0, (rawText?.length || 0) - 300) * 15);
 }
 
 export async function analyzeTask(task, userContexts, projects = [], today = null, dayName = null, history = []) {
