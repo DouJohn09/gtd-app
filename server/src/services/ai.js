@@ -1,4 +1,5 @@
 import { upcomingDaysTable } from '../lib/relativeDate.js';
+import { languageRule } from '../lib/language.js';
 import { lookup } from 'node:dns/promises';
 import net from 'node:net';
 import {
@@ -24,7 +25,9 @@ const clip = (s, n) => {
 const TITLE_MAX = 200;
 const NOTES_MAX = 300;
 
-function getSystemPrompt(userContexts) {
+// appLanguage: the language explanations are written in (the app is English
+// only for now, so callers leave it out).
+function getSystemPrompt(userContexts, { appLanguage } = {}) {
   const contextList = userContexts?.length
     ? userContexts.map(c => c.name || c).join(', ')
     : '@home, @work, @errands, @computer, @phone, @anywhere';
@@ -51,6 +54,8 @@ When analyzing tasks:
 Priority scale (whenever a "priority" field appears): integer 1-5 where 5 = most urgent/important and 1 = least. Higher numbers sort first in the app.
 
 Any "reasoning" or "reason" field you write is shown to the user in the UI. Write it in plain, friendly language a person who has never heard of GTD understands — say "this is a clear single step you can act on" rather than "this is the next physical action".
+
+${languageRule(appLanguage)}
 
 Always respond in JSON format as specified in each request.`;
 }
@@ -192,6 +197,7 @@ FREE-SLOT INTENT RULES (auto-scheduling):
 
 OTHER RULES:
 - Title rule: preserve the user's intent. Produce a clear, complete action statement — NOT a 2–3 word keyword summary. Keep the verb, the object, and any meaningful qualifier ("in the URL", "for the bookmark", "before Friday", etc.). Aim for natural phrasing (typically 5–15 words). Strip ONLY parsed dates/times/recurrence patterns and obvious filler ("um", "like", "I want to", "I need to"). Do NOT compress nouns, drop qualifiers, or paraphrase into vague keywords.
+- Title language: write each title in the language the user used for that task, even when every example here is English. "vyzvednout balík na poště" → "Vyzvednout balík na poště" (NOT "Pick up the parcel"); "Steuererklärung bis Freitag abgeben" → "Steuererklärung abgeben"; "माँ को फोन करना" → "माँ को फोन करना". This applies to waiting-for and someday tasks too. Translating a title into English is an error.
 - Examples of over-compression to AVOID:
   - Input: "Work GTD app project: make URL or the bookmark in the URL not say GTD app." → BAD title: "URL bookmark name". GOOD title: "Rename the URL/bookmark so it doesn't say 'GTD app'".
   - Input: "Ping Sarah next week about whether the Q3 forecast assumes the new pricing." → BAD title: "Sarah Q3 pricing". GOOD title: "Ask Sarah whether the Q3 forecast assumes the new pricing".
