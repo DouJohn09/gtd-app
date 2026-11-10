@@ -15,7 +15,7 @@ export default function HabitCard({ habit, onToggle, onEdit, onDelete }) {
 
   return (
     <div
-      className="rounded-2xl glass p-3.5 flex items-center gap-3 group transition-all"
+      className="rounded-2xl glass p-3.5 max-sm:p-3 flex items-center gap-3 max-sm:gap-2.5 group transition-all"
       style={
         done
           ? { boxShadow: '0 8px 32px -12px rgba(0,0,0,0.4), inset 0 1px 0 rgb(255 255 255 / 0.05), inset 0 0 0 1px rgba(255,255,255,0.05), inset 3px 0 0 rgb(var(--mint-glow))' }
@@ -57,7 +57,8 @@ export default function HabitCard({ habit, onToggle, onEdit, onDelete }) {
         {slipped && <X className="w-3.5 h-3.5" strokeWidth={3} style={{ color: 'rgb(var(--rose-glow))' }} />}
       </button>
 
-      <div className="flex-1 min-w-0">
+      {/* Tapping the habit opens it for editing, as tapping a task does. */}
+      <button type="button" onClick={() => onEdit(habit)} className="flex-1 min-w-0 text-left select-none [touch-action:manipulation]">
         <div className="flex items-center gap-2 flex-wrap">
           <span className={`text-[14px] font-medium ${done ? 'line-through text-text-3' : skipped ? 'text-text-3' : 'text-text-1'}`}>
             {habit.name}
@@ -79,7 +80,7 @@ export default function HabitCard({ habit, onToggle, onEdit, onDelete }) {
           )}
           {habit.category && (
             <span
-              className="font-mono text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded-md"
+              className="font-mono text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded-md max-sm:hidden"
               style={{ background: `${habit.color}20`, color: habit.color, boxShadow: `inset 0 0 0 1px ${habit.color}40` }}
             >
               {habit.category}
@@ -89,7 +90,7 @@ export default function HabitCard({ habit, onToggle, onEdit, onDelete }) {
         {habit.description && (
           <p className="text-[12px] text-text-3 truncate mt-0.5">{habit.description}</p>
         )}
-      </div>
+      </button>
 
       {habit.streak > 0 && (
         isQuit ? (
@@ -122,13 +123,15 @@ export default function HabitCard({ habit, onToggle, onEdit, onDelete }) {
         </button>
         <button
           onClick={() => onEdit(habit)}
-          className="p-1.5 [@media(pointer:coarse)]:p-2.5 text-text-3 hover:text-text-1 rounded-lg transition-colors"
+          className="p-1.5 [@media(pointer:coarse)]:p-2.5 text-text-3 hover:text-text-1 rounded-lg transition-colors max-sm:hidden"
+          aria-label="Edit habit"
         >
           <Pencil className="w-3.5 h-3.5" />
         </button>
         <button
           onClick={() => onDelete(habit.id)}
-          className="p-1.5 [@media(pointer:coarse)]:p-2.5 text-text-3 hover:text-rose-glow rounded-lg transition-colors"
+          className="p-1.5 [@media(pointer:coarse)]:p-2.5 text-text-3 hover:text-rose-glow rounded-lg transition-colors max-sm:hidden"
+          aria-label="Delete habit"
         >
           <Trash2 className="w-3.5 h-3.5" />
         </button>

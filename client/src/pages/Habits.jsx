@@ -120,7 +120,7 @@ export default function Habits() {
   return (
     <div className="px-4 sm:px-6 lg:px-12 pt-5 sm:pt-10 pb-20 max-w-[1500px]">
       {/* Header */}
-      <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4 mb-5 sm:mb-8">
+      <div className="flex flex-col max-sm:flex-row max-sm:items-end max-sm:justify-between max-sm:gap-3 lg:flex-row lg:items-end lg:justify-between gap-4 mb-5 sm:mb-8">
         <div>
           <MonoLabel tone="mint" className="mb-1.5 sm:mb-3">rituals</MonoLabel>
           <h1 className="font-display text-[28px] sm:text-[52px] md:text-[60px] leading-[1.05] sm:leading-[1] tracking-tight">
@@ -139,19 +139,20 @@ export default function Habits() {
             </p>
           )}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           <button
             onClick={() => setShowRestDays(true)}
+            aria-label="Rest days"
             className="gtd-btn gtd-btn-secondary inline-flex items-center gap-1.5 text-[12.5px]"
             title="Mark a date range as rest days"
           >
-            <Palmtree className="w-3.5 h-3.5" /> Rest days
+            <Palmtree className="w-3.5 h-3.5" /> <span className="max-sm:hidden">Rest days</span>
           </button>
           <button
             onClick={() => { setEditingHabit(null); setShowModal(true); }}
             className="gtd-btn gtd-btn-primary inline-flex items-center gap-1.5 text-[12.5px]"
           >
-            <Plus className="w-3.5 h-3.5" /> New Habit
+            <Plus className="w-3.5 h-3.5" /> New<span className="max-sm:hidden"> Habit</span>
           </button>
         </div>
       </div>
@@ -217,7 +218,7 @@ export default function Habits() {
           </div>
         </div>
       ) : (
-        <div className="space-y-8">
+        <div className="space-y-8 max-sm:space-y-5">
           {/* Habits by category */}
           {Object.entries(grouped).map(([category, categoryHabits]) => (
             <div key={category}>
@@ -256,10 +257,10 @@ export default function Habits() {
                 <div className="mono-label" style={{ color: 'rgb(var(--mint-glow))' }}>last_30_days</div>
                 <div className="flex-1 h-px" style={{ background: 'linear-gradient(to right, rgba(255,255,255,0.06), transparent)' }} />
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3">
                 {stats.habits.map(h => (
-                  <div key={h.id} className="rounded-2xl glass p-4 relative overflow-hidden">
-                    <div className="flex items-center gap-2 mb-3">
+                  <div key={h.id} className="rounded-2xl glass p-4 max-sm:p-3 relative overflow-hidden">
+                    <div className="flex items-center gap-2 mb-3 max-sm:mb-2 min-w-0">
                       <div
                         className="w-2 h-2 rounded-full"
                         style={{ background: h.color, boxShadow: `0 0 10px ${h.color}aa` }}
@@ -268,7 +269,7 @@ export default function Habits() {
                     </div>
                     <div className="flex items-end justify-between gap-2">
                       <div>
-                        <div className="font-display text-[34px] leading-none" style={{ color: h.color }}>
+                        <div className="font-display text-[34px] max-sm:text-[26px] leading-none" style={{ color: h.color }}>
                           {h.completionRate}<span className="text-[16px] text-text-3 ml-0.5">%</span>
                         </div>
                         <div className="font-mono text-[10.5px] text-text-3 mt-1">
@@ -309,7 +310,7 @@ export default function Habits() {
                 <div className="mono-label">activity_90d</div>
                 <div className="flex-1 h-px" style={{ background: 'linear-gradient(to right, rgba(255,255,255,0.06), transparent)' }} />
               </div>
-              <div className="rounded-2xl glass p-5">
+              <div className="rounded-2xl glass p-5 max-sm:p-3.5">
                 <Heatmap data={stats.heatmap} totalHabits={habits.length} />
                 <div className="flex items-center justify-end gap-2 mt-4">
                   <span className="font-mono text-[10px] text-text-3 uppercase tracking-wider">less</span>
@@ -331,6 +332,7 @@ export default function Habits() {
           habit={editingHabit}
           onClose={() => { setShowModal(false); setEditingHabit(null); }}
           onSave={handleSave}
+          onDelete={(id) => { setShowModal(false); setEditingHabit(null); setConfirmDeleteId(id); }}
           existingCategories={[...new Set(habits.map(h => h.category).filter(Boolean))]}
           existingHabitNames={habits.map(h => h.name)}
         />

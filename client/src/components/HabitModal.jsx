@@ -1,6 +1,6 @@
 import { createPortal } from 'react-dom';
 import { useState, useEffect, useMemo } from 'react';
-import { X, Plus, Sparkles } from 'lucide-react';
+import { X, Plus, Sparkles, Trash2 } from 'lucide-react';
 
 const COLORS = ['#a78bfa', '#5eead4', '#fbbf24', '#fb7185', '#60a5fa', '#f472b6', '#34d399', '#f97316'];
 const DAYS = [
@@ -45,7 +45,7 @@ export const SUGGESTED_HABITS = [
   { name: 'Learn Something New', description: 'Study or practice',    category: 'Learning',     color: '#f97316', frequency: 'daily' },
 ];
 
-export default function HabitModal({ habit, onClose, onSave, existingCategories = [], existingHabitNames = [] }) {
+export default function HabitModal({ habit, onClose, onSave, onDelete, existingCategories = [], existingHabitNames = [] }) {
   const [form, setForm] = useState({
     name: '', description: '', frequency: 'daily', target_days: [],
     category: '', color: '#a78bfa', type: 'build',
@@ -443,6 +443,17 @@ export default function HabitModal({ habit, onClose, onSave, existingCategories 
           </div>
 
           <div className="sticky -bottom-5 -mx-5 -mb-5 px-5 pb-5 flex gap-2 pt-3 border-t border-white/[0.05]" style={{ background: 'rgba(16,16,24,0.92)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }}>
+            {habit?.id && onDelete && (
+              <button
+                type="button"
+                onClick={() => onDelete(habit.id)}
+                aria-label="Delete habit"
+                title="Delete habit"
+                className="gtd-btn gtd-btn-secondary px-3 text-text-3 hover:text-rose-glow"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            )}
             <button type="button" onClick={onClose} className="gtd-btn gtd-btn-secondary flex-1 text-[12.5px]">
               Cancel
             </button>
