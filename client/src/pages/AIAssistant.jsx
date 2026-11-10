@@ -278,7 +278,7 @@ export default function AIAssistant() {
         </p>
       </div>
 
-      <div className="grid md:grid-cols-2 gap-5">
+      <div className="grid md:grid-cols-2 gap-5 max-sm:gap-3">
         {/* Process Inbox */}
         <ToolCard
           tone="amber"
@@ -560,7 +560,7 @@ export default function AIAssistant() {
         title="Find Duplicates"
         subtitle="Scan for similar or repeated tasks."
         icon={Copy}
-        className="mt-5"
+        className="mt-5 max-sm:mt-3"
       >
         {dupDone !== null && !dupResult && (
           <SuccessCallout>
@@ -675,7 +675,7 @@ export default function AIAssistant() {
         title="Import Notes"
         subtitle="Paste raw text — AI structures it for you."
         icon={FileText}
-        className="mt-5"
+        className="mt-5 max-sm:mt-3"
       >
         {importDone !== null && !importResult && (
           <SuccessCallout>
@@ -688,7 +688,7 @@ export default function AIAssistant() {
             <textarea
               value={importText}
               onChange={(e) => setImportText(e.target.value)}
-              className="gtd-input min-h-[160px] mb-3 font-mono text-[12.5px]"
+              className="gtd-input min-h-[160px] max-sm:min-h-[110px] mb-3 font-mono text-[12.5px]"
               placeholder={"Paste your notes here...\n\nExample:\n- Buy groceries for the week\n- Call dentist to schedule appointment\n- Waiting for Bob to send the report\n- Learn Spanish someday"}
             />
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -998,24 +998,24 @@ export default function AIAssistant() {
 function ToolCard({ tone = 'violet', eyebrow, title, subtitle, icon: Icon, children, className = '' }) {
   return (
     <div
-      className={`relative rounded-2xl glass p-5 overflow-hidden ${className}`}
+      className={`relative rounded-2xl glass p-5 max-sm:p-3.5 overflow-hidden ${className}`}
     >
       <div
         className="absolute -top-12 -right-12 w-44 h-44 rounded-full pointer-events-none opacity-70"
         style={{ background: `radial-gradient(circle, rgb(var(--${tone}) / 0.12), transparent 70%)` }}
       />
       <div className="relative">
-        <div className="flex items-start gap-3 mb-4">
+        <div className="flex items-start max-sm:items-center gap-3 mb-4 max-sm:mb-3">
           <div
-            className="grid place-items-center w-10 h-10 rounded-xl flex-shrink-0"
+            className="grid place-items-center w-10 h-10 max-sm:w-8 max-sm:h-8 rounded-lg sm:rounded-xl flex-shrink-0"
             style={{ background: `rgb(var(--${tone}) / 0.12)`, boxShadow: `inset 0 0 0 1px rgb(var(--${tone}) / 0.22)` }}
           >
             <Icon className="w-4 h-4" style={{ color: `rgb(var(--${tone}-glow))` }} />
           </div>
           <div className="min-w-0">
-            <div className="mono-label" style={{ color: `rgb(var(--${tone}-glow))` }}>{eyebrow}</div>
-            <h2 className="font-display text-[22px] leading-tight mt-0.5">{title}</h2>
-            <p className="text-[12.5px] text-text-2 mt-0.5">{subtitle}</p>
+            <div className="mono-label max-sm:hidden" style={{ color: `rgb(var(--${tone}-glow))` }}>{eyebrow}</div>
+            <h2 className="font-display text-[22px] max-sm:text-[18px] leading-tight mt-0.5 max-sm:mt-0">{title}</h2>
+            <p className="text-[12.5px] max-sm:text-[12px] text-text-2 mt-0.5">{subtitle}</p>
           </div>
         </div>
         {children}
@@ -1029,7 +1029,7 @@ function PrimaryAction({ tone, loading, onClick, disabled, label, loadingLabel }
     <button
       onClick={onClick}
       disabled={loading || disabled}
-      className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-medium text-[13px] transition-all disabled:opacity-50"
+      className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 max-sm:py-2 rounded-xl font-medium text-[13px] transition-all disabled:opacity-50"
       style={{
         background: `linear-gradient(180deg, rgb(var(--${tone}) / 0.18), rgb(var(--${tone}) / 0.10))`,
         color: `rgb(var(--${tone}-glow))`,
