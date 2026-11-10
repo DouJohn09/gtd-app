@@ -508,7 +508,7 @@ export default function Calendar() {
         >
           today
         </button>
-        <h2 className="font-display text-[24px] md:text-[28px] leading-none ml-2">
+        <h2 className="font-display text-[18px] sm:text-[24px] md:text-[28px] leading-none ml-1 sm:ml-2">
           {getPeriodLabel()}
         </h2>
       </div>

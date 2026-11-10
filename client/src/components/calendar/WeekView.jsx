@@ -31,6 +31,12 @@ function splitItems(items) {
   return { timeBlocks, allDayItems };
 }
 
+// Start time in minutes for the phone agenda; null for all-day and untimed items.
+function startMinutes(item) {
+  if (item.type === 'google_event') return item.all_day ? null : timeToMinutes(googleEventToBlock(item)?.scheduled_time);
+  return timeToMinutes(item.scheduled_time);
+}
+
 function ItemCard({ item, onEditTask, onCompleteTask }) {
   if (item.type === 'habit') return <HabitChip habit={item} onToggle={onCompleteTask} />;
   return item.type === 'google_event' ? (
@@ -170,24 +176,43 @@ export default function WeekView({ days, itemsByDate, onEditTask, onCompleteTask
         </div>
       </div>
 
-      {/* Mobile: stacked day cards listing everything, timed items included */}
-      <div className="md:hidden grid grid-cols-1 gap-2">
+      {/* Mobile: one agenda card. Each day is a row: day on the left, its items
+          in time order on the right; an empty day is a single short line. */}
+      <div className="md:hidden rounded-2xl glass px-3 py-1">
         {days.map(({ date, day, dayName, isToday }) => {
-          const items = itemsByDate[date] || [];
+          const items = (itemsByDate[date] || [])
+            .map(item => ({ item, mins: startMinutes(item) }))
+            .sort((a, b) => (a.mins ?? -1) - (b.mins ?? -1));
+          const anyTimed = items.some(i => i.mins !== null);
           return (
-            <div
-              key={date}
-              className="rounded-2xl glass p-2"
-              style={{
-                boxShadow: isToday
-                  ? '0 8px 32px -12px rgba(0,0,0,0.4), inset 0 0 0 1.5px rgb(var(--violet))'
-                  : undefined,
-              }}
-            >
-              <DayHeader dayName={dayName} day={day} isToday={isToday} onClick={() => onDayClick?.(date)} />
-              <div className="space-y-0.5">
-                {items.map(item => (
-                  <ItemCard key={item.id} item={item} onEditTask={onEditTask} onCompleteTask={onCompleteTask} />
+            <div key={date} className="flex gap-3 py-2.5 border-t border-white/[0.05] first:border-t-0">
+              <button
+                onClick={() => onDayClick?.(date)}
+                className="w-9 shrink-0 text-center self-start"
+                aria-label={`Open ${dayName} ${day} in day view`}
+              >
+                <div className="mono-label text-[9px]" style={isToday ? { color: 'rgb(var(--violet-glow))' } : undefined}>{dayName}</div>
+                <div
+                  className="font-display text-[17px] leading-none mt-0.5 inline-grid place-items-center w-7 h-7 rounded-full"
+                  style={isToday ? { background: 'rgb(var(--violet))', color: '#0a0a0f', boxShadow: '0 0 14px rgba(167,139,250,0.55)' } : undefined}
+                >
+                  {day}
+                </div>
+              </button>
+              <div className="flex-1 min-w-0 self-center space-y-1">
+                {items.length === 0 ? (
+                  <div className="font-mono text-[11px] text-text-3">Nothing planned</div>
+                ) : items.map(({ item, mins }) => (
+                  <div key={item.id} className="flex items-center gap-2">
+                    {anyTimed && (
+                      <span className="font-mono text-[10px] text-text-3 w-10 shrink-0 text-right tabular-nums">
+                        {mins === null ? '' : formatTimeLabel(mins)}
+                      </span>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <ItemCard item={item} onEditTask={onEditTask} onCompleteTask={onCompleteTask} />
+                    </div>
+                  </div>
                 ))}
               </div>
             </div>
